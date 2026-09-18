@@ -1,17 +1,52 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
-import { getPropertyDetail, getDevelopment } from '@/lib/property-details';
+import { getPropertyDetail, getDevelopment, type PropertyDetail } from '@/lib/property-details';
+import { getCreatedPropertyById } from '@/lib/use-created-properties';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 
 const BED_PATH = 'M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6 M3 18h18 M5 10V7a2 2 0 0 1 2-2h3v5';
 
 export default function ImovelPage({ params }: { params: { id: string } }) {
-  const property = getPropertyDetail(params.id);
-  if (!property) notFound();
+  // O catálogo de exemplo é estático (funciona em qualquer navegador); os
+  // imóveis cadastrados pelo painel só existem no localStorage do navegador
+  // de quem cadastrou — por isso o segundo é buscado à parte, depois de
+  // montar, em vez de os dois virem prontos direto do servidor.
+  const staticProperty = getPropertyDetail(params.id);
+  const [createdProperty, setCreatedProperty] = useState<PropertyDetail | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!staticProperty) setCreatedProperty(getCreatedPropertyById(params.id));
+  }, [params.id, staticProperty]);
+
+  const property = staticProperty ?? createdProperty;
+
+  if (!staticProperty && createdProperty === undefined) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+      </div>
+    );
+  }
+
+  if (!property) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-3 px-5 py-16 text-center">
+          <h1 className="font-serif text-xl font-semibold">Imóvel não encontrado</h1>
+          <Link href="/" className="text-sm font-semibold text-accent hover:underline">
+            ← Voltar para a Home
+          </Link>
+        </main>
+      </div>
+    );
+  }
 
   const development = property.empreendimentoId ? getDevelopment(property.empreendimentoId) : null;
   const siblings = development ? development.units.filter((u) => u.id !== property.id) : [];

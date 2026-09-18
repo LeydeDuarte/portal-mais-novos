@@ -4,6 +4,9 @@ export type PropertyDetail = Property & {
   description: string;
   amenities: string[];
   empreendimentoId?: string;
+  // Preenchido só nos imóveis cadastrados pelo painel do corretor — quem
+  // cadastrou. Nos imóveis do catálogo de exemplo, fica indefinido.
+  corretorEmail?: string;
 };
 
 export type Development = {

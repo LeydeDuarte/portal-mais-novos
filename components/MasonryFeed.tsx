@@ -6,6 +6,7 @@ import type { Property } from '@/lib/mock-properties';
 import { matchesFilters, type FilterState } from '@/lib/filters';
 import { useFavorites } from '@/lib/use-favorites';
 import { useSession } from '@/lib/use-session';
+import { useCreatedProperties } from '@/lib/use-created-properties';
 import PropertyCard from './PropertyCard';
 import LoginModal from './LoginModal';
 
@@ -22,6 +23,7 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const { favorites, toggleFavorite } = useFavorites();
+  const { items: createdItems } = useCreatedProperties();
   const { session, signIn } = useSession();
 
   const loadNextPage = useCallback(() => {
@@ -62,9 +64,9 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
   // carregou — busca mais páginas automaticamente em vez de mostrar "nenhum
   // resultado" cedo demais.
   useEffect(() => {
-    const visibleCount = items.filter((p) => matchesFilters(p, filters)).length;
+    const visibleCount = [...createdItems, ...items].filter((p) => matchesFilters(p, filters)).length;
     if (visibleCount < 6 && !loading && !done) loadNextPage();
-  }, [items, filters, loading, done, loadNextPage]);
+  }, [items, createdItems, filters, loading, done, loadNextPage]);
 
   const handleFavoriteClick = (id: string) => {
     if (!session.loggedIn) {
@@ -97,7 +99,7 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
     }
   };
 
-  const filteredItems = items.filter((p) => matchesFilters(p, filters));
+  const filteredItems = [...createdItems, ...items].filter((p) => matchesFilters(p, filters));
 
   return (
     <>

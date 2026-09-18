@@ -46,7 +46,7 @@ export default function Header() {
             <circle cx="12" cy="7" r="4" />
           </svg>
         </button>
-        <a href="#" className="hidden whitespace-nowrap rounded-full bg-ink px-4.5 py-2.5 text-[13px] font-bold text-white hover:opacity-90 md:inline-block">
+        <a href="/painel/imoveis/novo" className="hidden whitespace-nowrap rounded-full bg-ink px-4.5 py-2.5 text-[13px] font-bold text-white hover:opacity-90 md:inline-block">
           Anunciar imóvel
         </a>
       </div>
