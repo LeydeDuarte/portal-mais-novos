@@ -16,6 +16,7 @@ type Props = {
 };
 
 const BED_PATH = 'M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6 M3 18h18 M5 10V7a2 2 0 0 1 2-2h3v5';
+const BATH_PATH = 'M4 12h16 M6 12V6a2 2 0 0 1 2-2h1 M6 20v-2 M18 20v-2';
 const CAR_ICON = (
   <>
     <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -145,6 +146,7 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
           <div className="mt-0.5 flex flex-wrap items-center gap-2.5">
             <Spec icon={<path d={BED_PATH} />}>{property.beds}</Spec>
             <Spec icon={CAR_ICON}>{property.parking}</Spec>
+            {property.banheiros && <Spec icon={<path d={BATH_PATH} />}>{property.banheiros}</Spec>}
             <Spec icon={AREA_ICON}>{property.area}</Spec>
           </div>
         </div>

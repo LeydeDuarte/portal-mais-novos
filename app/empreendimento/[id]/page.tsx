@@ -1,16 +1,56 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { getDevelopment, getAveragePricePerM2, formatPricePerM2 } from '@/lib/property-details';
+import { getDevelopment, getAveragePricePerM2, formatPricePerM2, type Development, type PropertyDetail } from '@/lib/property-details';
+import { getCreatedDevelopmentById } from '@/lib/use-created-developments';
+import { useCreatedProperties } from '@/lib/use-created-properties';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 
 export default function EmpreendimentoPage({ params }: { params: { id: string } }) {
-  const development = getDevelopment(params.id);
-  if (!development) notFound();
+  const staticDevelopment = getDevelopment(params.id);
+  const [createdDevelopment, setCreatedDevelopment] = useState<Development | null | undefined>(undefined);
+  const { items: createdProperties } = useCreatedProperties();
+
+  useEffect(() => {
+    if (!staticDevelopment) setCreatedDevelopment(getCreatedDevelopmentById(params.id));
+  }, [params.id, staticDevelopment]);
+
+  const development = staticDevelopment ?? createdDevelopment;
+
+  if (!staticDevelopment && createdDevelopment === undefined) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+      </div>
+    );
+  }
+
+  if (!development) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-3 px-5 py-16 text-center">
+          <h1 className="font-serif text-xl font-semibold">Empreendimento não encontrado</h1>
+          <Link href="/" className="text-sm font-semibold text-accent hover:underline">
+            ← Voltar para a Home
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
+  // Une as tipologias já cadastradas junto do condomínio com qualquer imóvel
+  // avulso que tenha sido vinculado a ele depois — é assim que os anúncios de
+  // um mesmo condomínio se juntam numa página só, mesmo cadastrados em momentos diferentes.
+  const linkedUnits = createdProperties.filter((p) => p.empreendimentoId === development.id);
+  const allUnits: PropertyDetail[] = [...development.units, ...linkedUnits];
+
   const badge = getStatusBadge(development.deliveryDate);
-  const avgPricePerM2 = getAveragePricePerM2(development.units);
+  const avgPricePerM2 = getAveragePricePerM2(allUnits);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -83,24 +123,32 @@ export default function EmpreendimentoPage({ params }: { params: { id: string } 
         </div>
 
         <div className="mt-8">
-          <h2 className="mb-4 text-lg font-bold">Tipologias disponíveis</h2>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-            {[...development.units]
-              .sort((a, b) => parseFloat(a.area) - parseFloat(b.area))
-              .map((unit) => (
-              <Link
-                key={unit.id}
-                href={`/imovel/${unit.id}`}
-                className="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-4 hover:bg-[var(--pill-bg)]"
-              >
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[unit.tipoUnidade]}</div>
-                <div className="font-serif text-lg font-semibold">{unit.price}</div>
-                <div className="text-xs text-[var(--text-muted)]">{unit.beds} · {unit.parking} · {unit.area}</div>
-                <div className="text-xs text-[var(--text-faint)]">{formatPricePerM2(getAveragePricePerM2([unit]))}</div>
-                <span className="mt-1 text-xs font-semibold text-accent">Ver unidade →</span>
-              </Link>
-            ))}
-          </div>
+          <h2 className="mb-4 text-lg font-bold">
+            {allUnits.length > 0 ? 'Anúncios neste condomínio' : 'Ainda sem anúncios vinculados'}
+          </h2>
+          {allUnits.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">
+              Cadastre um imóvel avulso e vincule a este condomínio para ele aparecer aqui.
+            </p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+              {[...allUnits]
+                .sort((a, b) => parseFloat(a.area) - parseFloat(b.area))
+                .map((unit) => (
+                <Link
+                  key={unit.id}
+                  href={`/imovel/${unit.id}`}
+                  className="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-4 hover:bg-[var(--pill-bg)]"
+                >
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[unit.tipoUnidade]}</div>
+                  <div className="font-serif text-lg font-semibold">{unit.price}</div>
+                  <div className="text-xs text-[var(--text-muted)]">{unit.beds} · {unit.parking} · {unit.area}</div>
+                  <div className="text-xs text-[var(--text-faint)]">{formatPricePerM2(getAveragePricePerM2([unit]))}</div>
+                  <span className="mt-1 text-xs font-semibold text-accent">Ver unidade →</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </main>
 

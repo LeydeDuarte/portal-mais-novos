@@ -24,7 +24,9 @@ export type Development = {
   // vez para o empreendimento inteiro (vale para todas as unidades nele).
   aceitaTemporada: boolean;
   heroHeight: number;
-  units: PropertyDetail[]; // cada unit = uma tipologia (metragem/quartos/valor próprios)
+  videoUrl?: string;
+  corretorEmail?: string; // preenchido só nos condomínios cadastrados pelo painel
+  units: PropertyDetail[]; // cada unit = uma tipologia (metragem/quartos/valor próprios) — inclui as vinculadas depois via imóvel avulso
 };
 
 // Preço médio do m² do empreendimento — nunca cadastrado, sempre calculado a

@@ -41,8 +41,8 @@ export default function PainelPage() {
             href="/painel/imoveis/novo"
             className="flex flex-col gap-1 rounded-xl border border-[var(--border)] p-5 hover:bg-[var(--pill-bg)]"
           >
-            <span className="font-serif text-lg font-semibold">Cadastrar imóvel</span>
-            <span className="text-sm text-[var(--text-muted)]">Preenche o formulário e o imóvel já aparece no Comprar.</span>
+            <span className="font-serif text-lg font-semibold">Cadastrar imóvel ou condomínio</span>
+            <span className="text-sm text-[var(--text-muted)]">Imóvel avulso, ou um empreendimento com várias unidades vinculadas.</span>
           </Link>
 
           <Link

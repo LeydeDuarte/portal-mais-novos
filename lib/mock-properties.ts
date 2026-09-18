@@ -12,6 +12,10 @@ export type Property = {
   location: string;
   beds: string;
   parking: string;
+  // Opcionais — só os imóveis cadastrados pelo painel novo preenchem;
+  // o catálogo de exemplo mais antigo fica sem, e a exibição já trata isso.
+  banheiros?: string;
+  videoUrl?: string; // link do YouTube/Instagram, quando "Tem vídeo de capa" está marcado
   area: string;
   height: number;
   video: boolean;

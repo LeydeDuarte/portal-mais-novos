@@ -70,6 +70,16 @@ export default function ImovelPage({ params }: { params: { id: string } }) {
               style={{ height: 360 }}
             >
               <span className="text-sm text-[var(--text-faint)]">{property.video ? '[CAPA EM VÍDEO]' : '[FOTO]'}</span>
+              {property.videoUrl && (
+                <a
+                  href={property.videoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="absolute bottom-3 right-3 rounded-md bg-ink/70 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink"
+                >
+                  Assistir vídeo ↗
+                </a>
+              )}
               <div className="absolute left-3 top-3 flex items-center gap-2">
                 <span
                   className="rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wide"
@@ -170,6 +180,14 @@ export default function ImovelPage({ params }: { params: { id: string } }) {
                   </svg>
                   {property.area}
                 </span>
+                {property.banheiros && (
+                  <span className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 12h16 M6 12V6a2 2 0 0 1 2-2h1 M6 20v-2 M18 20v-2" />
+                    </svg>
+                    {property.banheiros}
+                  </span>
+                )}
               </div>
 
               <div className="mt-5">
