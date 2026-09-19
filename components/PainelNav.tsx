@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/painel', label: 'Painel' },
   { href: '/painel/imoveis/novo', label: 'Cadastrar' },
   { href: '/painel/cadastro-ia', label: 'Cadastro IA' },
+  { href: '/painel/monitoramento', label: 'Monitoramento' },
   { href: '/painel/imoveis', label: 'Meus imóveis' }
 ];
 

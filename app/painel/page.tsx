@@ -63,6 +63,14 @@ export default function PainelPage() {
             <span className="text-sm text-[var(--text-muted)]">Cole o texto do anúncio e revise o rascunho antes de publicar.</span>
           </Link>
 
+          <Link
+            href="/painel/monitoramento"
+            className="flex flex-col gap-1 rounded-xl border border-[var(--border)] p-5 hover:bg-[var(--pill-bg)]"
+          >
+            <span className="font-serif text-lg font-semibold">Monitoramento de mercado</span>
+            <span className="text-sm text-[var(--text-muted)]">Imóveis anunciados na cidade que ainda não estão na nossa base.</span>
+          </Link>
+
           {staff.role === 'admin' && (
             <div className="flex flex-col gap-1 rounded-xl border border-dashed border-[var(--border)] p-5 opacity-60">
               <span className="font-serif text-lg font-semibold">Gerenciar corretores</span>
