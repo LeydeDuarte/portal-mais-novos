@@ -3,11 +3,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
+import PainelNav from '@/components/PainelNav';
 import ChipSelect from '@/components/ChipSelect';
 import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
+import PhotoUploadField from '@/components/PhotoUploadField';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { useCreatedProperties } from '@/lib/use-created-properties';
 import { extractFieldsFromText } from '@/lib/ai-extraction';
+import { generateTitle } from '@/lib/title-generator';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { maskCurrencyInput, appendSuffix } from '@/lib/currency';
 import type { PropertyDetail } from '@/lib/property-details';
@@ -30,6 +33,7 @@ export default function CadastroIAPage() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [form, setForm] = useState({
+    titulo: '',
     tipoUnidade: 'apartamento' as TipoUnidade,
     finalidade: 'venda' as 'venda' | 'aluguel',
     deliveryDate: '',
@@ -42,7 +46,8 @@ export default function CadastroIAPage() {
     area: '',
     aceitaTemporada: false,
     description: '',
-    amenities: [] as string[]
+    amenities: [] as string[],
+    photoNames: [] as string[]
   });
 
   if (!loaded || !staff) return null;
@@ -61,8 +66,12 @@ export default function CadastroIAPage() {
     // falsa impressão de que isso já é uma IA generativa de verdade.
     setTimeout(() => {
       const extracted = extractFieldsFromText(rawText);
+      const tipoUnidade = extracted.tipoUnidade ?? form.tipoUnidade;
+      const finalidade = extracted.finalidade ?? form.finalidade;
+      const location = extracted.location ?? form.location;
       setForm((prev) => ({
         ...prev,
+        titulo: generateTitle({ tipoUnidade, finalidade, location, quartos: extracted.quartos }),
         tipoUnidade: extracted.tipoUnidade ?? prev.tipoUnidade,
         finalidade: extracted.finalidade ?? prev.finalidade,
         priceDigits: extracted.price ?? prev.priceDigits,
@@ -89,6 +98,7 @@ export default function CadastroIAPage() {
 
     const property: PropertyDetail = {
       id,
+      titulo: form.titulo || undefined,
       tipoUnidade: form.tipoUnidade,
       finalidade: form.finalidade,
       deliveryDate: form.deliveryDate || new Date().toISOString().slice(0, 7),
@@ -115,6 +125,7 @@ export default function CadastroIAPage() {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
+      <PainelNav />
         <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-4 px-5 py-16 text-center">
           <h1 className="font-serif text-2xl font-semibold">Imóvel publicado!</h1>
           <p className="text-sm text-[var(--text-muted)]">Cadastrado a partir do texto, com sua revisão antes de publicar.</p>
@@ -142,6 +153,7 @@ export default function CadastroIAPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
+      <PainelNav />
       <main className="mx-auto w-full max-w-xl px-5 py-8 md:px-8">
         <h1 className="font-serif text-2xl font-semibold">Cadastro assistido por IA</h1>
         <p className="mt-1 mb-6 text-sm text-[var(--text-muted)]">
@@ -173,6 +185,11 @@ export default function CadastroIAPage() {
           <form onSubmit={handlePublish} className="flex flex-col gap-3">
             <div className="rounded-lg bg-[var(--pill-bg)] p-3 text-xs text-[var(--text-muted)]">
               Rascunho pré-preenchido — confira e ajuste antes de publicar. Campos que o reconhecimento não achou ficaram em branco.
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Título do anúncio (gerado automaticamente — pode editar)</label>
+              <input className={inputClass} value={form.titulo} onChange={(e) => update('titulo', e.target.value)} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -232,6 +249,12 @@ export default function CadastroIAPage() {
               <label className="text-xs font-semibold text-[var(--text-muted)]">Comodidades</label>
               <AmenitiesCheckboxes selected={form.amenities} onChange={(v) => update('amenities', v)} />
             </div>
+
+            <PhotoUploadField
+              label="Fotos (a IA vai poder extrair do PDF nesta etapa, quando conectada)"
+              fileNames={form.photoNames}
+              onChange={(v) => update('photoNames', v)}
+            />
 
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.aceitaTemporada} onChange={(e) => update('aceitaTemporada', e.target.checked)} />

@@ -3,8 +3,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
+import PainelNav from '@/components/PainelNav';
 import ChipSelect from '@/components/ChipSelect';
 import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
+import PhotoUploadField from '@/components/PhotoUploadField';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { useCreatedProperties } from '@/lib/use-created-properties';
 import { useCreatedDevelopments } from '@/lib/use-created-developments';
@@ -32,6 +34,7 @@ export default function NovoImovelPage() {
 
   // ---------- Formulário: imóvel avulso ----------
   const [imovel, setImovel] = useState({
+    titulo: '',
     tipoUnidade: 'apartamento' as TipoUnidade,
     finalidade: 'venda' as 'venda' | 'aluguel',
     deliveryDate: '',
@@ -41,13 +44,15 @@ export default function NovoImovelPage() {
     quartos: '',
     vagas: '',
     banheiros: '',
+    escaninhos: '',
     area: '',
     aceitaTemporada: false,
     video: false,
     videoUrl: '',
     description: '',
     amenities: [] as string[],
-    empreendimentoId: ''
+    empreendimentoId: '',
+    photoNames: [] as string[]
   });
 
   // ---------- Formulário: empreendimento/condomínio ----------
@@ -62,8 +67,24 @@ export default function NovoImovelPage() {
     amenities: [] as string[],
     aceitaTemporada: false,
     video: false,
-    videoUrl: ''
+    videoUrl: '',
+    photoNames: [] as string[]
   });
+
+  type Tipologia = { id: string; tipoUnidade: TipoUnidade; quartos: string; vagas: string; area: string; priceDigits: string };
+  const [tipologias, setTipologias] = useState<Tipologia[]>([
+    { id: 'tip-1', tipoUnidade: 'apartamento', quartos: '', vagas: '', area: '', priceDigits: '' }
+  ]);
+
+  const addTipologia = () => {
+    setTipologias((prev) => [...prev, { id: `tip-${Date.now()}`, tipoUnidade: 'apartamento', quartos: '', vagas: '', area: '', priceDigits: '' }]);
+  };
+  const removeTipologia = (id: string) => {
+    setTipologias((prev) => (prev.length > 1 ? prev.filter((t) => t.id !== id) : prev));
+  };
+  const updateTipologia = <K extends keyof Tipologia>(id: string, key: K, value: Tipologia[K]) => {
+    setTipologias((prev) => prev.map((t) => (t.id === id ? { ...t, [key]: value } : t)));
+  };
 
   if (!loaded || !staff) return null;
 
@@ -83,6 +104,7 @@ export default function NovoImovelPage() {
 
     const property: PropertyDetail = {
       id,
+      titulo: imovel.titulo || undefined,
       tipoUnidade: imovel.tipoUnidade,
       finalidade: imovel.finalidade,
       deliveryDate: imovel.deliveryDate || new Date().toISOString().slice(0, 7),
@@ -91,6 +113,7 @@ export default function NovoImovelPage() {
       beds: `${imovel.quartos} qts`,
       parking: `${imovel.vagas} vg`,
       banheiros: imovel.banheiros ? `${imovel.banheiros} banheiros` : undefined,
+      escaninhos: imovel.escaninhos && imovel.escaninhos !== '0' ? `${imovel.escaninhos} escaninho(s)` : undefined,
       videoUrl: imovel.video ? imovel.videoUrl : undefined,
       area: `${imovel.area} m²`,
       height: 240 + Math.floor(Math.random() * 100),
@@ -134,6 +157,35 @@ export default function NovoImovelPage() {
     };
 
     addDevelopment(development);
+
+    // Cada tipologia informada vira um imóvel avulso já vinculado a este
+    // condomínio — é assim que elas aparecem tanto na página do
+    // empreendimento quanto no feed geral do Comprar (mesmo mecanismo do
+    // vínculo manual imóvel → condomínio).
+    tipologias.forEach((t, i) => {
+      if (!t.quartos && !t.area && !t.priceDigits) return; // linha em branco, ignora
+      addProperty({
+        id: `${id}-tip-${i}`,
+        titulo: undefined,
+        tipoUnidade: t.tipoUnidade,
+        finalidade: 'venda',
+        deliveryDate,
+        price: maskCurrencyInput(t.priceDigits),
+        location: dev.location,
+        beds: `${t.quartos || '?'} qts`,
+        parking: `${t.vagas || '?'} vg`,
+        area: `${t.area || '?'} m²`,
+        height: 240 + Math.floor(Math.random() * 100),
+        video: false,
+        aceitaTemporada: dev.aceitaTemporada,
+        matchScore: 50,
+        description: `Tipologia do condomínio ${dev.name}, em ${dev.location}.`,
+        amenities: dev.amenities,
+        empreendimentoId: id,
+        corretorEmail: staff!.email
+      });
+    });
+
     setSuccess(id);
   };
 
@@ -142,6 +194,7 @@ export default function NovoImovelPage() {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
+      <PainelNav />
         <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-4 px-5 py-16 text-center">
           <h1 className="font-serif text-2xl font-semibold">{isDev ? 'Condomínio cadastrado!' : 'Imóvel cadastrado!'}</h1>
           <p className="text-sm text-[var(--text-muted)]">
@@ -172,6 +225,7 @@ export default function NovoImovelPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
+      <PainelNav />
       <main className="mx-auto w-full max-w-xl px-5 py-8 md:px-8">
         <h1 className="font-serif text-2xl font-semibold">Cadastrar</h1>
         <p className="mt-1 mb-5 text-sm text-[var(--text-muted)]">Cadastro manual — publica direto (sem revisão por IA neste protótipo).</p>
@@ -195,6 +249,16 @@ export default function NovoImovelPage() {
 
         {modo === 'imovel' ? (
           <form onSubmit={handleSubmitImovel} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Título do anúncio (opcional — se deixar em branco, gera um genérico)</label>
+              <input
+                className={inputClass}
+                value={imovel.titulo}
+                onChange={(e) => updateImovel('titulo', e.target.value)}
+                placeholder="Ex: Apartamento à venda no Setor Bueno, 3 quartos"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-[var(--text-muted)]">Tipo de imóvel</label>
@@ -268,6 +332,7 @@ export default function NovoImovelPage() {
             <ChipSelect label="Quartos" options={QUARTO_OPCOES} value={imovel.quartos} onChange={(v) => updateImovel('quartos', v)} />
             <ChipSelect label="Vagas de garagem" options={VAGA_OPCOES} value={imovel.vagas} onChange={(v) => updateImovel('vagas', v)} />
             <ChipSelect label="Banheiros" options={BANHEIRO_OPCOES} value={imovel.banheiros} onChange={(v) => updateImovel('banheiros', v)} />
+            <ChipSelect label="Escaninhos" options={['0', '1', '2', '3+']} value={imovel.escaninhos} onChange={(v) => updateImovel('escaninhos', v)} />
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-[var(--text-muted)]">Área (m²)</label>
@@ -283,6 +348,8 @@ export default function NovoImovelPage() {
               <label className="text-xs font-semibold text-[var(--text-muted)]">Comodidades</label>
               <AmenitiesCheckboxes selected={imovel.amenities} onChange={(v) => updateImovel('amenities', v)} />
             </div>
+
+            <PhotoUploadField fileNames={imovel.photoNames} onChange={(v) => updateImovel('photoNames', v)} />
 
             <div className="flex flex-col gap-2 pt-1">
               <label className="flex items-center gap-2 text-sm">
@@ -360,6 +427,73 @@ export default function NovoImovelPage() {
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-[var(--text-muted)]">Área de lazer</label>
               <AmenitiesCheckboxes selected={dev.amenities} onChange={(v) => updateDev('amenities', v)} />
+            </div>
+
+            <PhotoUploadField
+              label="Fotos do empreendimento (fachada, área comum)"
+              fileNames={dev.photoNames}
+              onChange={(v) => updateDev('photoNames', v)}
+            />
+
+            <div className="flex flex-col gap-3 rounded-xl border border-[var(--border)] p-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold">Tipologias do empreendimento</label>
+                <button type="button" onClick={addTipologia} className="rounded-full bg-[var(--pill-bg)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--pill-bg-hover)]">
+                  + Adicionar tipologia
+                </button>
+              </div>
+              <span className="text-xs text-[var(--text-faint)]">
+                Um condomínio costuma ter mais de uma metragem (2 quartos, 3 quartos, cobertura...). Cadastre quantas tipologias existirem — cada uma vira um
+                anúncio vinculado a este condomínio, já entra no feed do Comprar e nos filtros de quartos/preço.
+              </span>
+
+              {tipologias.map((t, i) => (
+                <div key={t.id} className="flex flex-col gap-2 rounded-lg bg-[var(--pill-bg)] p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-faint)]">Tipologia {i + 1}</span>
+                    {tipologias.length > 1 && (
+                      <button type="button" onClick={() => removeTipologia(t.id)} className="text-xs font-semibold text-red-600 hover:underline">
+                        Remover
+                      </button>
+                    )}
+                  </div>
+
+                  <select
+                    className={inputClass}
+                    value={t.tipoUnidade}
+                    onChange={(e) => updateTipologia(t.id, 'tipoUnidade', e.target.value as TipoUnidade)}
+                  >
+                    {TIPO_UNIDADE_GRUPOS.map((grupo) => (
+                      <optgroup key={grupo.label} label={grupo.label}>
+                        {grupo.tipos.map((tipo) => (
+                          <option key={tipo} value={tipo}>
+                            {TIPO_UNIDADE_LABEL[tipo]}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+
+                  <ChipSelect label="Quartos" options={QUARTO_OPCOES} value={t.quartos} onChange={(v) => updateTipologia(t.id, 'quartos', v)} />
+                  <ChipSelect label="Vagas" options={VAGA_OPCOES} value={t.vagas} onChange={(v) => updateTipologia(t.id, 'vagas', v)} />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      className={inputClass}
+                      placeholder="Área (m²)"
+                      value={t.area}
+                      onChange={(e) => updateTipologia(t.id, 'area', e.target.value)}
+                    />
+                    <input
+                      className={inputClass}
+                      placeholder="Preço"
+                      value={maskCurrencyInput(t.priceDigits)}
+                      onChange={(e) => updateTipologia(t.id, 'priceDigits', e.target.value)}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div className="flex flex-col gap-2 pt-1">

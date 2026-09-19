@@ -16,7 +16,8 @@ function firstDigits(text: string): string {
 export function buildPropertyMetadata(property: PropertyDetail): Metadata {
   const badge = getStatusBadge(property.deliveryDate);
   const tipo = TIPO_UNIDADE_LABEL[property.tipoUnidade];
-  const title = `${tipo} em ${property.location} — ${badge.label} | ${SITE_NAME}`;
+  const baseTitle = property.titulo || `${tipo} em ${property.location}`;
+  const title = `${baseTitle} — ${badge.label} | ${SITE_NAME}`;
   const description = property.description.slice(0, 155);
   const url = `${SITE_URL}/imovel/${property.id}`;
 
@@ -48,7 +49,7 @@ export function buildPropertyJsonLd(property: PropertyDetail) {
     // (Apartment/SingleFamilyResidence/Place, conforme o tipo do imóvel)
     // descreve o imóvel em si — o JSON-LD aceita @type como lista.
     '@type': ['RealEstateListing', TIPO_UNIDADE_SCHEMA_ORG[property.tipoUnidade]],
-    name: `${TIPO_UNIDADE_LABEL[property.tipoUnidade]} em ${property.location}`,
+    name: property.titulo || `${TIPO_UNIDADE_LABEL[property.tipoUnidade]} em ${property.location}`,
     description: property.description,
     url,
     address: {

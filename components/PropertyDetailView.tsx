@@ -30,7 +30,7 @@ export default function PropertyDetailView({ property }: { property: PropertyDet
         </Link>
 
         <h1 className="mb-5 font-serif text-2xl font-semibold">
-          {TIPO_UNIDADE_LABEL[property.tipoUnidade]} em {property.location}
+          {property.titulo || `${TIPO_UNIDADE_LABEL[property.tipoUnidade]} em ${property.location}`}
         </h1>
 
         <div className="grid gap-8 md:grid-cols-[1.3fr_1fr]">

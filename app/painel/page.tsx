@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Header from '@/components/Header';
+import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { useCreatedProperties } from '@/lib/use-created-properties';
 
@@ -23,6 +24,7 @@ export default function PainelPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
+      <PainelNav />
       <main className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8">
         <div className="flex items-center justify-between">
           <div>

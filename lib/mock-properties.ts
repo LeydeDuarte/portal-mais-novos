@@ -15,6 +15,8 @@ export type Property = {
   // Opcionais — só os imóveis cadastrados pelo painel novo preenchem;
   // o catálogo de exemplo mais antigo fica sem, e a exibição já trata isso.
   banheiros?: string;
+  escaninhos?: string; // depósito/escaninho privativo, comum em prédios
+  titulo?: string; // título do anúncio — se não tiver, gera um genérico na exibição
   videoUrl?: string; // link do YouTube/Instagram, quando "Tem vídeo de capa" está marcado
   area: string;
   height: number;
