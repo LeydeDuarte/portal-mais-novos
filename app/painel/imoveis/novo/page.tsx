@@ -294,13 +294,19 @@ export default function NovoImovelPage() {
                 Tem vídeo de capa
               </label>
               {imovel.video && (
-                <input
-                  type="url"
-                  className={inputClass}
-                  placeholder="Link do YouTube ou Instagram"
-                  value={imovel.videoUrl}
-                  onChange={(e) => updateImovel('videoUrl', e.target.value)}
-                />
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="url"
+                    className={inputClass}
+                    placeholder="Link do YouTube ou Instagram"
+                    value={imovel.videoUrl}
+                    onChange={(e) => updateImovel('videoUrl', e.target.value)}
+                  />
+                  <span className="text-xs text-[var(--text-faint)]">
+                    YouTube: cole o link da barra de endereço ao assistir o vídeo (ex: youtube.com/watch?v=... ou youtu.be/...).
+                    Instagram: abra o Reel/post, toque em "..." → Copiar link (ex: instagram.com/reel/...). Precisa ser um post público.
+                  </span>
+                </div>
               )}
             </div>
 
@@ -366,13 +372,19 @@ export default function NovoImovelPage() {
                 Tem vídeo institucional
               </label>
               {dev.video && (
-                <input
-                  type="url"
-                  className={inputClass}
-                  placeholder="Link do YouTube ou Instagram"
-                  value={dev.videoUrl}
-                  onChange={(e) => updateDev('videoUrl', e.target.value)}
-                />
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="url"
+                    className={inputClass}
+                    placeholder="Link do YouTube ou Instagram"
+                    value={dev.videoUrl}
+                    onChange={(e) => updateDev('videoUrl', e.target.value)}
+                  />
+                  <span className="text-xs text-[var(--text-faint)]">
+                    YouTube: cole o link da barra de endereço ao assistir o vídeo (ex: youtube.com/watch?v=... ou youtu.be/...).
+                    Instagram: abra o Reel/post, toque em "..." → Copiar link (ex: instagram.com/reel/...). Precisa ser um post público.
+                  </span>
+                </div>
               )}
             </div>
 

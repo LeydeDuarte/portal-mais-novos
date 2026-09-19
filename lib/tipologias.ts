@@ -59,3 +59,28 @@ export const TIPO_UNIDADE_GRUPOS: { label: string; tipos: TipoUnidade[] }[] = [
   { label: 'Casa', tipos: ['casa', 'casa_condominio', 'sobrado', 'chacara_sitio_fazenda', 'terreno_lote'] },
   { label: 'Comercial', tipos: ['sala_comercial', 'loja_ponto_comercial', 'galpao', 'predio_comercial'] }
 ];
+
+// Tipo mais específico do vocabulário schema.org pra cada tipo de unidade —
+// usado junto do "RealEstateListing" no dado estruturado (Schema Markup) de
+// cada imóvel, pra descrever o imóvel em si, não só o anúncio dele.
+export const TIPO_UNIDADE_SCHEMA_ORG: Record<TipoUnidade, string> = {
+  studio: 'Apartment',
+  flat: 'Apartment',
+  loft: 'Apartment',
+  apartamento: 'Apartment',
+  apartamento_garden: 'Apartment',
+  apartamento_duplex: 'Apartment',
+  apartamento_triplex: 'Apartment',
+  cobertura: 'Apartment',
+  cobertura_duplex: 'Apartment',
+  penthouse: 'Apartment',
+  casa: 'SingleFamilyResidence',
+  casa_condominio: 'SingleFamilyResidence',
+  sobrado: 'SingleFamilyResidence',
+  chacara_sitio_fazenda: 'SingleFamilyResidence',
+  terreno_lote: 'Place', // schema.org não tem um tipo específico pra terreno/lote vazio
+  sala_comercial: 'Place', // idem para comercial — sem tipo residencial específico que se aplique
+  loja_ponto_comercial: 'Place',
+  galpao: 'Place',
+  predio_comercial: 'Place'
+};

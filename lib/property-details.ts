@@ -250,6 +250,10 @@ export const DEVELOPMENTS: Development[] = [
 const ALL_UNITS: PropertyDetail[] = DEVELOPMENTS.flatMap((d) => d.units);
 const ALL_LISTINGS: (Property | PropertyDetail)[] = [...BASE_PROPERTIES, ...ALL_UNITS];
 
+// Exportado pra gerar as páginas estáticas no build e o sitemap.xml — a lista
+// "canônica" do catálogo de exemplo, sem os ids variantes do scroll infinito.
+export const BASE_PROPERTIES_FOR_SITEMAP = ALL_LISTINGS;
+
 // Simula um catálogo grande ciclando o dataset de exemplo com pequenas variações —
 // substituir por paginação por cursor real da API (ver documento de arquitetura).
 export function buildFeedPage(pageIndex: number): Property[] {

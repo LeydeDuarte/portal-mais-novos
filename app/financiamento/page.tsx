@@ -1,8 +1,15 @@
+import type { Metadata } from 'next';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
 // Página própria, ainda vazia — o financiamento vai ganhar seu próprio fluxo
 // (simulação, análise de crédito) mais adiante, separado do feed de imóveis.
+// noindex enquanto estiver vazia — não faz sentido o Google indexar uma
+// página sem conteúdo; tirar o noindex quando o conteúdo de verdade entrar.
+export const metadata: Metadata = {
+  title: 'Financiamento imobiliário',
+  robots: { index: false, follow: true }
+};
 export default function FinanciamentoPage() {
   return (
     <div className="flex min-h-screen flex-col">

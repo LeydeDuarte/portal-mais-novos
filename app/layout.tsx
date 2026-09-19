@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Playfair_Display, Inter } from 'next/font/google';
 import './globals.css';
+import { SITE_URL, SITE_NAME } from '@/lib/seo';
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
@@ -15,8 +16,21 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Mais Novos Imóveis — Home',
-  description: 'Estruturação de Ativos Imobiliários — imóveis em Goiânia e para brasileiros no exterior.'
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} — Estruturação de Ativos Imobiliários`,
+    template: `%s | ${SITE_NAME}`
+  },
+  description: 'Estruturação de Ativos Imobiliários — compra, venda, financiamento e Home Equity em Goiânia e para brasileiros no exterior.',
+  openGraph: {
+    siteName: SITE_NAME,
+    type: 'website',
+    locale: 'pt_BR'
+  },
+  robots: {
+    index: true,
+    follow: true
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

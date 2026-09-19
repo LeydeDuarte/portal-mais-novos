@@ -1,8 +1,15 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { DEVELOPMENTS } from '@/lib/property-details';
 import { getStatusBadge, isFutureDelivery } from '@/lib/classification';
+
+export const metadata: Metadata = {
+  title: 'Lançamentos e empreendimentos em Goiânia',
+  description: 'Empreendimentos e condomínios em lançamento e em construção em Goiânia — unidades na planta com preço e metragem por tipologia.',
+  alternates: { canonical: '/lancamentos' }
+};
 
 export default function LancamentosPage() {
   // Só entram aqui empreendimentos cuja data de entrega ainda não passou —

@@ -1,8 +1,13 @@
+import type { Metadata } from 'next';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
 // Página própria, ainda vazia — vai virar o blog/editorial (o "News" definido
 // na conversa sobre a estrutura de páginas), separado do feed de imóveis.
+export const metadata: Metadata = {
+  title: 'News',
+  robots: { index: false, follow: true }
+};
 export default function NewsPage() {
   return (
     <div className="flex min-h-screen flex-col">
