@@ -53,16 +53,18 @@ export default function PainelPage() {
             <span className="text-sm text-[var(--text-muted)]">{myProperties.length} cadastrado(s) por você.</span>
           </Link>
 
+          <Link
+            href="/painel/cadastro-ia"
+            className="flex flex-col gap-1 rounded-xl border border-[var(--border)] p-5 hover:bg-[var(--pill-bg)]"
+          >
+            <span className="font-serif text-lg font-semibold">Cadastro assistido por IA</span>
+            <span className="text-sm text-[var(--text-muted)]">Cole o texto do anúncio e revise o rascunho antes de publicar.</span>
+          </Link>
+
           {staff.role === 'admin' && (
             <div className="flex flex-col gap-1 rounded-xl border border-dashed border-[var(--border)] p-5 opacity-60">
               <span className="font-serif text-lg font-semibold">Gerenciar corretores</span>
               <span className="text-sm text-[var(--text-muted)]">Em breve — convidar, desativar contas.</span>
-            </div>
-          )}
-          {staff.role === 'admin' && (
-            <div className="flex flex-col gap-1 rounded-xl border border-dashed border-[var(--border)] p-5 opacity-60">
-              <span className="font-serif text-lg font-semibold">Cadastro por IA</span>
-              <span className="text-sm text-[var(--text-muted)]">Em breve — subir PDF/fotos e a IA preenche.</span>
             </div>
           )}
         </div>
