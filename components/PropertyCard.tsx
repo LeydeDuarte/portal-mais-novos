@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type { Property } from '@/lib/mock-properties';
 import { useVideoAutoplay } from '@/lib/video-rotation';
+import { getEmbedInfo } from '@/lib/video-embed';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 
@@ -77,6 +78,7 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
   };
 
   const badge = getStatusBadge(property.deliveryDate);
+  const embed = property.videoUrl ? getEmbedInfo(property.videoUrl) : null;
 
   return (
     <div className="mb-2.5 inline-block w-full break-inside-avoid md:mb-4">
@@ -84,11 +86,22 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
         <div
           ref={setRefs}
           className={`group relative flex items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)] ${
-            isPlaying ? 'video-playing' : ''
+            isPlaying && !embed ? 'video-playing' : ''
           }`}
           style={{ height: property.height }}
         >
-          <span className="text-[11px] text-[var(--text-faint)]">{property.video ? '[CAPA EM VÍDEO]' : '[FOTO]'}</span>
+          {isPlaying && embed ? (
+            <iframe
+              src={embed.embedUrl}
+              className="h-full w-full"
+              style={{ border: 0, pointerEvents: 'none' }}
+              allow="autoplay; encrypted-media"
+              tabIndex={-1}
+              title="Vídeo do imóvel"
+            />
+          ) : (
+            <span className="text-[11px] text-[var(--text-faint)]">{property.video ? '[CAPA EM VÍDEO]' : '[FOTO]'}</span>
+          )}
 
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/25 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
 
