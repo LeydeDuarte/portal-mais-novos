@@ -93,9 +93,9 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
           {isPlaying && embed ? (
             <iframe
               src={embed.embedUrl}
-              className="h-full w-full"
+              className="absolute left-1/2 top-1/2 h-[300%] w-[300%] -translate-x-1/2 -translate-y-1/2"
               style={{ border: 0, pointerEvents: 'none' }}
-              allow="autoplay; encrypted-media"
+              allow="autoplay; encrypted-media; picture-in-picture"
               tabIndex={-1}
               title="Vídeo do imóvel"
             />

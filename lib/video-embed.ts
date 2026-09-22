@@ -14,7 +14,7 @@ export function getEmbedInfo(url: string): EmbedInfo | null {
     const id = yt[1];
     return {
       platform: 'youtube',
-      embedUrl: `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&rel=0`
+      embedUrl: `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&rel=0&modestbranding=1&iv_load_policy=3&disablekb=1&fs=0&playsinline=1`
     };
   }
 
