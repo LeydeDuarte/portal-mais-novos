@@ -11,7 +11,7 @@ export type PropertyRow = {
   titulo: string | null;
   tipo_unidade: string;
   finalidade: 'venda' | 'aluguel';
-  delivery_date: string; // formato AAAA-MM-DD vindo do driver
+  delivery_date: string | Date; // o driver às vezes devolve Date, às vezes string
   price_value: string; // numeric vem como string do driver do Postgres
   price_period: 'unico' | 'mensal';
   location: string;
@@ -34,7 +34,7 @@ export type DevelopmentRow = {
   id: string;
   name: string;
   location: string;
-  delivery_date: string;
+  delivery_date: string | Date;
   description: string;
   tipo: 'vertical' | 'horizontal';
   pavimentos: number | null;
@@ -51,8 +51,15 @@ function formatPrice(value: string, period: 'unico' | 'mensal'): string {
   return period === 'mensal' ? `${formatted}/mês` : formatted;
 }
 
-function formatDeliveryDate(isoDate: string): string {
-  return isoDate.slice(0, 7); // "AAAA-MM-DD" → "AAAA-MM"
+// O driver do Postgres às vezes devolve colunas "date" como objeto Date, não
+// como texto — isso normaliza os dois casos antes de qualquer .slice()/.split().
+function toISODateString(value: string | Date): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return value;
+}
+
+function formatDeliveryDate(value: string | Date): string {
+  return toISODateString(value).slice(0, 7); // "AAAA-MM-DD" → "AAAA-MM"
 }
 
 // Altura do card no feed — puramente visual (masonry), não precisa vir do
@@ -90,13 +97,14 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
 }
 
 export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]): Development {
-  const [year, month] = row.delivery_date.slice(0, 7).split('-');
+  const deliveryDateFormatted = formatDeliveryDate(row.delivery_date);
+  const [year, month] = deliveryDateFormatted.split('-');
   const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
   return {
     id: row.id,
     name: row.name,
     location: row.location,
-    deliveryDate: formatDeliveryDate(row.delivery_date),
+    deliveryDate: deliveryDateFormatted,
     deliveryNote: `Previsão de entrega: ${MESES[Number(month) - 1] ?? month} de ${year}`,
     description: row.description,
     tipo: row.tipo,
