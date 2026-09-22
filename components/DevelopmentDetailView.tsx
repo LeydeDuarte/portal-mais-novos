@@ -3,13 +3,20 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
 import { getStatusBadge } from '@/lib/classification';
-import { getEmbedInfo } from '@/lib/video-embed';
+import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 
-export default function DevelopmentDetailView({ development }: { development: Development }) {
+export default async function DevelopmentDetailView({ development }: { development: Development }) {
   const badge = getStatusBadge(development.deliveryDate);
   const embed = development.videoUrl ? getEmbedInfo(development.videoUrl) : null;
   const avgPricePerM2 = getAveragePricePerM2(development.units);
+
+  const youtubeAspect = embed?.platform === 'youtube' ? await getYouTubeAspectRatio(embed.videoId) : null;
+  const mediaStyle = youtubeAspect
+    ? { aspectRatio: `${youtubeAspect.width} / ${youtubeAspect.height}`, maxHeight: '70vh' }
+    : embed
+      ? { aspectRatio: '16 / 9' }
+      : { height: development.heroHeight };
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -21,8 +28,8 @@ export default function DevelopmentDetailView({ development }: { development: De
         </Link>
 
         <div
-          className="relative flex items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)]"
-          style={{ height: development.heroHeight }}
+          className="relative mx-auto flex w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)]"
+          style={mediaStyle}
         >
           {embed ? (
             <iframe

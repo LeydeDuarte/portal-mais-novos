@@ -47,7 +47,12 @@ function Spec({ children, icon }: { children: React.ReactNode; icon: React.React
 }
 
 export default function PropertyCard({ property, isFavorite, loggedIn, onFavoriteClick, onDwell }: Props) {
-  const { ref: videoRef, isPlaying } = useVideoAutoplay(property.id, property.matchScore, property.video);
+  const embed = property.videoUrl ? getEmbedInfo(property.videoUrl) : null;
+  // Instagram não faz autoplay em embed (exige clique, às vezes até redireciona
+  // pra fora do site) — só entra na roleta de autoplay do feed quem é YouTube
+  // (toca de verdade) ou não tem link nenhum (simulação antiga, só visual).
+  const eligibleForFeedAutoplay = property.video && embed?.platform !== 'instagram';
+  const { ref: videoRef, isPlaying } = useVideoAutoplay(property.id, property.matchScore, eligibleForFeedAutoplay);
   const dwellRef = useRef<HTMLDivElement | null>(null);
   const enteredAt = useRef<number | null>(null);
 
@@ -78,7 +83,6 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
   };
 
   const badge = getStatusBadge(property.deliveryDate);
-  const embed = property.videoUrl ? getEmbedInfo(property.videoUrl) : null;
 
   return (
     <div className="mb-2.5 inline-block w-full break-inside-avoid md:mb-4">

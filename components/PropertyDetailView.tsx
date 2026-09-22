@@ -6,7 +6,7 @@ import type { PropertyDetail } from '@/lib/property-details';
 import { getDevelopmentById } from '@/lib/actions';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
-import { getEmbedInfo } from '@/lib/video-embed';
+import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 
 const BED_PATH = 'M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6 M3 18h18 M5 10V7a2 2 0 0 1 2-2h3v5';
 
@@ -16,6 +16,17 @@ export default async function PropertyDetailView({ property }: { property: Prope
   const siblings = development ? development.units.filter((u) => u.id !== property.id) : [];
   const badge = getStatusBadge(property.deliveryDate);
   const embed = property.videoUrl ? getEmbedInfo(property.videoUrl) : null;
+
+  // Descobre o formato real do vídeo (horizontal ou vertical) pra evitar
+  // tanto tarja preta quanto corte — o quadro nasce do tamanho certo pro
+  // vídeo, em vez de forçar um formato fixo. Só existe pra YouTube (o
+  // Instagram não expõe essa informação do mesmo jeito).
+  const youtubeAspect = embed?.platform === 'youtube' ? await getYouTubeAspectRatio(embed.videoId) : null;
+  const mediaStyle = youtubeAspect
+    ? { aspectRatio: `${youtubeAspect.width} / ${youtubeAspect.height}`, maxHeight: '70vh' }
+    : embed
+      ? { aspectRatio: '16 / 9' }
+      : { height: 360 };
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -33,10 +44,10 @@ export default async function PropertyDetailView({ property }: { property: Prope
         <div className="grid gap-8 md:grid-cols-[1.3fr_1fr]">
           <div>
             <div
-              className={`relative flex items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)] ${
+              className={`relative mx-auto flex w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)] ${
                 property.video && !embed ? 'video-playing' : ''
               }`}
-              style={{ height: 360 }}
+              style={mediaStyle}
             >
               {embed ? (
                 <iframe
