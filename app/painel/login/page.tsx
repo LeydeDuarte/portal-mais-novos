@@ -12,9 +12,9 @@ export default function PainelLoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const user = login(email, password);
+    const user = await login(email, password);
     if (!user) {
       setError('E-mail ou senha incorretos.');
       return;

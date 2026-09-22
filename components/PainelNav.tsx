@@ -19,8 +19,8 @@ export default function PainelNav() {
   const router = useRouter();
   const { staff, logout } = useStaffSession();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push('/painel/login');
   };
 

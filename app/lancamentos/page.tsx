@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { DEVELOPMENTS } from '@/lib/property-details';
+import { getAllDevelopments } from '@/lib/actions';
 import { getStatusBadge, isFutureDelivery } from '@/lib/classification';
 
 export const metadata: Metadata = {
@@ -11,11 +11,17 @@ export const metadata: Metadata = {
   alternates: { canonical: '/lancamentos' }
 };
 
-export default function LancamentosPage() {
+// Sem isso, o Next tentaria "congelar" essa página no momento do build,
+// usando os dados do banco de naquele instante — errado pra uma listagem
+// que muda toda vez que alguém cadastra um empreendimento novo.
+export const dynamic = 'force-dynamic';
+
+export default async function LancamentosPage() {
+  const all = await getAllDevelopments();
   // Só entram aqui empreendimentos cuja data de entrega ainda não passou —
   // depois que passa, as unidades continuam existindo, só que já aparecem
   // como "Usado" no feed geral do Comprar, não mais agrupadas como lançamento.
-  const upcoming = DEVELOPMENTS.filter((d) => isFutureDelivery(d.deliveryDate));
+  const upcoming = all.filter((d) => isFutureDelivery(d.deliveryDate));
 
   return (
     <div className="flex min-h-screen flex-col">

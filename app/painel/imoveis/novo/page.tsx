@@ -8,11 +8,10 @@ import ChipSelect from '@/components/ChipSelect';
 import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
 import PhotoUploadField from '@/components/PhotoUploadField';
 import { useStaffSession } from '@/lib/use-staff-session';
-import { useCreatedProperties } from '@/lib/use-created-properties';
-import { useCreatedDevelopments } from '@/lib/use-created-developments';
+import { createProperty, createDevelopment, getAllDevelopments } from '@/lib/actions';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
-import { DEVELOPMENTS, type PropertyDetail, type Development } from '@/lib/property-details';
-import { maskCurrencyInput, appendSuffix } from '@/lib/currency';
+import type { Development } from '@/lib/property-details';
+import { maskCurrencyInput } from '@/lib/currency';
 
 const inputClass = 'rounded-lg border border-[var(--border)] px-3 py-2.5 text-sm outline-none';
 const QUARTO_OPCOES = ['1', '2', '3', '4', '5+'];
@@ -21,8 +20,6 @@ const BANHEIRO_OPCOES = ['1', '2', '3', '4', '5+'];
 
 export default function NovoImovelPage() {
   const { staff, loaded } = useStaffSession();
-  const { add: addProperty } = useCreatedProperties();
-  const { items: createdDevelopments, add: addDevelopment } = useCreatedDevelopments();
   const router = useRouter();
 
   useEffect(() => {
@@ -31,6 +28,12 @@ export default function NovoImovelPage() {
 
   const [modo, setModo] = useState<'imovel' | 'empreendimento'>('imovel');
   const [success, setSuccess] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [todosCondominios, setTodosCondominios] = useState<Development[]>([]);
+
+  useEffect(() => {
+    getAllDevelopments().then(setTodosCondominios);
+  }, [success]); // recarrega a lista depois de publicar um condomínio novo
 
   // ---------- Formulário: imóvel avulso ----------
   const [imovel, setImovel] = useState({
@@ -88,8 +91,6 @@ export default function NovoImovelPage() {
 
   if (!loaded || !staff) return null;
 
-  const todosCondominios: (Development | { id: string; name: string })[] = [...DEVELOPMENTS, ...createdDevelopments];
-
   const updateImovel = <K extends keyof typeof imovel>(key: K, value: (typeof imovel)[K]) => {
     setImovel((prev) => ({ ...prev, [key]: value }));
   };
@@ -97,95 +98,88 @@ export default function NovoImovelPage() {
     setDev((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSubmitImovel = (e: FormEvent) => {
-    e.preventDefault();
-    const id = `manual-${Date.now()}`;
-    const priceFormatted = appendSuffix(maskCurrencyInput(imovel.priceDigits), imovel.finalidade === 'aluguel' ? imovel.priceSuffix : '');
+  const parsePriceDigits = (digits: string): number => Number(digits.replace(/\D/g, '')) || 0;
 
-    const property: PropertyDetail = {
+  const handleSubmitImovel = async (e: FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const id = `manual-${Date.now()}`;
+
+    await createProperty({
       id,
       titulo: imovel.titulo || undefined,
       tipoUnidade: imovel.tipoUnidade,
       finalidade: imovel.finalidade,
       deliveryDate: imovel.deliveryDate || new Date().toISOString().slice(0, 7),
-      price: priceFormatted,
+      priceValue: parsePriceDigits(imovel.priceDigits),
+      pricePeriod: imovel.finalidade === 'aluguel' && imovel.priceSuffix === '/mês' ? 'mensal' : 'unico',
       location: imovel.location,
-      beds: `${imovel.quartos} qts`,
-      parking: `${imovel.vagas} vg`,
-      banheiros: imovel.banheiros ? `${imovel.banheiros} banheiros` : undefined,
-      escaninhos: imovel.escaninhos && imovel.escaninhos !== '0' ? `${imovel.escaninhos} escaninho(s)` : undefined,
-      videoUrl: imovel.video ? imovel.videoUrl : undefined,
-      area: `${imovel.area} m²`,
-      height: 240 + Math.floor(Math.random() * 100),
+      quartos: imovel.quartos ? Number(imovel.quartos.replace('+', '')) : undefined,
+      vagas: imovel.vagas ? Number(imovel.vagas.replace('+', '')) : undefined,
+      banheiros: imovel.banheiros ? Number(imovel.banheiros.replace('+', '')) : undefined,
+      escaninhos: imovel.escaninhos && imovel.escaninhos !== '0' ? Number(imovel.escaninhos.replace('+', '')) : undefined,
+      area: imovel.area ? Number(imovel.area) : undefined,
       video: imovel.video,
+      videoUrl: imovel.video ? imovel.videoUrl : undefined,
       aceitaTemporada: imovel.aceitaTemporada,
-      matchScore: 50,
       description: imovel.description || `Imóvel ${imovel.finalidade === 'aluguel' ? 'disponível para locação' : 'à venda'} em ${imovel.location}.`,
       amenities: imovel.amenities,
       empreendimentoId: imovel.empreendimentoId || undefined,
       corretorEmail: staff!.email
-    };
+    });
 
-    addProperty(property);
+    setSubmitting(false);
     setSuccess(id);
   };
 
-  const handleSubmitDev = (e: FormEvent) => {
+  const handleSubmitDev = async (e: FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     const id = `condo-${Date.now()}`;
     const deliveryDate = dev.deliveryDate || new Date().toISOString().slice(0, 7);
-    const [year, month] = deliveryDate.split('-');
-    const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-    const deliveryNote = `Previsão de entrega: ${MESES[Number(month) - 1] ?? month} de ${year}`;
 
-    const development: Development = {
+    await createDevelopment({
       id,
       name: dev.name,
       location: dev.location,
       deliveryDate,
-      deliveryNote,
       description: dev.description || `Condomínio ${dev.tipo === 'vertical' ? 'vertical' : 'horizontal'} em ${dev.location}.`,
       tipo: dev.tipo,
       pavimentos: dev.tipo === 'vertical' && dev.pavimentos ? Number(dev.pavimentos) : undefined,
       areaTerreno: dev.tipo === 'horizontal' && dev.areaTerreno ? `${dev.areaTerreno} m²` : undefined,
       amenities: dev.amenities,
       aceitaTemporada: dev.aceitaTemporada,
-      heroHeight: 300,
       videoUrl: dev.video ? dev.videoUrl : undefined,
-      corretorEmail: staff!.email,
-      units: []
-    };
-
-    addDevelopment(development);
+      corretorEmail: staff!.email
+    });
 
     // Cada tipologia informada vira um imóvel avulso já vinculado a este
     // condomínio — é assim que elas aparecem tanto na página do
     // empreendimento quanto no feed geral do Comprar (mesmo mecanismo do
     // vínculo manual imóvel → condomínio).
-    tipologias.forEach((t, i) => {
-      if (!t.quartos && !t.area && !t.priceDigits) return; // linha em branco, ignora
-      addProperty({
+    for (const [i, t] of tipologias.entries()) {
+      if (!t.quartos && !t.area && !t.priceDigits) continue; // linha em branco, ignora
+      await createProperty({
         id: `${id}-tip-${i}`,
-        titulo: undefined,
         tipoUnidade: t.tipoUnidade,
         finalidade: 'venda',
         deliveryDate,
-        price: maskCurrencyInput(t.priceDigits),
+        priceValue: parsePriceDigits(t.priceDigits),
+        pricePeriod: 'unico',
         location: dev.location,
-        beds: `${t.quartos || '?'} qts`,
-        parking: `${t.vagas || '?'} vg`,
-        area: `${t.area || '?'} m²`,
-        height: 240 + Math.floor(Math.random() * 100),
+        quartos: t.quartos ? Number(t.quartos.replace('+', '')) : undefined,
+        vagas: t.vagas ? Number(t.vagas.replace('+', '')) : undefined,
+        area: t.area ? Number(t.area) : undefined,
         video: false,
         aceitaTemporada: dev.aceitaTemporada,
-        matchScore: 50,
         description: `Tipologia do condomínio ${dev.name}, em ${dev.location}.`,
         amenities: dev.amenities,
         empreendimentoId: id,
         corretorEmail: staff!.email
       });
-    });
+    }
 
+    setSubmitting(false);
     setSuccess(id);
   };
 
@@ -377,8 +371,8 @@ export default function NovoImovelPage() {
               )}
             </div>
 
-            <button type="submit" className="mt-2 self-start rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">
-              Publicar imóvel
+            <button type="submit" disabled={submitting} className="mt-2 self-start rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">
+              {submitting ? 'Publicando…' : 'Publicar imóvel'}
             </button>
           </form>
         ) : (
@@ -527,8 +521,8 @@ export default function NovoImovelPage() {
               reúne todos os anúncios.
             </p>
 
-            <button type="submit" className="mt-2 self-start rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">
-              Publicar condomínio
+            <button type="submit" disabled={submitting} className="mt-2 self-start rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">
+              {submitting ? 'Publicando…' : 'Publicar condomínio'}
             </button>
           </form>
         )}

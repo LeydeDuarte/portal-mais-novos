@@ -1,26 +1,40 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
-import { useCreatedProperties } from '@/lib/use-created-properties';
+import { getPropertiesByCorretor, deleteProperty } from '@/lib/actions';
+import type { PropertyDetail } from '@/lib/property-details';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 
 export default function MeusImoveisPage() {
   const { staff, loaded } = useStaffSession();
-  const { items, remove } = useCreatedProperties();
   const router = useRouter();
+  const [items, setItems] = useState<PropertyDetail[]>([]);
+  const [fetched, setFetched] = useState(false);
 
   useEffect(() => {
     if (loaded && !staff) router.replace('/painel/login');
   }, [loaded, staff, router]);
 
-  if (!loaded || !staff) return null;
+  useEffect(() => {
+    if (staff) {
+      getPropertiesByCorretor(staff.email, staff.role === 'admin').then((rows) => {
+        setItems(rows);
+        setFetched(true);
+      });
+    }
+  }, [staff]);
 
-  const visible = staff.role === 'admin' ? items : items.filter((p) => p.corretorEmail === staff.email);
+  const handleRemove = async (id: string) => {
+    await deleteProperty(id);
+    setItems((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  if (!loaded || !staff) return null;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -34,11 +48,13 @@ export default function MeusImoveisPage() {
           </Link>
         </div>
 
-        {visible.length === 0 ? (
+        {!fetched ? (
+          <p className="mt-8 text-sm text-[var(--text-muted)]">Carregando…</p>
+        ) : items.length === 0 ? (
           <p className="mt-8 text-sm text-[var(--text-muted)]">Nenhum imóvel cadastrado ainda.</p>
         ) : (
           <div className="mt-6 flex flex-col gap-3">
-            {visible.map((p) => (
+            {items.map((p) => (
               <div key={p.id} className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] p-4">
                 <div className="flex flex-col gap-0.5">
                   <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[p.tipoUnidade]}</span>
@@ -52,7 +68,7 @@ export default function MeusImoveisPage() {
                   <Link href={`/imovel/${p.id}`} className="text-sm font-semibold text-accent hover:underline">
                     Ver
                   </Link>
-                  <button type="button" onClick={() => remove(p.id)} className="text-sm font-semibold text-red-600 hover:underline">
+                  <button type="button" onClick={() => handleRemove(p.id)} className="text-sm font-semibold text-red-600 hover:underline">
                     Excluir
                   </button>
                 </div>

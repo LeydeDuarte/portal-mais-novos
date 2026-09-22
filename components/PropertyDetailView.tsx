@@ -2,20 +2,17 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
-import { getDevelopment, type PropertyDetail } from '@/lib/property-details';
+import type { PropertyDetail } from '@/lib/property-details';
+import { getDevelopmentById } from '@/lib/actions';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import { getEmbedInfo } from '@/lib/video-embed';
 
 const BED_PATH = 'M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6 M3 18h18 M5 10V7a2 2 0 0 1 2-2h3v5';
 
-// Visualização do imóvel — usada tanto pela página do catálogo estático
-// (renderizada no servidor, com metadata/JSON-LD, boa pro Google) quanto
-// pelo fallback client-side dos imóveis cadastrados no painel (que só
-// existem no localStorage de quem cadastrou, então não têm como ser
-// pré-renderizados no servidor).
-export default function PropertyDetailView({ property }: { property: PropertyDetail }) {
-  const development = property.empreendimentoId ? getDevelopment(property.empreendimentoId) : null;
+// Visualização do imóvel — Server Component, busca no banco de dados.
+export default async function PropertyDetailView({ property }: { property: PropertyDetail }) {
+  const development = property.empreendimentoId ? await getDevelopmentById(property.empreendimentoId) : null;
   const siblings = development ? development.units.filter((u) => u.id !== property.id) : [];
   const badge = getStatusBadge(property.deliveryDate);
   const embed = property.videoUrl ? getEmbedInfo(property.videoUrl) : null;

@@ -8,19 +8,17 @@ import ChipSelect from '@/components/ChipSelect';
 import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
 import PhotoUploadField from '@/components/PhotoUploadField';
 import { useStaffSession } from '@/lib/use-staff-session';
-import { useCreatedProperties } from '@/lib/use-created-properties';
+import { createProperty } from '@/lib/actions';
 import { extractFieldsFromText } from '@/lib/ai-extraction';
 import { generateTitle } from '@/lib/title-generator';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
-import { maskCurrencyInput, appendSuffix } from '@/lib/currency';
-import type { PropertyDetail } from '@/lib/property-details';
+import { maskCurrencyInput } from '@/lib/currency';
 
 const inputClass = 'rounded-lg border border-[var(--border)] px-3 py-2.5 text-sm outline-none';
 const NUM_OPCOES = ['1', '2', '3', '4', '5+'];
 
 export default function CadastroIAPage() {
   const { staff, loaded } = useStaffSession();
-  const { add } = useCreatedProperties();
   const router = useRouter();
 
   useEffect(() => {
@@ -89,35 +87,34 @@ export default function CadastroIAPage() {
     }, 1200);
   };
 
-  const handlePublish = (e: FormEvent) => {
-    e.preventDefault();
-    const id = `ia-${Date.now()}`;
-    const priceFormatted = form.priceDigits.startsWith('R$')
-      ? form.priceDigits
-      : appendSuffix(maskCurrencyInput(form.priceDigits), form.finalidade === 'aluguel' ? form.priceSuffix : '');
+  const [submitting, setSubmitting] = useState(false);
 
-    const property: PropertyDetail = {
+  const handlePublish = async (e: FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const id = `ia-${Date.now()}`;
+
+    await createProperty({
       id,
       titulo: form.titulo || undefined,
       tipoUnidade: form.tipoUnidade,
       finalidade: form.finalidade,
       deliveryDate: form.deliveryDate || new Date().toISOString().slice(0, 7),
-      price: priceFormatted,
+      priceValue: Number(form.priceDigits.replace(/\D/g, '')) || 0,
+      pricePeriod: form.finalidade === 'aluguel' && form.priceSuffix === '/mês' ? 'mensal' : 'unico',
       location: form.location || 'Goiânia — GO',
-      beds: `${form.quartos || '?'} qts`,
-      parking: `${form.vagas || '?'} vg`,
-      banheiros: form.banheiros ? `${form.banheiros} banheiros` : undefined,
-      area: `${form.area || '?'} m²`,
-      height: 240 + Math.floor(Math.random() * 100),
+      quartos: form.quartos ? Number(form.quartos.replace('+', '')) : undefined,
+      vagas: form.vagas ? Number(form.vagas.replace('+', '')) : undefined,
+      banheiros: form.banheiros ? Number(form.banheiros.replace('+', '')) : undefined,
+      area: form.area ? Number(form.area) : undefined,
       video: false,
       aceitaTemporada: form.aceitaTemporada,
-      matchScore: 50,
       description: form.description || `Imóvel ${form.finalidade === 'aluguel' ? 'disponível para locação' : 'à venda'} em ${form.location}.`,
       amenities: form.amenities,
       corretorEmail: staff!.email
-    };
+    });
 
-    add(property);
+    setSubmitting(false);
     setSuccess(id);
   };
 
@@ -262,8 +259,8 @@ export default function CadastroIAPage() {
             </label>
 
             <div className="mt-2 flex gap-3">
-              <button type="submit" className="rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">
-                Publicar imóvel
+              <button type="submit" disabled={submitting} className="rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">
+                {submitting ? 'Publicando…' : 'Publicar imóvel'}
               </button>
               <button
                 type="button"

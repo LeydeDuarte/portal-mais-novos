@@ -1,8 +1,12 @@
 import type { MetadataRoute } from 'next';
-import { BASE_PROPERTIES_FOR_SITEMAP, DEVELOPMENTS } from '@/lib/property-details';
+import { getAllPropertyIds, getAllDevelopmentIds } from '@/lib/actions';
 import { SITE_URL } from '@/lib/seo';
 
-export default function sitemap(): MetadataRoute.Sitemap {
+// Mesmo motivo do /lancamentos — o sitemap precisa refletir os cadastros
+// mais recentes, não ficar congelado no que existia no momento do build.
+export const dynamic = 'force-dynamic';
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE_URL, changeFrequency: 'daily', priority: 1 },
     { url: `${SITE_URL}/lancamentos`, changeFrequency: 'daily', priority: 0.8 },
@@ -10,14 +14,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/news`, changeFrequency: 'weekly', priority: 0.3 }
   ];
 
-  const propertyPages: MetadataRoute.Sitemap = BASE_PROPERTIES_FOR_SITEMAP.map((p) => ({
-    url: `${SITE_URL}/imovel/${p.id}`,
+  const [propertyIds, developmentIds] = await Promise.all([getAllPropertyIds(), getAllDevelopmentIds()]);
+
+  const propertyPages: MetadataRoute.Sitemap = propertyIds.map((id) => ({
+    url: `${SITE_URL}/imovel/${id}`,
     changeFrequency: 'weekly',
     priority: 0.7
   }));
 
-  const developmentPages: MetadataRoute.Sitemap = DEVELOPMENTS.map((d) => ({
-    url: `${SITE_URL}/empreendimento/${d.id}`,
+  const developmentPages: MetadataRoute.Sitemap = developmentIds.map((id) => ({
+    url: `${SITE_URL}/empreendimento/${id}`,
     changeFrequency: 'weekly',
     priority: 0.7
   }));

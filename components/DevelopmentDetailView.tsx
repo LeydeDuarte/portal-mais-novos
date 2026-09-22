@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import DevelopmentUnitsSection from '@/components/DevelopmentUnitsSection';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
 import { getStatusBadge } from '@/lib/classification';
 import { getEmbedInfo } from '@/lib/video-embed';
+import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 
 export default function DevelopmentDetailView({ development }: { development: Development }) {
   const badge = getStatusBadge(development.deliveryDate);
@@ -92,7 +92,34 @@ export default function DevelopmentDetailView({ development }: { development: De
           </ul>
         </div>
 
-        <DevelopmentUnitsSection development={development} />
+        <div className="mt-8">
+          <h2 className="mb-4 text-lg font-bold">
+            {development.units.length > 0 ? 'Anúncios neste condomínio' : 'Ainda sem anúncios vinculados'}
+          </h2>
+          {development.units.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">
+              Cadastre um imóvel avulso e vincule a este condomínio para ele aparecer aqui.
+            </p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+              {[...development.units]
+                .sort((a, b) => parseFloat(a.area) - parseFloat(b.area))
+                .map((unit) => (
+                <Link
+                  key={unit.id}
+                  href={`/imovel/${unit.id}`}
+                  className="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-4 hover:bg-[var(--pill-bg)]"
+                >
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[unit.tipoUnidade]}</div>
+                  <div className="font-serif text-lg font-semibold">{unit.price}</div>
+                  <div className="text-xs text-[var(--text-muted)]">{unit.beds} · {unit.parking} · {unit.area}</div>
+                  <div className="text-xs text-[var(--text-faint)]">{formatPricePerM2(getAveragePricePerM2([unit]))}</div>
+                  <span className="mt-1 text-xs font-semibold text-accent">Ver unidade →</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
 
       <Footer />

@@ -56,11 +56,20 @@ extrair o zip por cima da pasta existente, `git add .` (digitando na mão),
   - Máscara de moeda no preço
   - Link de vídeo (YouTube/Instagram) com embed real na capa
 
+## Banco de dados
+
+O catálogo de imóveis e empreendimentos, o login da equipe e o cadastro
+(manual e por IA) agora usam um banco Postgres real (Neon), não mais o
+localStorage do navegador — qualquer pessoa que visitar o site já vê os
+mesmos imóveis, de qualquer navegador/computador. Requer a variável de
+ambiente `DATABASE_URL` configurada (já está na Vercel).
+
 ## O que ainda é mock/placeholder
 
 - Fotos são placeholders (`[FOTO]`) — sem upload de imagem ainda (fica combinado pra entrar junto do módulo de IA)
-- Não há backend/API/banco de dados real — os imóveis e empreendimentos cadastrados pelo painel ficam salvos só no `localStorage` do navegador de quem cadastrou (por isso não têm SEO — só existem naquele navegador)
-- Login de cliente (Google) e de equipe são simulados
+- Painel de monitoramento de mercado (leads) ainda usa localStorage
+- Login de cliente (Google) continua simulado — favoritos ainda ficam no localStorage
+- Login da equipe (admin/corretor) já é real: senha verificada contra o banco, sessão em cookie assinado
 - Dados dos imóveis de exemplo são fixos em `lib/mock-properties.ts` e `lib/property-details.ts`
 
 ## Próximos passos (roadmap combinado)

@@ -2,24 +2,26 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
-import { useCreatedProperties } from '@/lib/use-created-properties';
+import { getPropertiesByCorretor } from '@/lib/actions';
 
 export default function PainelPage() {
   const { staff, loaded, logout } = useStaffSession();
-  const { items } = useCreatedProperties();
   const router = useRouter();
+  const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (loaded && !staff) router.replace('/painel/login');
   }, [loaded, staff, router]);
 
-  if (!loaded || !staff) return null;
+  useEffect(() => {
+    if (staff) getPropertiesByCorretor(staff.email, staff.role === 'admin').then((rows) => setCount(rows.length));
+  }, [staff]);
 
-  const myProperties = staff.role === 'admin' ? items : items.filter((p) => p.corretorEmail === staff.email);
+  if (!loaded || !staff) return null;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -52,7 +54,7 @@ export default function PainelPage() {
             className="flex flex-col gap-1 rounded-xl border border-[var(--border)] p-5 hover:bg-[var(--pill-bg)]"
           >
             <span className="font-serif text-lg font-semibold">Meus imóveis</span>
-            <span className="text-sm text-[var(--text-muted)]">{myProperties.length} cadastrado(s) por você.</span>
+            <span className="text-sm text-[var(--text-muted)]">{count ?? '…'} cadastrado(s) por você.</span>
           </Link>
 
           <Link
