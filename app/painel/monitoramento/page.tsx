@@ -13,7 +13,7 @@ const STATUS_LABEL = { novo: 'Novo', contatado: 'Contatado', descartado: 'Descar
 
 export default function MonitoramentoPage() {
   const { staff, loaded } = useStaffSession();
-  const { items: leads, addLead, updateStatus } = useMarketLeads();
+  const { items: leads, takenIds, error, addLead, updateStatus } = useMarketLeads(loaded && !!staff);
   const router = useRouter();
   const [cidade, setCidade] = useState(CIDADES_MONITORADAS[0]);
 
@@ -24,7 +24,8 @@ export default function MonitoramentoPage() {
   if (!loaded || !staff) return null;
 
   const referencias = MARKET_REFERENCES.filter((r) => r.cidade === cidade);
-  const leadIds = new Set(leads.map((l) => l.id));
+  const myLeadIds = new Set(leads.map((l) => l.id));
+  const isAdmin = staff.role === 'admin';
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -57,12 +58,17 @@ export default function MonitoramentoPage() {
           </select>
         </div>
 
+        {error ? (
+          <p className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</p>
+        ) : null}
+
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-[var(--text-faint)]">
           {referencias.length} anúncio(s) encontrado(s) em {cidade}
         </h2>
         <div className="flex flex-col gap-3">
           {referencias.map((ref) => {
-            const jaEhLead = leadIds.has(ref.id);
+            const jaEhLead = takenIds.has(ref.id);
+            const ehMeu = myLeadIds.has(ref.id);
             return (
               <div key={ref.id} className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] p-4">
                 <div className="flex flex-col gap-0.5">
@@ -77,10 +83,10 @@ export default function MonitoramentoPage() {
                 <button
                   type="button"
                   disabled={jaEhLead}
-                  onClick={() => addLead(ref, staff.email)}
+                  onClick={() => addLead(ref)}
                   className="shrink-0 rounded-full bg-ink px-4 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-40"
                 >
-                  {jaEhLead ? 'Já é lead' : 'Marcar como lead'}
+                  {jaEhLead ? (ehMeu ? 'Já é seu lead' : 'Lead de outro corretor') : 'Marcar como lead'}
                 </button>
               </div>
             );
@@ -88,7 +94,7 @@ export default function MonitoramentoPage() {
         </div>
 
         <h2 className="mt-10 mb-3 text-sm font-bold uppercase tracking-wide text-[var(--text-faint)]">
-          Meus leads de captação ({leads.length})
+          {isAdmin ? 'Leads de captação da equipe' : 'Meus leads de captação'} ({leads.length})
         </h2>
         {leads.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)]">Nenhum lead marcado ainda.</p>
@@ -99,6 +105,9 @@ export default function MonitoramentoPage() {
                 <div className="flex flex-col gap-0.5">
                   <span className="font-serif text-base font-semibold">{lead.precoAproximado}</span>
                   <span className="text-sm text-[var(--text-muted)]">{lead.bairro}, {lead.cidade}</span>
+                  {isAdmin && lead.corretorEmail ? (
+                    <span className="text-xs text-[var(--text-faint)]">Corretor: {lead.corretorEmail}</span>
+                  ) : null}
                 </div>
                 <select
                   className="rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-semibold"
