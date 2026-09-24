@@ -18,6 +18,7 @@ export default function CondominiosPage() {
   const [items, setItems] = useState<CondominioResumo[] | null>(null);
   const [q, setQ] = useState('');
   const [filtro, setFiltro] = useState<'todos' | 'rascunho' | 'publicado'>('todos');
+  const [limite, setLimite] = useState(100);
 
   useEffect(() => {
     if (loaded && !staff) router.replace('/painel/login');
@@ -49,9 +50,14 @@ export default function CondominiosPage() {
               {rascunhos > 0 ? `${rascunhos} rascunho(s) esperando para ser finalizado(s) e publicado(s).` : 'Todos os condomínios cadastrados.'}
             </p>
           </div>
-          <Link href="/painel/imoveis/novo" className="shrink-0 rounded-full bg-ink px-4 py-2 text-sm font-bold text-white hover:opacity-90">
-            + Cadastrar
-          </Link>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <Link href="/painel/condominios/importar" className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold hover:bg-[var(--pill-bg)]">
+              Importar planilha
+            </Link>
+            <Link href="/painel/imoveis/novo" className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white hover:opacity-90">
+              + Cadastrar
+            </Link>
+          </div>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
@@ -79,7 +85,8 @@ export default function CondominiosPage() {
           <p className="mt-8 text-sm text-[var(--text-muted)]">Nenhum condomínio encontrado.</p>
         ) : (
           <div className="mt-5 flex flex-col gap-3">
-            {lista.map((c) => (
+            <p className="text-xs text-[var(--text-muted)]">{lista.length} condomínio(s){lista.length > limite ? ` — mostrando ${limite}; use a busca para achar um específico` : ''}</p>
+            {lista.slice(0, limite).map((c) => (
               <div key={c.id} className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] p-4">
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <div className="flex items-center gap-2">
@@ -113,6 +120,11 @@ export default function CondominiosPage() {
                 </div>
               </div>
             ))}
+            {lista.length > limite && (
+              <button type="button" onClick={() => setLimite((l) => l + 200)} className="self-center rounded-full bg-[var(--pill-bg)] px-4 py-2 text-sm font-semibold hover:bg-[var(--pill-bg-hover)]">
+                Mostrar mais
+              </button>
+            )}
           </div>
         )}
       </main>

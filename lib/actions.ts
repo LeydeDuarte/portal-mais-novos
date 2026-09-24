@@ -13,6 +13,7 @@ import { formatTitulo } from './text';
 import { enviarEmail, emailConfigurado, emailLayout, escapeHtml } from './email';
 import { SITE_URL } from './seo';
 import { chaveLinkPrivado } from './session';
+import { chaveNome, mesmoCondominio } from './planilha-condominios';
 
 const PAGE_SIZE = 12;
 const STAFF_COOKIE = 'mn_staff';
@@ -337,6 +338,9 @@ export async function getLocationIndex(): Promise<LocalSugestao[]> {
        union all
        select d.bairro, d.cidade, d.uf, d.name, d.id
          from developments d where d.status = 'publicado' and d.delivery_date is not null and d.cidade is not null
+          -- condomínio só entra na lista de locais se tiver foto ou imóvel (os milhares importados
+          -- por planilha continuam achados pela busca digitada, sem pesar a lista)
+          and (jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) > 0 or exists (select 1 from properties x where x.empreendimento_id = d.id and x.visibilidade = 'publico'))
      ),
      cidades as (
        select 'cidade' as tipo, mode() within group (order by cidade) as nome, mode() within group (order by cidade) as cidade,
@@ -1324,4 +1328,149 @@ export async function listHistorico(): Promise<HistoricoLinha[]> {
     condominio: r.condominio,
     encerradoEm: new Date(r.encerrado_em).toISOString()
   }));
+}
+
+// ---------------- Importação de condomínios por planilha ----------------
+export type CondoImport = {
+  nome: string;
+  tipo: 'vertical' | 'horizontal';
+  tiposUnidade: TipoUnidade[];
+  cep: string;
+  uf: string;
+  cidade: string;
+  bairro: string;
+  logradouro: string;
+  entrega?: string; // AAAA-MM
+  descricao: string;
+  pavimentos?: number;
+  amenities: string[];
+  rascunho?: boolean;
+  lat?: number;
+  lng?: number;
+  videoUrl?: string;
+};
+export type ResultadoImport = { criados: number; atualizados: number; pulados: number; erros: string[] };
+
+type Existente = { id: string; name: string; cep: string | null; bairro: string | null; cidade: string | null };
+async function carregarExistentes(): Promise<Map<string, Existente[]>> {
+  const rows = await query<Existente>('select id, name, cep, bairro, cidade from developments');
+  const m = new Map<string, Existente[]>();
+  for (const r of rows) {
+    const k = chaveNome(r.name);
+    m.set(k, [...(m.get(k) ?? []), r]);
+  }
+  return m;
+}
+function acharExistente(idx: Map<string, Existente[]>, c: { nome: string; cep: string; bairro: string; cidade: string }): Existente | undefined {
+  return (idx.get(chaveNome(c.nome)) ?? []).find((e) => mesmoCondominio({ nome: e.name, cep: e.cep, bairro: e.bairro, cidade: e.cidade }, c));
+}
+
+/** Quais linhas já existem no banco (índice das linhas) — para a tela mostrar antes de gravar */
+export async function conferirExistentes(lista: { nome: string; cep: string; bairro: string; cidade: string }[]): Promise<number[]> {
+  requireStaff();
+  const idx = await carregarExistentes();
+  return lista.map((c, i) => (acharExistente(idx, c) ? i : -1)).filter((i) => i >= 0);
+}
+
+/**
+ * Grava um lote (até 300 linhas). Já existentes (mesmo nome + mesmo CEP ou mesmo bairro):
+ *  - 'pular': não mexe
+ *  - 'completar': só preenche o que estiver vazio (entrega, descrição, endereço, pavimentos, lazer, localização)
+ */
+export async function importarCondominios(lote: CondoImport[], opcoes: { status: 'publicado' | 'rascunho'; existentes: 'pular' | 'completar' }): Promise<ResultadoImport> {
+  const staff = requireStaff();
+  const res: ResultadoImport = { criados: 0, atualizados: 0, pulados: 0, erros: [] };
+  const linhas = (lote ?? []).slice(0, 300).filter((c) => c && typeof c.nome === 'string' && c.nome.trim());
+  if (!linhas.length) return res;
+
+  const idx = await carregarExistentes();
+  const novos: Record<string, unknown>[] = [];
+  const atualizar: Record<string, unknown>[] = [];
+  const agora = Date.now().toString(36);
+  const num = (v: unknown, max: number) => (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= max && v !== 0 ? v : null);
+  linhas.forEach((c, i) => {
+    const nome = formatTitulo(c.nome.trim()).slice(0, 160);
+    const bairro = clean(c.bairro)?.slice(0, 120) ?? null;
+    const cidade = clean(c.cidade)?.slice(0, 120) ?? null;
+    const uf = clean(c.uf?.toUpperCase())?.slice(0, 2) ?? null;
+    const cep = clean((c.cep ?? '').replace(/\D/g, ''))?.slice(0, 8) ?? null;
+    const entrega = c.entrega && /^\d{4}-\d{2}$/.test(c.entrega) ? `${c.entrega}-01` : null;
+    const reg = {
+      name: nome,
+      location: [bairro, [cidade, uf].filter(Boolean).join(' — ')].filter(Boolean).join(', '),
+      delivery_date: entrega,
+      description: (c.descricao ?? '').slice(0, 5000),
+      tipo: c.tipo === 'horizontal' ? 'horizontal' : 'vertical',
+      pavimentos: c.pavimentos && c.pavimentos > 0 && c.pavimentos < 200 ? Math.round(c.pavimentos) : null,
+      amenities: (c.amenities ?? []).filter((a) => typeof a === 'string').slice(0, 30),
+      tipos_unidade: Array.from(new Set((c.tiposUnidade ?? []).filter((t) => t in TIPO_UNIDADE_LABEL))),
+      cep,
+      logradouro: clean(c.logradouro)?.slice(0, 200) ?? null,
+      bairro,
+      cidade,
+      uf,
+      lat: num(c.lat, 90),
+      lng: num(c.lng, 180),
+      video_url: c.videoUrl && /^https:\/\/(www\.)?(youtube\.com|youtu\.be|instagram\.com|vimeo\.com)\//.test(c.videoUrl) ? c.videoUrl.slice(0, 300) : null,
+      // Sem data de entrega não dá para publicar (regra do site) — entra como rascunho
+      status: opcoes.status === 'publicado' && !c.rascunho && entrega && bairro && cidade ? 'publicado' : 'rascunho'
+    };
+    const existente = acharExistente(idx, { nome, cep: cep ?? '', bairro: bairro ?? '', cidade: cidade ?? '' });
+    if (existente) {
+      if (opcoes.existentes === 'completar') atualizar.push({ id: existente.id, ...reg });
+      else res.pulados++;
+      return;
+    }
+    const id = `condo-p${agora}${i.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    novos.push({ id, ...reg });
+    // evita duplicar dentro do próprio lote
+    const k = chaveNome(nome);
+    idx.set(k, [...(idx.get(k) ?? []), { id, name: nome, cep, bairro, cidade }]);
+  });
+
+  const COLS = `id text, name text, location text, delivery_date date, description text, tipo text, pavimentos int, amenities jsonb,
+                tipos_unidade jsonb, cep text, logradouro text, bairro text, cidade text, uf text, lat double precision, lng double precision,
+                video_url text, status text`;
+  try {
+    if (novos.length) {
+      await query(
+        `insert into developments (id, corretor_email, name, location, delivery_date, description, tipo, pavimentos, area_terreno, amenities,
+            aceita_temporada, hero_height, video_url, photos, tipos_unidade, quartos_opcoes, cep, logradouro, bairro, cidade, uf, status, video_vertical,
+            lat, lng, origem)
+         select r.id, $2, r.name, r.location, r.delivery_date, r.description, r.tipo, r.pavimentos, null, coalesce(r.amenities, '[]'::jsonb),
+            false, 300, r.video_url, '[]'::jsonb, coalesce(r.tipos_unidade, '[]'::jsonb), '[]'::jsonb, r.cep, r.logradouro, r.bairro, r.cidade, r.uf,
+            r.status, false, r.lat, r.lng, 'planilha'
+           from jsonb_to_recordset($1::jsonb) as r(${COLS})`,
+        [JSON.stringify(novos), staff.email]
+      );
+      res.criados = novos.length;
+    }
+    if (atualizar.length) {
+      await query(
+        `update developments d set
+            delivery_date = coalesce(d.delivery_date, r.delivery_date),
+            description = case when length(coalesce(trim(d.description), '')) < length(coalesce(r.description, '')) and length(coalesce(trim(d.description), '')) < 60
+                               then r.description else d.description end,
+            pavimentos = coalesce(d.pavimentos, r.pavimentos),
+            amenities = case when jsonb_array_length(coalesce(d.amenities, '[]'::jsonb)) = 0 then coalesce(r.amenities, '[]'::jsonb) else d.amenities end,
+            tipos_unidade = case when jsonb_array_length(coalesce(d.tipos_unidade, '[]'::jsonb)) = 0 then coalesce(r.tipos_unidade, '[]'::jsonb) else d.tipos_unidade end,
+            cep = coalesce(nullif(d.cep, ''), r.cep),
+            logradouro = coalesce(nullif(d.logradouro, ''), r.logradouro),
+            bairro = coalesce(nullif(d.bairro, ''), r.bairro),
+            cidade = coalesce(nullif(d.cidade, ''), r.cidade),
+            uf = coalesce(nullif(d.uf, ''), r.uf),
+            lat = coalesce(d.lat, r.lat),
+            lng = coalesce(d.lng, r.lng),
+            video_url = coalesce(nullif(d.video_url, ''), r.video_url),
+            location = case when coalesce(d.location, '') = '' then r.location else d.location end
+           from jsonb_to_recordset($1::jsonb) as r(${COLS})
+          where d.id = r.id`,
+        [JSON.stringify(atualizar)]
+      );
+      res.atualizados = atualizar.length;
+    }
+  } catch (e) {
+    res.erros.push(e instanceof Error ? e.message.slice(0, 200) : 'Falha ao gravar o lote.');
+  }
+  return res;
 }
