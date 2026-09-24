@@ -1,7 +1,11 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { cookies } from 'next/headers';
+import { verifySession } from '@/lib/session';
+import RegistrarApp from '@/components/RegistrarApp';
 import { Playfair_Display, Inter } from 'next/font/google';
 import './globals.css';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
+import ProtecaoImagens from '@/components/ProtecaoImagens';
 
 // Nunca reaproveitar respostas antigas do banco em nenhuma página
 export const fetchCache = 'default-no-store';
@@ -36,10 +40,31 @@ export const metadata: Metadata = {
   }
 };
 
+export const viewport: Viewport = { themeColor: '#257CFF' };
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // App (PWA) só para a equipe: o manifesto e o service worker só vão para quem
+  // está logado como admin, analista ou corretor — o público não vê "Instalar app".
+  const equipe = !!verifySession(cookies().get('mn_staff')?.value);
   return (
     <html lang="pt-BR" className={`${playfair.variable} ${inter.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+      <head>
+        {equipe && (
+          <>
+            <link rel="manifest" href="/manifest.webmanifest" />
+            <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+            <meta name="apple-mobile-web-app-capable" content="yes" />
+            <meta name="mobile-web-app-capable" content="yes" />
+            <meta name="apple-mobile-web-app-title" content="Mais Novos" />
+            <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+          </>
+        )}
+      </head>
+      <body className="font-sans antialiased">
+        <ProtecaoImagens />
+        {equipe && <RegistrarApp />}
+        {children}
+      </body>
     </html>
   );
 }

@@ -9,6 +9,7 @@ import RichText from '@/components/RichText';
 import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
+import ContarVisita from '@/components/ContarVisita';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getAveragePricePerM2, formatPricePerM2, type PropertyDetail } from '@/lib/property-details';
 import { getDevelopmentById, getRelatedListings } from '@/lib/actions';
@@ -19,7 +20,15 @@ import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 const BED_PATH = 'M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6 M3 18h18 M5 10V7a2 2 0 0 1 2-2h3v5';
 
 // Visualização do imóvel — Server Component, busca no banco de dados.
-export default async function PropertyDetailView({ property, avisoPrivado }: { property: PropertyDetail; avisoPrivado?: 'completo' | 'link' }) {
+export default async function PropertyDetailView({
+  property,
+  avisoPrivado,
+  marcaDagua
+}: {
+  property: PropertyDetail;
+  avisoPrivado?: 'completo' | 'link';
+  marcaDagua?: string;
+}) {
   const development = property.empreendimentoId ? await getDevelopmentById(property.empreendimentoId) : null;
   const related = await getRelatedListings({ propertyId: property.id }).catch(() => ({ mesmoCondominio: [], regiao: [], precoReferencia: null }));
   const badge = getStatusBadge(property.deliveryDate);
@@ -68,6 +77,7 @@ export default async function PropertyDetailView({ property, avisoPrivado }: { p
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
+      <ContarVisita tipo="imovel" id={property.id} />
 
       <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
         <Link href="/" className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -80,7 +90,8 @@ export default async function PropertyDetailView({ property, avisoPrivado }: { p
             <span>
               {avisoPrivado === 'link' ? (
                 <>
-                  <strong>Anúncio exclusivo.</strong> Você recebeu um link privado — este imóvel não está publicado para o público em geral.
+                  <strong>Anúncio exclusivo.</strong> Este link foi liberado só para você e só abre neste aparelho. Quer mostrar para outra pessoa? Peça ao
+                  nosso atendimento — enviamos um link para o telefone dela.
                 </>
               ) : (
                 <>
@@ -96,9 +107,14 @@ export default async function PropertyDetailView({ property, avisoPrivado }: { p
           {property.location}
         </p>
 
+        {property.vendidoEm && (
+          <p className="mb-4 rounded-xl p-3 text-sm font-semibold text-white" style={{ background: '#e62f2f' }}>
+            Este imóvel foi vendido. Veja abaixo opções parecidas na mesma região — ou fale conosco que encontramos outro para você.
+          </p>
+        )}
         {hasGallery && (
           <section aria-label="Fotos e vídeo do imóvel" className="mb-8">
-            <PhotoGallery photos={photos} video={galleryVideo} alt={titulo} badges={badges} />
+            <PhotoGallery photos={photos} video={galleryVideo} alt={titulo} badges={badges} vendido={!!property.vendidoEm} marcaDagua={marcaDagua} />
           </section>
         )}
 

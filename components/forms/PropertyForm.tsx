@@ -157,7 +157,7 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         titulo: v.titulo || undefined,
         tipoUnidade: v.tipoUnidade,
         finalidade: v.finalidade,
-        deliveryDate: v.deliveryDate || new Date().toISOString().slice(0, 7),
+        deliveryDate: v.deliveryDate || '', // vazio = ano desconhecido ("----")
         priceValue: Number(v.priceDigits.replace(/\D/g, '')) || 0,
         pricePeriod: v.finalidade === 'aluguel' && v.priceSuffix === '/mês' ? 'mensal' : 'unico',
         location,
@@ -245,8 +245,8 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
       />
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-semibold text-[var(--text-muted)]">Data de entrega (mês/ano — se já pronto, pode ser uma data passada)</label>
-        <input type="month" required className={inputClass} value={v.deliveryDate} onChange={(e) => set('deliveryDate', e.target.value)} />
+        <label className="text-xs font-semibold text-[var(--text-muted)]">Data de entrega (mês/ano — se já pronto, pode ser uma data passada; se não souber, deixe vazio)</label>
+        <input type="month" className={inputClass} value={v.deliveryDate} onChange={(e) => set('deliveryDate', e.target.value)} />
       </div>
 
       <div className="grid grid-cols-[1fr_auto] gap-3">

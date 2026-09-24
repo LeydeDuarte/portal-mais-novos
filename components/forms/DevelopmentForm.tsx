@@ -19,7 +19,7 @@ const QUARTOS_MULTI = ['1', '2', '3', '4', '5'].map((q) => ({ value: q, label: q
 
 type Tip = { key: string; id?: string; tipoUnidade: TipoUnidade; quartos: string; vagas: string; area: string; priceDigits: string; plantas: string[] };
 
-export type DevelopmentSaveResult = { ok: true } | { ok: false; faltando: string[] };
+export type DevelopmentSaveResult = { ok: true } | { ok: false; faltando: string[]; duplicado?: { id: string; name: string; bairro: string | null } };
 
 type Props = {
   initial?: DevelopmentEditData;
@@ -65,6 +65,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
   const [saving, setSaving] = useState<DevelopmentStatus | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [faltando, setFaltando] = useState<string[]>([]);
+  const [duplicado, setDuplicado] = useState<{ id: string; name: string; bairro: string | null } | null>(null);
 
   const set = <K extends keyof typeof f>(key: K, value: (typeof f)[K]) => setF((prev) => ({ ...prev, [key]: value }));
   const updTip = <K extends keyof Tip>(key: string, k: K, value: Tip[K]) => setTips((prev) => prev.map((t) => (t.key === key ? { ...t, [k]: value } : t)));
@@ -74,7 +75,6 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
   const pendencias = [
     !f.name.trim() && 'Nome',
     (!f.endereco.bairro || !f.endereco.cidade) && 'Endereço (CEP, ou bairro e cidade)',
-    !f.deliveryDate && 'Data de entrega',
     f.video && f.videoUrl.trim() && f.videoVertical === null && 'Formato do vídeo (Deitado ou Em pé)'
   ].filter(Boolean) as string[];
 
@@ -118,7 +118,11 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
           plantas: t.plantas
         }))
       );
-      if (!res.ok) setFaltando(res.faltando);
+      setDuplicado(null);
+      if (!res.ok) {
+        setFaltando(res.faltando);
+        if (res.duplicado) setDuplicado(res.duplicado);
+      }
     } catch {
       setErro('Não foi possível salvar agora. Confira sua conexão (e se a sessão do painel não expirou) e tente de novo.');
     } finally {
@@ -307,6 +311,16 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
 
       {faltando.length > 0 && (
         <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Ainda não dá para publicar — falta: {faltando.join(', ')}.</p>
+      )}
+      {duplicado && (
+        <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          Este condomínio já está cadastrado: <strong>{duplicado.name}</strong>
+          {duplicado.bairro ? ` (${duplicado.bairro})` : ''}. Para não duplicar, complete o que já existe —{' '}
+          <a href={`/painel/condominios/${duplicado.id}/editar`} className="font-bold underline">
+            abrir o cadastro existente
+          </a>
+          .
+        </p>
       )}
       {erro && <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{erro}</p>}
 

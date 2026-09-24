@@ -13,7 +13,7 @@ export type PropertyRow = {
   titulo: string | null;
   tipo_unidade: string;
   finalidade: 'venda' | 'aluguel';
-  delivery_date: string | Date; // o driver às vezes devolve Date, às vezes string
+  delivery_date: string | Date | null; // o driver às vezes devolve Date, às vezes string
   price_value: string; // numeric vem como string do driver do Postgres
   price_period: 'unico' | 'mensal';
   location: string;
@@ -34,6 +34,8 @@ export type PropertyRow = {
   plantas?: unknown;
   visibilidade?: string;
   jetimob_codigo?: string | null;
+  vendido_em?: string | Date | null;
+  visualizacoes?: number | null;
   cep?: string | null;
   logradouro?: string | null;
   bairro?: string | null;
@@ -67,6 +69,7 @@ export type DevelopmentRow = {
   tipos_unidade?: unknown;
   quartos_opcoes?: unknown;
   status?: string;
+  visualizacoes?: number | null;
   video_vertical?: boolean;
 };
 
@@ -101,7 +104,8 @@ function toISODateString(value: string | Date): string {
   return value;
 }
 
-function formatDeliveryDate(value: string | Date): string {
+function formatDeliveryDate(value: string | Date | null): string {
+  if (!value) return ''; // sem ano de entrega → exibe "----"
   return toISODateString(value).slice(0, 7); // "AAAA-MM-DD" → "AAAA-MM"
 }
 
@@ -142,6 +146,8 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
     plantas: toStringArray(row.plantas),
     visibilidade: row.visibilidade === 'privado' ? 'privado' : 'publico',
     codigo: row.jetimob_codigo ?? undefined,
+    visualizacoes: Number(row.visualizacoes) || 0,
+    vendidoEm: row.vendido_em ? new Date(row.vendido_em).toISOString() : undefined,
     condominio: row.condominio ? formatTitulo(row.condominio) : undefined,
     bairro: row.bairro ?? undefined,
     cidade: row.cidade ?? undefined,
@@ -163,7 +169,7 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
       ? `${new Date(`${deliveryDateFormatted}-01T00:00:00`) > new Date() ? 'Previsão de entrega' : 'Entregue em'}${
           new Date(`${deliveryDateFormatted}-01T00:00:00`) > new Date() ? ':' : ''
         } ${MESES[Number(month) - 1] ?? month} de ${year}`
-      : 'Data de entrega a confirmar',
+      : 'Entrega: --/----',
     description: row.description,
     tipo: row.tipo,
     pavimentos: row.pavimentos ?? undefined,

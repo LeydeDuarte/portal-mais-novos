@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import SeloVendido from '@/components/SeloVendido';
 
 export type GalleryVideo = {
   embedUrl: string; // link de incorporação (YouTube com autoplay sem som, ou Instagram)
@@ -13,7 +14,25 @@ type Props = {
   alt: string;
   video?: GalleryVideo | null; // quando existe, ocupa o lugar da foto principal
   badges?: React.ReactNode; // selos (Lançamento, Aceita temporada...) sobre o item principal
+  vendido?: boolean; // tag VENDIDO no centro do item principal
+  marcaDagua?: string; // texto repetido por cima das fotos (link privado: telefone de quem recebeu)
 };
+
+// Marca d'água em mosaico: se alguém tirar print e mandar num grupo, dá para saber de onde veio
+function MarcaDagua({ texto }: { texto: string }) {
+  const linhas = Array.from({ length: 9 });
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[6] select-none overflow-hidden" aria-hidden>
+      <div className="absolute -inset-1/2 flex rotate-[-24deg] flex-col justify-around">
+        {linhas.map((_, i) => (
+          <div key={i} className="whitespace-nowrap text-[13px] font-bold tracking-wide text-white/35 [text-shadow:0_0_2px_rgba(0,0,0,0.35)]" style={{ marginLeft: i % 2 ? '-6em' : 0 }}>
+            {Array.from({ length: 8 }).map(() => `${texto}  ·  `).join('')}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 type Item = { kind: 'video'; video: GalleryVideo } | { kind: 'photo'; url: string };
 
@@ -61,7 +80,7 @@ function VideoTag() {
 // - computador: mosaico com o item principal grande à esquerda e 4 fotos menores à direita
 // - celular: carrossel deslizando para o lado
 // Clicar em qualquer item abre a tela cheia, com setas, contador e miniaturas.
-export default function PhotoGallery({ photos, alt, video, badges }: Props) {
+export default function PhotoGallery({ photos, alt, video, badges, vendido, marcaDagua }: Props) {
   const items: Item[] = [...(video ? [{ kind: 'video' as const, video }] : []), ...photos.map((url) => ({ kind: 'photo' as const, url }))];
   const [open, setOpen] = useState<number | null>(null);
 
@@ -116,8 +135,10 @@ export default function PhotoGallery({ photos, alt, video, badges }: Props) {
               className="relative aspect-[4/3] w-[88%] shrink-0 snap-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)]"
             >
               {renderThumb(item, i)}
-              {i === 0 && badges && <div className="absolute left-3 top-3">{badges}</div>}
+              {i === 0 && badges && <div className="absolute left-3 top-3 z-[7]">{badges}</div>}
               {item.kind === 'video' && <VideoTag />}
+              {i === 0 && vendido && <SeloVendido grande />}
+              {marcaDagua && <MarcaDagua texto={marcaDagua} />}
             </button>
           ))}
         </div>
@@ -134,8 +155,9 @@ export default function PhotoGallery({ photos, alt, video, badges }: Props) {
       >
         <button type="button" onClick={() => setOpen(0)} className="relative h-full overflow-hidden bg-[var(--card-img-bg)]">
           {renderThumb(main, 0, 'transition-transform duration-300 hover:scale-[1.02]')}
-          {badges && <div className="absolute left-3 top-3">{badges}</div>}
+          {badges && <div className="absolute left-3 top-3 z-[7]">{badges}</div>}
           {main.kind === 'video' && <VideoTag />}
+          {vendido && <SeloVendido grande />}
         </button>
         {side.length === 1 && (
           <button type="button" onClick={() => setOpen(1)} className="relative h-full overflow-hidden bg-[var(--card-img-bg)]">
@@ -154,11 +176,12 @@ export default function PhotoGallery({ photos, alt, video, badges }: Props) {
                 ))}
             </div>
           ))}
+        {marcaDagua && <MarcaDagua texto={marcaDagua} />}
         {items.length > 1 && (
           <button
             type="button"
             onClick={() => setOpen(video ? 1 : 0)}
-            className="absolute bottom-4 right-4 rounded-full bg-white px-4 py-2 text-sm font-bold text-ink shadow-md hover:bg-white/90"
+            className="absolute bottom-4 right-4 z-[7] rounded-full bg-white px-4 py-2 text-sm font-bold text-ink shadow-md hover:bg-white/90"
           >
             Ver todas as {photoCount} fotos
           </button>
@@ -192,6 +215,7 @@ export default function PhotoGallery({ photos, alt, video, badges }: Props) {
                 <img src={item.url} alt={`${alt} — foto`} className="h-full max-h-full w-full max-w-full object-contain" />
               );
             })()}
+            {marcaDagua && <MarcaDagua texto={marcaDagua} />}
             {items.length > 1 && (
               <>
                 <button

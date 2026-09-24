@@ -1,6 +1,8 @@
 'use client';
 
 import TemporadaBadge from '@/components/TemporadaBadge';
+import SeloVendido from '@/components/SeloVendido';
+import Visualizacoes from '@/components/Visualizacoes';
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type { Property } from '@/lib/mock-properties';
@@ -115,6 +117,9 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
           ) : (
             <span className="text-[11px] text-[var(--text-faint)]">{property.video ? '[CAPA EM VÍDEO]' : '[FOTO]'}</span>
           )}
+
+          {property.vendidoEm && <SeloVendido />}
+          <Visualizacoes n={property.visualizacoes} className="absolute bottom-2.5 left-2.5 z-10" />
 
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/25 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
 

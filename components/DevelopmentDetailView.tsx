@@ -16,6 +16,7 @@ import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/
 import { getStatusBadge } from '@/lib/classification';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
+import ContarVisita from '@/components/ContarVisita';
 
 function formatBRL(v: number): string {
   if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mi`;
@@ -23,9 +24,7 @@ function formatBRL(v: number): string {
 }
 
 export default async function DevelopmentDetailView({ development }: { development: Development }) {
-  const badge = development.deliveryDate
-    ? getStatusBadge(development.deliveryDate)
-    : { text: 'Entrega a confirmar', bg: 'rgba(20,22,26,0.72)', color: '#fff', bucket: 'usado' as const, label: '', year: 0 };
+  const badge = getStatusBadge(development.deliveryDate);
   const tipologias = development.units.filter((u) => u.isTipologia);
   const related = await getRelatedListings({ developmentId: development.id }).catch(() => ({ mesmoCondominio: [], regiao: [], precoReferencia: null }));
   const futuro = !!development.deliveryDate && badge.bucket === 'lancamento';
@@ -63,6 +62,7 @@ export default async function DevelopmentDetailView({ development }: { developme
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
+      <ContarVisita tipo="empreendimento" id={development.id} />
 
       <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
         <Link href="/" className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text)]">

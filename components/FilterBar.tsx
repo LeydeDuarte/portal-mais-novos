@@ -160,8 +160,9 @@ export default function FilterBar({ filters, onChange }: Props) {
         <select className={`${selectClass} ${filters.situacao !== 'todas' ? 'ring-2 ring-ink' : ''}`} style={selectStyle} value={filters.situacao} onChange={(e) => set('situacao', e.target.value as FilterState['situacao'])}>
           <option value="todas">Status</option>
           <option value="lancamento">Lançamento</option>
-          <option value="seminovo">Seminovo</option>
-          <option value="usado">Usado</option>
+          <option value="novo">Novo (até 3 anos)</option>
+          <option value="seminovo">Seminovo (3 a 6 anos)</option>
+          <option value="usado">Usado (+6 anos)</option>
         </select>
 
         {/* Balões de local (exatos) e de palavra-chave — cada um sai com o seu ✕ */}

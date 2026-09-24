@@ -12,7 +12,6 @@ import { r2PublicBase, cleanPhotoUrl } from './r2-url';
 import { formatTitulo } from './text';
 import { enviarEmail, emailConfigurado, emailLayout, escapeHtml } from './email';
 import { SITE_URL } from './seo';
-import { chaveLinkPrivado } from './session';
 import { chaveNome, mesmoCondominio } from './planilha-condominios';
 
 const PAGE_SIZE = 12;
@@ -40,6 +39,7 @@ export type DevelopmentCardData = {
   unitsCount: number;
   aceitaTemporada: boolean;
   height: number;
+  visualizacoes: number;
 };
 
 export type FeedItem = { kind: 'imovel'; property: PropertyDetail } | { kind: 'empreendimento'; development: DevelopmentCardData };
@@ -71,6 +71,7 @@ const TIPOS_CTE = `tl(k, label) as (values ${Object.entries(TIPO_UNIDADE_LABEL)
 
 export async function getFeedPage(page: number, filters: FilterState, opcoes?: { ocultos?: boolean }): Promise<{ items: FeedItem[]; hasMore: boolean }> {
   const ocultos = !!opcoes?.ocultos;
+  if (page === 0) await limparVendidos().catch(() => {});
   const params: unknown[] = [];
   const p = (value: unknown) => {
     params.push(value);
@@ -112,7 +113,7 @@ export async function getFeedPage(page: number, filters: FilterState, opcoes?: {
   if (filters.vagasMin !== 'todas') devConds.push(`u.max_vagas >= ${p(filters.vagasMin)}`);
   if (filters.aceitaTemporada === 'sim') devConds.push('d.aceita_temporada = true');
   // Só condomínios publicados; as tipologias da tabela de vendas aparecem dentro do card do empreendimento
-  devConds.push("d.status = 'publicado' and d.delivery_date is not null");
+  devConds.push("d.status = 'publicado'"); // sem ano de entrega também aparece (com "----" no lugar do ano)
   // Condomínio sem fotos e sem nenhum imóvel/tipologia não entra no feed geral —
   // só aparece quando a pessoa pesquisa (por local ou palavra-chave).
   const pesquisando = (filters.termos ?? []).length > 0 || (filters.locais ?? []).length > 0;
@@ -126,8 +127,10 @@ export async function getFeedPage(page: number, filters: FilterState, opcoes?: {
   // ---- Condições que valem para os dois ----
   const situacaoSql = (col: string) => {
     if (filters.situacao === 'lancamento') return `${col} > now()`;
-    if (filters.situacao === 'seminovo') return `${col} <= now() and ${col} > now() - interval '5 years'`;
-    if (filters.situacao === 'usado') return `${col} <= now() - interval '5 years'`;
+    // mesmas faixas de lib/classification.ts: novo até 36 meses, seminovo até 6 anos
+    if (filters.situacao === 'novo') return `${col} <= now() and ${col} > now() - interval '3 years'`;
+    if (filters.situacao === 'seminovo') return `${col} <= now() - interval '3 years' and ${col} > now() - interval '6 years'`;
+    if (filters.situacao === 'usado') return `${col} <= now() - interval '6 years'`;
     return null;
   };
   const sitP = situacaoSql('p.delivery_date');
@@ -312,7 +315,8 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       areaMax: row.a_max != null ? Number(row.a_max) : null,
       unitsCount: Number(row.n) || 0,
       aceitaTemporada: base.aceitaTemporada,
-      height: heightFromId(base.id) + 40
+      height: heightFromId(base.id) + 40,
+      visualizacoes: Number(row.visualizacoes) || 0
     };
   });
 }
@@ -403,11 +407,12 @@ async function assertCanEdit(table: 'properties' | 'developments', id: string, s
 
 // ---------------- Leitura para as páginas públicas ----------------
 // Anúncio privado só volta completo para a equipe ou com a chave do link privado
-export async function getPropertyById(id: string, chave?: string): Promise<PropertyDetail | null> {
+// Privado só volta completo para a equipe (o cliente usa o link pessoal — lib/links-privados.ts)
+export async function getPropertyById(id: string): Promise<PropertyDetail | null> {
   const rows = await query<PropertyRow>('select * from properties where id = $1', [id]);
   const r = rows[0];
   if (!r) return null;
-  if (r.visibilidade === 'privado' && !currentStaff() && chave !== chaveLinkPrivado(id)) return null;
+  if (r.visibilidade === 'privado' && !currentStaff()) return null;
   return mapPropertyRow(r);
 }
 
@@ -603,7 +608,7 @@ function propertyValues(input: PropertyFields) {
     input.titulo ? formatTitulo(input.titulo) : null,
     input.tipoUnidade,
     input.finalidade,
-    `${input.deliveryDate}-01`,
+    input.deliveryDate && /^\d{4}-\d{2}$/.test(input.deliveryDate) ? `${input.deliveryDate}-01` : null, // vazio = "----"
     input.priceValue,
     input.pricePeriod,
     input.location,
@@ -672,28 +677,40 @@ async function arquivarNoHistorico(id: string, motivo: 'excluido' | 'vendido', v
 export async function deleteProperty(id: string): Promise<void> {
   const staff = requireStaff();
   await assertCanEdit('properties', id, staff);
-  await arquivarNoHistorico(id, 'excluido');
+  const v = await query<{ vendido_em: string | null }>('select vendido_em from properties where id = $1', [id]);
+  if (!v[0]?.vendido_em) await arquivarNoHistorico(id, 'excluido'); // vendido já está no histórico
   await query('delete from favorites where property_id = $1', [id]).catch(() => {});
   await query('delete from properties where id = $1', [id]);
 }
 
-// Só anúncio avulso pode ser marcado como vendido (sai do ar e fica no histórico)
+// Só anúncio avulso pode ser marcado como vendido. Vai para o histórico na hora
+// (conta no Mercado) e, se for público, fica 15 dias no feed com a tag VENDIDO.
+const DIAS_VENDIDO_NO_FEED = 15;
 export async function marcarComoVendido(id: string, valorVenda?: number): Promise<void> {
   const staff = requireStaff();
   await assertCanEdit('properties', id, staff);
-  const r = await query<{ is_tipologia: boolean }>('select is_tipologia from properties where id = $1', [id]);
+  const r = await query<{ is_tipologia: boolean; visibilidade: string; vendido_em: string | null }>('select is_tipologia, visibilidade, vendido_em from properties where id = $1', [id]);
   if (!r[0] || r[0].is_tipologia) throw new Error('Só anúncio avulso pode ser marcado como vendido.');
+  if (r[0].vendido_em) return;
   await arquivarNoHistorico(id, 'vendido', valorVenda ?? null);
-  await query('delete from favorites where property_id = $1', [id]).catch(() => {});
-  await query('delete from properties where id = $1', [id]);
+  if (r[0].visibilidade === 'privado') {
+    await query('delete from favorites where property_id = $1', [id]).catch(() => {});
+    await query('delete from properties where id = $1', [id]);
+  } else {
+    await query('update properties set vendido_em = now() where id = $1', [id]);
+  }
 }
 
-// Link privado (para mandar ao cliente) de um anúncio oculto
-export async function getLinkPrivado(id: string): Promise<string> {
-  const staff = requireStaff();
-  await assertCanEdit('properties', id, staff);
-  return `${SITE_URL}/imovel/${id}?k=${chaveLinkPrivado(id)}`;
+// Tira do ar os vendidos há mais de 15 dias (já estão no histórico)
+let ultimaLimpeza = 0;
+async function limparVendidos() {
+  if (Date.now() - ultimaLimpeza < 10 * 60 * 1000) return;
+  ultimaLimpeza = Date.now();
+  const velhos = `select id from properties where vendido_em < now() - interval '${DIAS_VENDIDO_NO_FEED} days'`;
+  await query(`delete from favorites where property_id in (${velhos})`).catch(() => {});
+  await query(`delete from properties where id in (${velhos})`);
 }
+
 
 // ---------------- Anúncios reservados (privados), mascarados ----------------
 export type AnuncioOculto = {
@@ -762,10 +779,10 @@ export type PropertyEditData = PropertyFields & { id: string; corretorEmail: str
 export async function getPropertyForEdit(id: string): Promise<PropertyEditData | null> {
   const staff = requireStaff();
   await assertCanEdit('properties', id, staff);
-  const rows = await query<PropertyRow & { price_value: string; delivery_date: string | Date }>('select * from properties where id = $1', [id]);
+  const rows = await query<PropertyRow & { price_value: string; delivery_date: string | Date | null }>('select * from properties where id = $1', [id]);
   const r = rows[0];
   if (!r) return null;
-  const d = r.delivery_date instanceof Date ? r.delivery_date.toISOString() : String(r.delivery_date);
+  const d = !r.delivery_date ? '' : r.delivery_date instanceof Date ? r.delivery_date.toISOString() : String(r.delivery_date);
   return {
     id: r.id,
     corretorEmail: r.corretor_email,
@@ -833,7 +850,6 @@ export async function pendenciasParaPublicar(f: DevelopmentFields): Promise<stri
   const faltando: string[] = [];
   if (!f.name?.trim()) faltando.push('nome');
   if (!f.bairro?.trim() || !f.cidade?.trim()) faltando.push('endereço (bairro e cidade)');
-  if (!f.deliveryDate) faltando.push('data de entrega');
   // Narrativa, tipos, fotos e lazer são opcionais — dá para publicar e completar depois
   return faltando;
 }
@@ -867,8 +883,19 @@ const DEV_COLS =
   'name, location, delivery_date, description, tipo, pavimentos, area_terreno, amenities, aceita_temporada, hero_height, video_url, photos, tipos_unidade, quartos_opcoes, cep, logradouro, bairro, cidade, uf, status, video_vertical';
 const DEV_CASTS = ['', '', '::date', '', '', '', '', '::jsonb', '', '', '', '::jsonb', '::jsonb', '::jsonb', '', '', '', '', '', '', ''];
 
-export async function createDevelopment(input: CreateDevelopmentInput): Promise<{ ok: true } | { ok: false; faltando: string[] }> {
+export type CondoDuplicado = { id: string; name: string; bairro: string | null };
+export async function createDevelopment(
+  input: CreateDevelopmentInput
+): Promise<{ ok: true } | { ok: false; faltando: string[]; duplicado?: CondoDuplicado }> {
   const staff = requireStaff();
+  // Não deixa cadastrar de novo um condomínio que já existe (mesmo nome + mesmo CEP ou bairro)
+  const existentes = await query<{ id: string; name: string; cep: string | null; bairro: string | null; cidade: string | null }>(
+    'select id, name, cep, bairro, cidade from developments'
+  );
+  const dup = existentes.find((e) =>
+    mesmoCondominio({ nome: e.name, cep: e.cep, bairro: e.bairro, cidade: e.cidade }, { nome: input.name, cep: input.cep, bairro: input.bairro, cidade: input.cidade })
+  );
+  if (dup) return { ok: false, faltando: [], duplicado: { id: dup.id, name: dup.name, bairro: dup.bairro } };
   if (input.status !== 'rascunho') {
     const faltando = await pendenciasParaPublicar(input);
     if (faltando.length) return { ok: false, faltando };
@@ -915,7 +942,7 @@ export async function saveTipologias(developmentId: string, tipologias: Tipologi
   const keep = new Set(tipologias.map((t) => t.id).filter(Boolean) as string[]);
   for (const e of existing) if (!keep.has(e.id)) await query('delete from properties where id = $1 and is_tipologia = true', [e.id]);
 
-  const delivery = dev.delivery_date ? (dev.delivery_date instanceof Date ? dev.delivery_date.toISOString() : String(dev.delivery_date)).slice(0, 7) : new Date().toISOString().slice(0, 7);
+  const delivery = dev.delivery_date ? (dev.delivery_date instanceof Date ? dev.delivery_date.toISOString() : String(dev.delivery_date)).slice(0, 7) : '';
   for (const [i, t] of tipologias.entries()) {
     const fields: PropertyFields = {
       tipoUnidade: t.tipoUnidade,
@@ -1242,7 +1269,7 @@ export type MercadoMes = { mes: string; m2Anuncios: number | null; nAnuncios: nu
 const BASE_MERCADO = `
   select p.bairro, p.cidade, p.tipo_unidade, p.price_value as preco, p.area, p.created_at as data_anuncio, null::timestamptz as data_fim,
          case when p.visibilidade = 'privado' then 'privado' else 'ativo' end as estado
-    from properties p where p.is_tipologia = false and p.finalidade = 'venda'
+    from properties p where p.is_tipologia = false and p.finalidade = 'venda' and p.vendido_em is null
   union all
   select h.bairro, h.cidade, h.tipo_unidade, coalesce(h.valor_venda, h.price_value), h.area, h.anunciado_em, h.encerrado_em, h.motivo
     from imoveis_historico h where h.finalidade = 'venda'`;
@@ -1412,8 +1439,8 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
       lat: num(c.lat, 90),
       lng: num(c.lng, 180),
       video_url: c.videoUrl && /^https:\/\/(www\.)?(youtube\.com|youtu\.be|instagram\.com|vimeo\.com)\//.test(c.videoUrl) ? c.videoUrl.slice(0, 300) : null,
-      // Sem data de entrega não dá para publicar (regra do site) — entra como rascunho
-      status: opcoes.status === 'publicado' && !c.rascunho && entrega && bairro && cidade ? 'publicado' : 'rascunho'
+      // Sem bairro/cidade entra como rascunho; sem ano de entrega pode publicar (aparece "----")
+      status: opcoes.status === 'publicado' && !c.rascunho && bairro && cidade ? 'publicado' : 'rascunho'
     };
     const existente = acharExistente(idx, { nome, cep: cep ?? '', bairro: bairro ?? '', cidade: cidade ?? '' });
     if (existente) {
@@ -1526,4 +1553,15 @@ export async function removerMembro(email: string, transferirPara?: string): Pro
   }
   await query('delete from staff_users where email = $1', [email]);
   return { ok: true };
+}
+
+// Total de imóveis à venda (cabeçalho do feed): anúncios avulsos públicos à venda
+// + condomínios/prédios lançamentos, novos e seminovos (entregues há até 6 anos),
+// que também contam como anúncio.
+export async function contarImoveisAVenda(): Promise<number> {
+  const r = await query<{ n: string }>(
+    `select (select count(*) from properties where is_tipologia = false and visibilidade = 'publico' and finalidade = 'venda' and vendido_em is null)
+          + (select count(*) from developments where status = 'publicado' and delivery_date > now() - interval '6 years') as n`
+  );
+  return Number(r[0]?.n) || 0;
 }

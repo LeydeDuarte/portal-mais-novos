@@ -7,6 +7,7 @@ import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { ROLE_LABEL, veTudo } from '@/lib/papeis';
+import InstalarApp from '@/components/InstalarApp';
 import { getPropertiesByCorretor } from '@/lib/actions';
 
 export default function PainelPage() {
@@ -73,6 +74,8 @@ export default function PainelPage() {
             <span className="font-serif text-lg font-semibold">Monitoramento de mercado</span>
             <span className="text-sm text-[var(--text-muted)]">Imóveis anunciados na cidade que ainda não estão na nossa base.</span>
           </Link>
+
+          <InstalarApp />
 
           {staff.role === 'admin' && (
             <Link href="/painel/equipe" className="flex flex-col gap-1 rounded-xl border border-[var(--border)] p-5 hover:bg-[var(--pill-bg)]">

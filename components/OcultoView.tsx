@@ -4,11 +4,12 @@ import Footer from '@/components/Footer';
 import ContatoLateral from '@/components/ContatoLateral';
 import type { AnuncioOculto } from '@/lib/actions';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
+import IconeOlhoCortado from '@/components/IconeOlhoCortado';
 import { brlCurto, tituloOculto } from '@/lib/ocultos';
 
 // Página pública de um anúncio PRIVADO: mostra só o resumo (bom para o Google
 // e para IAs encontrarem) e convida a pessoa a pedir o anúncio completo.
-export default function OcultoView({ a }: { a: AnuncioOculto }) {
+export default function OcultoView({ a, bloqueado = false }: { a: AnuncioOculto; bloqueado?: boolean }) {
   const titulo = tituloOculto(a);
   const itens = [
     ['Tipo', TIPO_UNIDADE_LABEL[a.tipoUnidade]],
@@ -32,22 +33,26 @@ export default function OcultoView({ a }: { a: AnuncioOculto }) {
         <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs font-bold text-white">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <rect x="4" y="11" width="16" height="10" rx="2" />
-                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-              </svg>
-              Anúncio reservado
+              <IconeOlhoCortado size={12} strokeWidth={2.4} />
+              Anúncio privado
             </span>
             <h1 className="mt-3 font-serif text-2xl font-semibold">{titulo}</h1>
 
-            <div className="mt-5 flex h-[220px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--pill-bg)] px-6 text-center">
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text-faint)]" aria-hidden>
-                <rect x="4" y="11" width="16" height="10" rx="2" />
-                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-              </svg>
-              <p className="max-w-md text-sm text-[var(--text-muted)]">Fotos e endereço disponíveis sob solicitação.</p>
+            <div className="mt-5 flex h-[260px] flex-col items-center justify-center gap-3 rounded-2xl bg-[#1d2026] px-6 text-center text-white">
+              <IconeOlhoCortado size={44} strokeWidth={1.6} className="opacity-90" />
+              <p className="text-lg font-extrabold uppercase tracking-[0.2em]">Anúncio privado</p>
+              <p className="max-w-md text-sm text-white/70">Fotos e endereço disponíveis sob solicitação.</p>
             </div>
 
+            {bloqueado && (
+              <div className="mt-6 rounded-2xl border border-[#e62f2f]/40 bg-[#fff5f5] p-5">
+                <h2 className="text-base font-bold">Este link é pessoal</h2>
+                <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
+                  Ele foi liberado para outra pessoa e só abre no aparelho dela. Quer ver este imóvel? Deixe seu nome e telefone ao lado — o nosso
+                  atendimento envia um link exclusivo para você.
+                </p>
+              </div>
+            )}
             <div className="mt-6 rounded-2xl border border-accent/40 bg-[#f5f8ff] p-5">
               <h2 className="text-base font-bold">Este imóvel está oculto para o público em geral</h2>
               <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
@@ -74,7 +79,11 @@ export default function OcultoView({ a }: { a: AnuncioOculto }) {
                 titulo="Quero ver este imóvel"
                 condominio={a.condominio || titulo}
                 referencia={`Anúncio reservado ${a.id} — ${titulo} — /imovel/${a.id}`}
-                mensagemInicial={`Olá! Quero ver o anúncio reservado: ${titulo}. Ainda está disponível?`}
+                mensagemInicial={
+                  bloqueado
+                    ? `Olá! Recebi o link do anúncio ${titulo}, mas ele não abriu no meu aparelho. Podem me enviar um link?`
+                    : `Olá! Quero ver o anúncio privado: ${titulo}. Ainda está disponível?`
+                }
               />
             </div>
           </aside>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getFeedPage, getAnunciosOcultos, type FeedItem, type AnuncioOculto } from '@/lib/actions';
+import { getFeedPage, getAnunciosOcultos, contarImoveisAVenda, type FeedItem, type AnuncioOculto } from '@/lib/actions';
 import { countActiveFilters, type FilterState } from '@/lib/filters';
 import OcultoCard from './OcultoCard';
 import { useFavorites } from '@/lib/use-favorites';
@@ -18,6 +18,10 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
   const [done, setDone] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [ocultos, setOcultos] = useState<AnuncioOculto[]>([]);
+  const [totalAVenda, setTotalAVenda] = useState<number | null>(null);
+  useEffect(() => {
+    contarImoveisAVenda().then(setTotalAVenda).catch(() => {});
+  }, []);
   const filtrando = countActiveFilters(filters) > 0;
   const pendingFavoriteId = useRef<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -122,6 +126,11 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
     <>
       <div className="px-4 pb-1 pt-5 text-[15px] font-bold md:px-8 md:pt-6">
         {filters.modo === 'lancamentos' ? 'Lançamentos e empreendimentos' : 'Imóveis para você'}
+        {totalAVenda ? (
+          <span className="ml-2 inline-flex translate-y-[-1px] items-center rounded-full bg-accent/10 px-2.5 py-0.5 align-middle text-xs font-bold text-accent">
+            <span className="font-sans tabular-nums">{totalAVenda.toLocaleString('pt-BR')}</span>&nbsp;imóveis à venda
+          </span>
+        ) : null}
         {filters.locais.length ? (
           <span className="font-normal text-[var(--text-muted)]"> · em {filters.locais.map((l) => l.nome).join(', ')}</span>
         ) : null}

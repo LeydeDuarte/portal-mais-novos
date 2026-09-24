@@ -242,6 +242,10 @@ export default function ImportarPdfPage() {
         uf: f.uf || undefined,
         status: 'rascunho'
       });
+      if (!r.ok && r.duplicado) {
+        if (condos.some((c) => c.id === r.duplicado!.id)) setDestino(r.duplicado.id);
+        throw new Error(`O condomínio ${r.duplicado.name} já está cadastrado — para não duplicar, selecionei ele em "Atualizar só a tabela". Confira e salve de novo.`);
+      }
       if (!r.ok) throw new Error('Faltando: ' + r.faltando.join(', '));
       if (f.entrega) {
         const urls = await subirPlantas(tips.filter((t) => t.incluir));

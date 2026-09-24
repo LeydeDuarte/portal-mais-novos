@@ -334,7 +334,7 @@ export default function ImportarCondominiosPage() {
             </div>
             {semEntrega > 0 && (
               <p className="mt-3 text-xs text-amber-800">
-                {semEntrega} sem data de entrega — entram como <strong>rascunho</strong> (a data é obrigatória para publicar). Dá para completar depois em Condomínios.
+                {semEntrega} sem data de entrega — entram normalmente e no feed aparece <strong>----</strong> no lugar do ano. Dá para completar depois em Condomínios.
               </p>
             )}
 

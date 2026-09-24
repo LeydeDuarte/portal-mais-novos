@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
-import { getPropertiesByCorretor, deleteProperty, marcarComoVendido, getLinkPrivado } from '@/lib/actions';
+import { getPropertiesByCorretor, deleteProperty, marcarComoVendido } from '@/lib/actions';
+import LinkPrivadoModal from '@/components/LinkPrivadoModal';
 import type { PropertyDetail } from '@/lib/property-details';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import { veTudo } from '@/lib/papeis';
@@ -46,22 +47,14 @@ export default function MeusImoveisPage() {
   );
 
   const handleVendido = async (id: string) => {
-    const valor = window.prompt('Marcar como VENDIDO. Ele sai do ar e fica no histórico de mercado.\n\nValor de venda (opcional, só números):', '');
+    const valor = window.prompt('Marcar como VENDIDO. Fica 15 dias no feed com a tag VENDIDO e depois sai sozinho (já entra no histórico de mercado).\n\nValor de venda (opcional, só números):', '');
     if (valor === null) return;
     await marcarComoVendido(id, Number(valor.replace(/\D/g, '')) || undefined);
-    setItems((prev) => prev.filter((p) => p.id !== id));
-    setAviso('Marcado como vendido — está no histórico de mercado.');
+    setItems((prev) => prev.map((p) => (p.id === id ? { ...p, vendidoEm: new Date().toISOString() } : p)));
+    setAviso('Marcado como vendido: fica 15 dias no feed com a tag VENDIDO (anúncio privado sai na hora) e já conta no histórico de mercado.');
   };
 
-  const copiarLink = async (id: string) => {
-    const link = await getLinkPrivado(id);
-    try {
-      await navigator.clipboard.writeText(link);
-      setAviso('Link privado copiado — é só colar no WhatsApp do cliente.');
-    } catch {
-      window.prompt('Copie o link privado:', link);
-    }
-  };
+  const [linkDe, setLinkDe] = useState<PropertyDetail | null>(null);
 
   const handleRemove = async (id: string) => {
     if (!window.confirm('Excluir este imóvel? Ele sai do site, mas os dados ficam guardados no histórico de mercado.')) return;
@@ -128,6 +121,11 @@ export default function MeusImoveisPage() {
                   <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-accent">
                     {TIPO_UNIDADE_LABEL[p.tipoUnidade]}
                     {p.visibilidade === 'privado' && <span className="rounded bg-ink px-1.5 py-0.5 text-[10px] text-white">Privado</span>}
+                    {p.vendidoEm && (
+                      <span className="rounded px-1.5 py-0.5 text-[10px] text-white" style={{ background: '#e62f2f' }}>
+                        Vendido · sai do feed em {Math.max(0, 15 - Math.floor((Date.now() - new Date(p.vendidoEm).getTime()) / 86400000))} dia(s)
+                      </span>
+                    )}
                   </span>
                   <span className="font-sans tabular-nums text-base font-bold tracking-tight">{p.price}</span>
                   <span className="text-sm text-[var(--text-muted)]">
@@ -142,11 +140,11 @@ export default function MeusImoveisPage() {
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
                   {p.visibilidade === 'privado' && (
-                    <button type="button" onClick={() => copiarLink(p.id)} className="text-sm font-semibold text-accent hover:underline">
-                      Copiar link privado
+                    <button type="button" onClick={() => setLinkDe(p)} className="text-sm font-semibold text-accent hover:underline">
+                      Enviar link privado
                     </button>
                   )}
-                  {p.finalidade === 'venda' && (
+                  {p.finalidade === 'venda' && !p.vendidoEm && (
                     <button type="button" onClick={() => handleVendido(p.id)} className="text-sm font-semibold text-emerald-700 hover:underline">
                       Vendido
                     </button>
@@ -166,6 +164,13 @@ export default function MeusImoveisPage() {
           </div>
         )}
       </main>
+      {linkDe && (
+        <LinkPrivadoModal
+          propertyId={linkDe.id}
+          titulo={[TIPO_UNIDADE_LABEL[linkDe.tipoUnidade], linkDe.condominio, linkDe.area].filter(Boolean).join(' · ')}
+          onClose={() => setLinkDe(null)}
+        />
+      )}
     </div>
   );
 }

@@ -107,7 +107,7 @@ export default function CondominioPicker({ condominios, selectedId, onSelect: on
     const id = `condo-${Date.now()}`;
     const location = formatLocation(novo.endereco);
     try {
-      await createDevelopment({
+      const r = await createDevelopment({
         id,
         name: novo.name.trim(),
         location,
@@ -118,6 +118,14 @@ export default function CondominioPicker({ condominios, selectedId, onSelect: on
         status: 'rascunho',
         ...novo.endereco
       });
+      if (!r.ok && r.duplicado) {
+        // já existe: usa o cadastrado em vez de criar outro
+        const existente = condominios.find((c) => c.id === r.duplicado!.id);
+        if (existente) onSelect(existente);
+        else setErro(`Já existe o condomínio ${r.duplicado.name}${r.duplicado.bairro ? ` (${r.duplicado.bairro})` : ''} — procure pelo nome acima.`);
+        setCreating(false);
+        return;
+      }
       const resumo: CondominioResumo = {
         id,
         name: novo.name.trim(),

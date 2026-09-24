@@ -8,6 +8,7 @@ import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { listCondominios, type CondominioResumo } from '@/lib/actions';
+import { contarDuplicados } from '@/lib/duplicados';
 
 function normalize(t: string) {
   return t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -25,8 +26,10 @@ export default function CondominiosPage() {
     if (loaded && !staff) router.replace('/painel/login');
   }, [loaded, staff, router]);
 
+  const [duplicados, setDuplicados] = useState(0);
   useEffect(() => {
     if (staff) listCondominios().then(setItems).catch(() => setItems([]));
+    if (staff && veTudo(staff.role)) contarDuplicados().then(setDuplicados).catch(() => {});
   }, [staff]);
 
   const lista = useMemo(() => {
@@ -52,6 +55,14 @@ export default function CondominiosPage() {
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {veTudo(staff.role) && (
+              <Link
+                href="/painel/condominios/duplicados"
+                className={`rounded-full px-4 py-2 text-sm font-bold ${duplicados ? 'bg-[#e62f2f] text-white hover:opacity-90' : 'border border-[var(--border)] hover:bg-[var(--pill-bg)]'}`}
+              >
+                {duplicados ? `${duplicados} possíveis duplicados` : 'Duplicados'}
+              </Link>
+            )}
             <Link href="/painel/condominios/importar" className="rounded-full border border-[var(--border)] px-4 py-2 text-sm font-bold hover:bg-[var(--pill-bg)]">
               Importar planilha
             </Link>

@@ -155,7 +155,7 @@ export function tipoDoImovel(i: Pick<JtImovel, 'tipo' | 'subtipo'>): TipoUnidade
 }
 
 // Sem data de entrega na Jetimob: usa a do condomínio; senão estima pelo status
-// (só para a etiqueta Lançamento/Seminovo/Usado — dá para corrigir no painel).
+// (só usada para limpar anos estimados pela 1ª importação).
 function entregaEstimada(status?: string | null, cadastro?: string | null): string {
   const s = sa(status ?? '');
   const ano = new Date().getFullYear();
@@ -272,7 +272,7 @@ export async function sincronizarCondominios(pagina: number, email: string, troc
            on conflict (id) do nothing`,
           [
             id, email, reg.name, reg.location, reg.delivery_date, reg.description, JSON.stringify(reg.amenities), reg.video_url, reg.cep, reg.logradouro,
-            reg.bairro, reg.cidade, reg.uf, reg.delivery_date && reg.bairro && reg.cidade ? 'publicado' : 'rascunho', reg.lat, reg.lng, c.id_condominio,
+            reg.bairro, reg.cidade, reg.uf, reg.bairro && reg.cidade ? 'publicado' : 'rascunho', reg.lat, reg.lng, c.id_condominio,
             JSON.stringify(filaDe(fotos, [])), JSON.stringify(fotos)
           ]
         );
@@ -294,7 +294,7 @@ export async function idsAtivos(): Promise<Set<string>> {
   return new Set((r.result ?? []).map(String));
 }
 
-type PropExistente = { id: string; jetimob_fotos_src: unknown; titulo: string | null; description: string; empreendimento_id: string | null };
+type PropExistente = { id: string; jetimob_fotos_src: unknown; titulo: string | null; description: string; empreendimento_id: string | null; delivery_date: Date | string | null };
 
 export async function sincronizarImoveis(
   pagina: number,
@@ -307,7 +307,7 @@ export async function sincronizarImoveis(
 
   const ids = r.data.map((i) => i.id_imovel).filter(Boolean);
   const existentes = await query<PropExistente & { jetimob_id: string }>(
-    'select id, jetimob_id, jetimob_fotos_src, titulo, description, empreendimento_id from properties where jetimob_id = any($1::bigint[])',
+    'select id, jetimob_id, jetimob_fotos_src, titulo, description, empreendimento_id, delivery_date from properties where jetimob_id = any($1::bigint[])',
     [ids]
   );
   const porJt = new Map(existentes.map((e) => [String(e.jetimob_id), e]));
@@ -333,7 +333,8 @@ export async function sincronizarImoveis(
       const area = areaBruta ? Math.round(areaBruta * fator * 100) / 100 : null;
       const condo = i.id_condominio ? condoPorJt.get(String(i.id_condominio)) : undefined;
       const condoData = condo?.delivery_date ? new Date(condo.delivery_date).toISOString().slice(0, 10) : null;
-      const entrega = entregaDe(i.entrega_ano, i.entrega_mes) ?? condoData ?? entregaDoNome(i.condominio_nome) ?? entregaEstimada(i.status, i.data_cadastro);
+      // Sem ano de entrega na Jetimob (nem no condomínio): fica vazio e o site mostra "----"
+      const entrega = entregaDe(i.entrega_ano, i.entrega_mes) ?? condoData ?? entregaDoNome(i.condominio_nome) ?? null;
       const bairro = txt(i.endereco_bairro) ? padronizarBairro(i.endereco_bairro!) : null;
       const cidade = txt(i.endereco_cidade) ? formatTitulo(i.endereco_cidade!) : null;
       const estado = uf(i.endereco_estado);
@@ -378,7 +379,13 @@ export async function sincronizarImoveis(
         valores.condominio, valores.visibilidade, valores.lat, valores.lng, valores.aproximada, i.id_imovel, i.codigo ?? null
       ];
       if (e && !opcoes.sobrescrever) {
-        // já importado: o portal é a fonte agora — só recoloca as fotos se ainda não vieram
+        // já importado: o portal é a fonte agora. Correção única: a 1ª importação
+        // inventava um ano quando a Jetimob não tinha — volta para vazio ("----").
+        if (!entrega && e.delivery_date) {
+          const atual = new Date(e.delivery_date).toISOString().slice(0, 10);
+          if (atual === entregaEstimada(i.status, i.data_cadastro)) await query('update properties set delivery_date = null where id = $1', [e.id]);
+        }
+        // só recoloca as fotos se ainda não vieram
         if (
           (fotosMudaram && src.length && opcoes.trocarFotos) ||
           (fotosMudaram && !(await query<{ n: number }>("select 1 as n from properties where id = $1 and jsonb_array_length(photos) > 0", [e.id])).length)

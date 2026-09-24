@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { AnuncioOculto } from '@/lib/actions';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import { brlCurto } from '@/lib/ocultos';
+import IconeOlhoCortado from '@/components/IconeOlhoCortado';
 
 // Card de anúncio RESERVADO (privado): só características — sem foto, título
 // ou endereço. Leva para a página do anúncio, onde a pessoa pede para ver.
@@ -11,14 +12,15 @@ export default function OcultoCard({ a }: { a: AnuncioOculto }) {
       href={`/imovel/${a.id}`}
       className="group flex flex-col gap-2 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--pill-bg)]/60 p-4 transition-colors hover:border-accent hover:bg-[var(--bg)]"
     >
+      <div className="flex h-28 flex-col items-center justify-center gap-1.5 rounded-xl bg-[#1d2026] text-white">
+        <IconeOlhoCortado size={26} strokeWidth={1.7} />
+        <span className="text-[11px] font-extrabold uppercase tracking-[0.18em]">Anúncio privado</span>
+      </div>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] font-bold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[a.tipoUnidade]}</span>
         <span className="flex items-center gap-1 rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold text-white">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <rect x="4" y="11" width="16" height="10" rx="2" />
-            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-          </svg>
-          Reservado
+          <IconeOlhoCortado size={10} strokeWidth={2.4} />
+          Privado
         </span>
       </div>
       <div className="font-sans text-lg font-bold tabular-nums tracking-tight">{a.preco ? brlCurto(a.preco) : 'Valor sob consulta'}</div>

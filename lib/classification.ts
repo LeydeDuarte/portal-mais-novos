@@ -3,16 +3,18 @@
 // formato "AAAA-MM"), comparando com a data atual:
 //
 // - Entrega no futuro                         → "Lançamento"
-// - Entrega até 5 anos atrás                  → "Seminovo"
-// - Entrega há mais de 5 anos                 → "Usado"
+// - Entregue há até 36 meses (3 anos)         → "Novo"
+// - Entregue de 3 a 6 anos atrás              → "Seminovo"
+// - Entregue há mais de 6 anos                → "Usado"
 //
 // Como a comparação é sempre contra hoje, um imóvel migra sozinho de
 // Lançamento → Seminovo → Usado conforme o tempo passa, sem precisar de
 // nenhuma atualização manual nem campo extra.
 
-export type StatusBucket = 'lancamento' | 'seminovo' | 'usado';
+export type StatusBucket = 'lancamento' | 'novo' | 'seminovo' | 'usado';
 
-const SEMINOVO_LIMITE_ANOS = 5;
+export const NOVO_LIMITE_ANOS = 3; // 36 meses depois da entrega
+export const SEMINOVO_LIMITE_ANOS = 6; // + 3 anos como seminovo
 const MS_POR_ANO = 1000 * 60 * 60 * 24 * 365.25;
 
 function parseDeliveryDate(deliveryDate: string): Date {
@@ -29,7 +31,9 @@ function anosDesdeEntrega(deliveryDate: string, today: Date): number {
 
 export function getStatusBucket(deliveryDate: string, today: Date = new Date()): StatusBucket {
   if (isFutureDelivery(deliveryDate, today)) return 'lancamento';
-  return anosDesdeEntrega(deliveryDate, today) <= SEMINOVO_LIMITE_ANOS ? 'seminovo' : 'usado';
+  const anos = anosDesdeEntrega(deliveryDate, today);
+  if (anos <= NOVO_LIMITE_ANOS) return 'novo';
+  return anos <= SEMINOVO_LIMITE_ANOS ? 'seminovo' : 'usado';
 }
 
 export function getDeliveryYear(deliveryDate: string): number {
@@ -38,6 +42,7 @@ export function getDeliveryYear(deliveryDate: string): number {
 
 const BUCKET_LABEL: Record<StatusBucket, string> = {
   lancamento: 'Lançamento',
+  novo: 'Novo',
   seminovo: 'Seminovo',
   usado: 'Usado'
 };
@@ -46,6 +51,7 @@ const BUCKET_LABEL: Record<StatusBucket, string> = {
 // ao mais antigo (tom neutro), pra dar a leitura visual de "quão novo é" de relance.
 const BUCKET_COLOR: Record<StatusBucket, { bg: string; text: string }> = {
   lancamento: { bg: '#257CFF', text: '#FFFFFF' },
+  novo: { bg: '#1B5FCC', text: '#FFFFFF' },
   seminovo: { bg: '#5B6B7A', text: '#FFFFFF' },
   usado: { bg: 'rgba(20,22,26,0.72)', text: '#FFFFFF' }
 };
@@ -59,7 +65,17 @@ export type StatusBadge = {
   color: string;
 };
 
-export function getStatusBadge(deliveryDate: string, today: Date = new Date()): StatusBadge {
+// Sem ano de entrega cadastrado (ex.: veio da Jetimob ou da planilha sem essa
+// informação): no lugar do ano aparecem só tracinhos.
+export const SEM_ANO = '----';
+export function temEntrega(deliveryDate?: string | null): deliveryDate is string {
+  return !!deliveryDate && /^\d{4}-\d{2}/.test(deliveryDate);
+}
+
+export function getStatusBadge(deliveryDate: string | null | undefined, today: Date = new Date()): StatusBadge {
+  if (!temEntrega(deliveryDate)) {
+    return { bucket: 'usado', label: '', year: 0, text: `Entrega · ${SEM_ANO}`, bg: 'rgba(20,22,26,0.72)', color: '#FFFFFF' };
+  }
   const bucket = getStatusBucket(deliveryDate, today);
   const year = getDeliveryYear(deliveryDate);
   const { bg, text: color } = BUCKET_COLOR[bucket];

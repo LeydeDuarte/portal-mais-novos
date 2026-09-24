@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
+import { destinoDoMesclado } from '@/lib/duplicados';
 import DevelopmentDetailView from '@/components/DevelopmentDetailView';
 import { getDevelopmentById } from '@/lib/actions';
 import { buildDevelopmentMetadata, buildDevelopmentJsonLd } from '@/lib/seo';
@@ -16,7 +17,12 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
 export default async function EmpreendimentoPage({ params }: { params: { id: string } }) {
   const development = await getDevelopmentById(params.id);
-  if (!development) notFound();
+  if (!development) {
+    // condomínio que foi juntado a outro: o endereço antigo leva para o que ficou
+    const novo = await destinoDoMesclado(params.id);
+    if (novo) permanentRedirect(`/empreendimento/${novo}`);
+    notFound();
+  }
 
   const jsonLd = buildDevelopmentJsonLd(development);
   return (

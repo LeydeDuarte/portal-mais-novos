@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Visualizacoes from '@/components/Visualizacoes';
 import TemporadaBadge from '@/components/TemporadaBadge';
 import type { DevelopmentCardData } from '@/lib/actions';
 import { getStatusBadge } from '@/lib/classification';
@@ -48,6 +49,7 @@ export default function DevelopmentCard({ development }: { development: Developm
               {badge.text}
             </span>
             <span className="rounded-md bg-[var(--pill-bg)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">Condomínio</span>
+            <Visualizacoes n={development.visualizacoes} className="ml-auto" />
           </div>
           <div className="mt-2.5 font-serif text-base font-semibold leading-tight md:text-lg">{development.name}</div>
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">{development.location}</div>
@@ -77,8 +79,9 @@ export default function DevelopmentCard({ development }: { development: Developm
             <span className="text-[11px] text-[var(--text-faint)]">[FOTO DO EMPREENDIMENTO]</span>
           )}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/60" />
+          <Visualizacoes n={development.visualizacoes} className="absolute right-2.5 top-2.5 z-20" />
 
-          <div className="absolute left-2.5 right-2.5 top-2.5 z-10 flex flex-wrap items-center gap-1.5">
+          <div className="absolute left-2.5 right-16 top-2.5 z-10 flex flex-wrap items-center gap-1.5">
             <span className="rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
               {badge.text}
             </span>
@@ -91,7 +94,7 @@ export default function DevelopmentCard({ development }: { development: Developm
           <div className="absolute bottom-3 left-3 right-3 z-10 text-white">
             <div className="font-serif text-base font-semibold leading-tight drop-shadow md:text-lg">{development.name}</div>
             <div className="text-[11px] opacity-90 md:text-xs">
-              Entrega {MESES[Number(mes) - 1] ?? mes}/{ano}
+              Entrega {ano ? `${MESES[Number(mes) - 1] ?? mes}/${ano}` : '--/----'}
             </div>
           </div>
         </div>

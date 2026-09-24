@@ -18,7 +18,7 @@ export function buildPropertyMetadata(property: PropertyDetail): Metadata {
   const badge = getStatusBadge(property.deliveryDate);
   const tipo = TIPO_UNIDADE_LABEL[property.tipoUnidade];
   const baseTitle = property.titulo || `${tipo} em ${property.location}`;
-  const title = `${baseTitle} — ${badge.label} | ${SITE_NAME}`;
+  const title = badge.label ? `${baseTitle} — ${badge.label} | ${SITE_NAME}` : `${baseTitle} | ${SITE_NAME}`;
   const description = descricaoTextoPuro(property.description).slice(0, 155);
   const url = `${SITE_URL}/imovel/${property.id}`;
 
@@ -86,7 +86,7 @@ export function buildAgentJsonLd() {
 
 export function buildDevelopmentMetadata(development: Development): Metadata {
   const badge = getStatusBadge(development.deliveryDate);
-  const title = `${development.name} — ${development.location} | ${badge.label} | ${SITE_NAME}`;
+  const title = `${development.name} — ${development.location}${badge.label ? ` | ${badge.label}` : ''} | ${SITE_NAME}`;
   const description = (descricaoTextoPuro(development.description) || `${development.name} em ${development.location}.`).slice(0, 155);
   const url = `${SITE_URL}/empreendimento/${development.id}`;
 
