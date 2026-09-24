@@ -1,21 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
-// Campo de busca do topo: em qualquer página, leva para o feed com ?q=.
-// Se a pessoa estiver em Lançamentos, a busca continua em Lançamentos.
-export default function Header({ initialQuery = '' }: { initialQuery?: string }) {
+// Campo de busca do topo.
+// - No feed (Comprar/Lançamentos): cada Enter vira um "balão" na barra de
+//   filtros e o campo esvazia para a próxima palavra (ex: "marista" Enter,
+//   "bueno" Enter → dois balões, mostra os dois bairros).
+// - Nas outras páginas: leva para o feed já com a busca (?q=).
+export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [q, setQ] = useState(initialQuery);
-  useEffect(() => setQ(initialQuery), [initialQuery]);
+  const [q, setQ] = useState('');
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const base = pathname === '/lancamentos' ? '/lancamentos' : '/';
     const term = q.trim();
-    router.push(term ? `${base}?q=${encodeURIComponent(term)}` : base);
+    if (!term) return;
+    const base = pathname === '/lancamentos' ? '/lancamentos' : '/';
+    router.push(`${base}?q=${encodeURIComponent(term)}`);
   };
 
   return (
@@ -41,6 +44,7 @@ export default function Header({ initialQuery = '' }: { initialQuery?: string })
         ))}
       </nav>
 
+      {searchSlot ?? (
       <form onSubmit={submit} role="search" className="flex max-w-[560px] flex-grow items-center gap-2 rounded-full bg-[var(--pill-bg)] px-4 py-2.5">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-[var(--text-muted)]">
           <circle cx="11" cy="11" r="7" />
@@ -56,6 +60,7 @@ export default function Header({ initialQuery = '' }: { initialQuery?: string })
           className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--text-faint)]"
         />
       </form>
+      )}
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         <button type="button" aria-label="Favoritos" className="flex h-[38px] w-[38px] items-center justify-center rounded-full hover:bg-[var(--pill-bg)]">

@@ -104,7 +104,12 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
     <>
       <div className="px-4 pb-1 pt-5 text-[15px] font-bold md:px-8 md:pt-6">
         {filters.modo === 'lancamentos' ? 'Lançamentos e empreendimentos' : 'Imóveis para você'}
-        {filters.q ? <span className="font-normal text-[var(--text-muted)]"> · busca por “{filters.q}”</span> : null}
+        {filters.locais.length ? (
+          <span className="font-normal text-[var(--text-muted)]"> · em {filters.locais.map((l) => l.nome).join(', ')}</span>
+        ) : null}
+        {filters.termos.length ? (
+          <span className="font-normal text-[var(--text-muted)]"> · busca por {filters.termos.map((t) => `“${t}”`).join(' ou ')}</span>
+        ) : null}
       </div>
 
       <div className="columns-2 gap-2.5 px-2.5 pb-16 pt-2.5 sm:columns-3 sm:gap-3 sm:px-5 md:columns-4 md:gap-4 md:px-7 xl:columns-5 xl:gap-4.5 2xl:columns-6">

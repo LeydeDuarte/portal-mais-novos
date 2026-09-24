@@ -4,11 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 
 // Autoplay rotativo dos imóveis com vídeo de capa: nunca mais de MAX_PLAYING
 // vídeos tocando ao mesmo tempo no feed inteiro. Entre os visíveis na tela,
-// prioriza o maior matchScore (afinidade de perfil) e troca periodicamente o
-// que está tocando há mais tempo pelo próximo melhor candidato visível.
+// prioriza o maior matchScore (afinidade de perfil) e, depois de ~30 s, troca
+// o que está tocando há mais tempo pelo próximo melhor candidato visível.
 
 const MAX_PLAYING = 3;
-const ROTATE_MS = 5500;
+// Cada vídeo toca pelo menos 30 segundos antes de dar a vez ao próximo
+// (a verificação roda a cada 2 s, só troca quem já completou o tempo).
+const MIN_PLAY_MS = 30_000;
+const TICK_MS = 2_000;
 
 type Entry = {
   id: string;
@@ -85,6 +88,7 @@ class VideoRotationManager {
     }
 
     playing.sort((a, b) => a.activatedAt - b.activatedAt);
+    if (Date.now() - playing[0].activatedAt < MIN_PLAY_MS) return; // ainda não completou os 30 s
     playing[0].playing = false;
     waiting[0].playing = true;
     waiting[0].activatedAt = Date.now();
@@ -93,7 +97,7 @@ class VideoRotationManager {
 
   private ensureTimer() {
     if (this.timer) return;
-    this.timer = setInterval(() => this.rotate(), ROTATE_MS);
+    this.timer = setInterval(() => this.rotate(), TICK_MS);
   }
 }
 

@@ -76,8 +76,16 @@ export async function getFeedPage(page: number, filters: FilterState): Promise<{
 
   // ---- Condições dos imóveis (alias p, com o empreendimento em d) ----
   if (filters.finalidade !== 'todas') propConds.push(`p.finalidade = ${p(filters.finalidade)}`);
-  if (filters.tipoUnidade !== 'todas') propConds.push(`p.tipo_unidade = ${p(filters.tipoUnidade)}`);
-  if (filters.precoMax !== 'todas') propConds.push(`p.price_value <= ${p(filters.precoMax)}`);
+  const tipos = (filters.tipos ?? []).filter((t) => t in TIPO_UNIDADE_LABEL);
+  const precoMin = filters.precoMin && filters.precoMin > 0 ? filters.precoMin : null;
+  const precoMax = filters.precoMax && filters.precoMax > 0 ? filters.precoMax : null;
+  const areaMin = filters.areaMin && filters.areaMin > 0 ? filters.areaMin : null;
+  const areaMax = filters.areaMax && filters.areaMax > 0 ? filters.areaMax : null;
+  if (tipos.length) propConds.push(`p.tipo_unidade = any(${p(tipos)}::text[])`);
+  if (precoMin) propConds.push(`p.price_value >= ${p(precoMin)}`);
+  if (precoMax) propConds.push(`p.price_value <= ${p(precoMax)}`);
+  if (areaMin) propConds.push(`p.area >= ${p(areaMin)}`);
+  if (areaMax) propConds.push(`p.area <= ${p(areaMax)}`);
   if (filters.quartosMin !== 'todas') propConds.push(`p.quartos >= ${p(filters.quartosMin)}`);
   if (filters.vagasMin !== 'todas') propConds.push(`p.vagas >= ${p(filters.vagasMin)}`);
   if (filters.aceitaTemporada === 'sim') propConds.push('p.aceita_temporada = true');
@@ -85,11 +93,15 @@ export async function getFeedPage(page: number, filters: FilterState): Promise<{
 
   // ---- Condições dos empreendimentos (alias d, resumo das unidades em u) ----
   if (filters.finalidade === 'aluguel') devConds.push('false');
-  if (filters.tipoUnidade !== 'todas') {
-    const t = p(filters.tipoUnidade);
-    devConds.push(`(d.tipos_unidade ? ${t} or coalesce(u.tipos, '[]'::jsonb) ? ${t})`);
+  if (tipos.length) {
+    const t = p(tipos);
+    devConds.push(`(d.tipos_unidade ?| ${t}::text[] or coalesce(u.tipos, '[]'::jsonb) ?| ${t}::text[])`);
   }
-  if (filters.precoMax !== 'todas') devConds.push(`u.min_price <= ${p(filters.precoMax)}`);
+  // Empreendimento entra se alguma tipologia cai dentro da faixa pedida
+  if (precoMin) devConds.push(`u.max_price >= ${p(precoMin)}`);
+  if (precoMax) devConds.push(`u.min_price <= ${p(precoMax)}`);
+  if (areaMin) devConds.push(`u.max_area >= ${p(areaMin)}`);
+  if (areaMax) devConds.push(`u.min_area <= ${p(areaMax)}`);
   if (filters.quartosMin !== 'todas') devConds.push(`greatest(u.max_quartos, dq.max_quartos) >= ${p(filters.quartosMin)}`);
   if (filters.vagasMin !== 'todas') devConds.push(`u.max_vagas >= ${p(filters.vagasMin)}`);
   if (filters.aceitaTemporada === 'sim') devConds.push('d.aceita_temporada = true');
@@ -123,10 +135,50 @@ export async function getFeedPage(page: number, filters: FilterState): Promise<{
   }
 
   // Busca livre: cada palavra precisa aparecer em algum dos campos
-  for (const token of searchTokens(filters.q || '')) {
-    const v = p(`%${token}%`);
-    propConds.push(`pt.txt like ${v}`);
-    devConds.push(`dx.txt like ${v}`);
+  // Locais marcados (cidade / bairro / condomínio) — qualquer um deles serve
+  const locais = (filters.locais ?? []).slice(0, 20);
+  if (locais.length) {
+    const propOr: string[] = [];
+    const devOr: string[] = [];
+    for (const l of locais) {
+      const cid = p(l.cidade);
+      const eqCid = (col: string) => `${norm(`coalesce(${col}, '')`)} = ${norm(`${cid}::text`)}`;
+      if (l.tipo === 'cidade') {
+        propOr.push(eqCid('p.cidade'));
+        devOr.push(eqCid('d.cidade'));
+      } else if (l.tipo === 'bairro') {
+        const b = p(l.nome);
+        propOr.push(`(${norm("coalesce(p.bairro, '')")} = ${norm(`${b}::text`)} and ${eqCid('p.cidade')})`);
+        devOr.push(`(${norm("coalesce(d.bairro, '')")} = ${norm(`${b}::text`)} and ${eqCid('d.cidade')})`);
+      } else {
+        const n = p(l.nome);
+        const nomeIgual = (col: string) => `${norm(`coalesce(${col}, '')`)} = ${norm(`${n}::text`)}`;
+        if (l.id) {
+          const id = p(l.id);
+          propOr.push(`(p.empreendimento_id = ${id} or (${nomeIgual('p.condominio')} and ${eqCid('p.cidade')}))`);
+          devOr.push(`d.id = ${id}`);
+        } else {
+          propOr.push(`(${nomeIgual('p.condominio')} and ${eqCid('p.cidade')})`);
+          devOr.push(`(${nomeIgual('d.name')} and ${eqCid('d.cidade')})`);
+        }
+      }
+    }
+    propConds.push(`(${propOr.join(' or ')})`);
+    devConds.push(`(${devOr.join(' or ')})`);
+  }
+
+  // Balões de busca: (todas as palavras do balão 1) OU (todas as palavras do balão 2) ...
+  const grupos = (filters.termos ?? []).map(searchTokens).filter((g) => g.length);
+  if (grupos.length) {
+    const propOr: string[] = [];
+    const devOr: string[] = [];
+    for (const tokens of grupos) {
+      const vs = tokens.map((t) => p(`%${t}%`));
+      propOr.push(`(${vs.map((v) => `pt.txt like ${v}`).join(' and ')})`);
+      devOr.push(`(${vs.map((v) => `dx.txt like ${v}`).join(' and ')})`);
+    }
+    propConds.push(`(${propOr.join(' or ')})`);
+    devConds.push(`(${devOr.join(' or ')})`);
   }
 
   const where = (conds: string[]) => (conds.length ? `where ${conds.join(' and ')}` : '');
@@ -150,6 +202,9 @@ export async function getFeedPage(page: number, filters: FilterState): Promise<{
          from developments d
          left join lateral (
            select min(x.price_value) filter (where x.price_value > 0) as min_price,
+                  max(x.price_value) as max_price,
+                  min(x.area) as min_area,
+                  max(x.area) as max_area,
                   max(x.quartos) as max_quartos,
                   max(x.vagas) as max_vagas,
                   jsonb_agg(distinct x.tipo_unidade) as tipos,
@@ -245,6 +300,49 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       height: heightFromId(base.id) + 40
     };
   });
+}
+
+// ---------------- Índice de locais para a busca ----------------
+// Só lugares onde EXISTE anúncio publicado (a lista cresce sozinha conforme
+// os cadastros entram). Agrupa grafias diferentes ("Goiania"/"Goiânia").
+export type LocalSugestao = {
+  tipo: 'cidade' | 'bairro' | 'condominio';
+  nome: string;
+  cidade: string;
+  uf: string;
+  id?: string; // condomínio cadastrado (empreendimento)
+  total: number;
+};
+
+export async function getLocationIndex(): Promise<LocalSugestao[]> {
+  const rows = await query<{ tipo: 'cidade' | 'bairro' | 'condominio'; nome: string; cidade: string; uf: string | null; id: string | null; total: string }>(
+    `with anuncios as (
+       select p.bairro, p.cidade, p.uf, coalesce(pd.name, p.condominio) as condominio, pd.id as dev_id
+         from properties p left join developments pd on pd.id = p.empreendimento_id
+        where p.is_tipologia = false and p.cidade is not null
+       union all
+       select d.bairro, d.cidade, d.uf, d.name, d.id
+         from developments d where d.status = 'publicado' and d.delivery_date is not null and d.cidade is not null
+     ),
+     cidades as (
+       select 'cidade' as tipo, mode() within group (order by cidade) as nome, mode() within group (order by cidade) as cidade,
+              max(uf) as uf, null::text as id, count(*) as total
+         from anuncios group by ${norm('cidade')}
+     ),
+     bairros as (
+       select 'bairro' as tipo, mode() within group (order by bairro) as nome, mode() within group (order by cidade) as cidade,
+              max(uf) as uf, null::text as id, count(*) as total
+         from anuncios where bairro is not null group by ${norm('bairro')}, ${norm('cidade')}
+     ),
+     condos as (
+       select 'condominio' as tipo, mode() within group (order by condominio) as nome, mode() within group (order by cidade) as cidade,
+              max(uf) as uf, max(dev_id) as id, count(*) as total
+         from anuncios where condominio is not null group by ${norm('condominio')}, ${norm('cidade')}
+     )
+     select * from cidades union all select * from bairros union all select * from condos
+     order by total desc`
+  );
+  return rows.map((r) => ({ tipo: r.tipo, nome: r.nome, cidade: r.cidade, uf: r.uf ?? '', id: r.id ?? undefined, total: Number(r.total) || 0 }));
 }
 
 // ---------------- Reconhecimento de condomínio pelo CEP ----------------
