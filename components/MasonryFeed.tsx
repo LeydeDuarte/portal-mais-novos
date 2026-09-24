@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getFeedPage, getAnunciosOcultos, contarImoveisAVenda, type FeedItem, type AnuncioOculto } from '@/lib/actions';
+import { getFeedPage, getAnunciosOcultos, contarImoveisAVenda, feedModoEquipe, condominiosDosBairros, type FeedItem, type AnuncioOculto, type CondoDoBairro } from '@/lib/actions';
+import Link from 'next/link';
 import { countActiveFilters, type FilterState } from '@/lib/filters';
 import OcultoCard from './OcultoCard';
 import { useFavorites } from '@/lib/use-favorites';
@@ -19,8 +20,10 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [ocultos, setOcultos] = useState<AnuncioOculto[]>([]);
   const [totalAVenda, setTotalAVenda] = useState<number | null>(null);
+  const [modoEquipe, setModoEquipe] = useState(false);
   useEffect(() => {
     contarImoveisAVenda().then(setTotalAVenda).catch(() => {});
+    feedModoEquipe().then(setModoEquipe).catch(() => {});
   }, []);
   const filtrando = countActiveFilters(filters) > 0;
   const pendingFavoriteId = useRef<string | null>(null);
@@ -65,6 +68,23 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
       vivo = false;
     };
   }, [done, filtrando, filters]);
+
+  // Filtro por bairro: no fim da lista, os nomes de todos os condomínios do bairro
+  const [condosBairro, setCondosBairro] = useState<CondoDoBairro[]>([]);
+  const [verTodosCondos, setVerTodosCondos] = useState(false);
+  useEffect(() => {
+    setCondosBairro([]);
+    setVerTodosCondos(false);
+    const bairros = filters.locais.filter((l) => l.tipo === 'bairro').map((l) => ({ nome: l.nome, cidade: l.cidade }));
+    if (!bairros.length) return;
+    let vivo = true;
+    condominiosDosBairros(bairros)
+      .then((c) => vivo && setCondosBairro(c))
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [filters]);
 
   useEffect(() => {
     setPage(0);
@@ -139,6 +159,13 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
         ) : null}
       </div>
 
+      {modoEquipe && (
+        <p className="mx-4 mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 md:mx-8">
+          <strong>Visão da equipe:</strong> você está logada no painel, então o feed mostra <strong>todos</strong> os condomínios. Visitantes só veem no
+          feed os condomínios com foto — os demais aparecem quando pesquisam o nome.
+        </p>
+      )}
+
       <div className="columns-2 gap-2.5 px-2.5 pb-16 pt-2.5 sm:columns-3 sm:gap-3 sm:px-5 md:columns-4 md:gap-4 md:px-7 xl:columns-5 xl:gap-4.5 2xl:columns-6">
         {items.map((item) =>
           item.kind === 'empreendimento' ? (
@@ -179,6 +206,40 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
             {ocultos.map((a) => (
               <OcultoCard key={a.id} a={a} />
             ))}
+          </div>
+        </section>
+      )}
+
+      {(done || (items.length === 0 && !loading)) && condosBairro.length > 0 && (
+        <section className="mx-auto mb-16 w-full max-w-6xl px-4 md:px-8" aria-label="Condomínios neste bairro">
+          <h2 className="text-lg font-bold">
+            Condomínios {filters.locais.filter((l) => l.tipo === 'bairro').length > 1 ? 'nestes bairros' : `no ${filters.locais.find((l) => l.tipo === 'bairro')?.nome}`}
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Conheça os condomínios da região — toque no nome para ver fotos, lazer e o que está à venda.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(verTodosCondos ? condosBairro : condosBairro.slice(0, 40)).map((c) => (
+              <Link
+                key={c.id}
+                href={`/empreendimento/${c.id}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 py-1.5 text-sm font-semibold hover:border-accent hover:text-accent"
+              >
+                {c.nome}
+                {c.anuncios > 0 && (
+                  <span className="rounded-full bg-[#16A34A] px-1.5 text-[10px] font-bold text-white" title={`${c.anuncios} anúncio(s)`}>
+                    {c.anuncios}
+                  </span>
+                )}
+              </Link>
+            ))}
+            {!verTodosCondos && condosBairro.length > 40 && (
+              <button
+                type="button"
+                onClick={() => setVerTodosCondos(true)}
+                className="rounded-full bg-[var(--pill-bg)] px-3.5 py-1.5 text-sm font-bold hover:bg-[var(--border)]"
+              >
+                Ver todos ({condosBairro.length})
+              </button>
+            )}
           </div>
         </section>
       )}

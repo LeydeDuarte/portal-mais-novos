@@ -41,6 +41,7 @@ export type DevelopmentCardData = {
   height: number;
   visualizacoes: number;
   tipo: 'vertical' | 'horizontal';
+  anuncios: number; // anúncios avulsos públicos ligados ao condomínio (bolinha no card)
 };
 
 export type FeedItem = { kind: 'imovel'; property: PropertyDetail } | { kind: 'empreendimento'; development: DevelopmentCardData };
@@ -115,12 +116,16 @@ export async function getFeedPage(page: number, filters: FilterState, opcoes?: {
   if (filters.aceitaTemporada === 'sim') devConds.push('d.aceita_temporada = true');
   // Só condomínios publicados; as tipologias da tabela de vendas aparecem dentro do card do empreendimento
   devConds.push("d.status = 'publicado'"); // sem ano de entrega também aparece (com "----" no lugar do ano)
-  // Para o público, condomínio que NÃO é lançamento e não tem foto nem anúncio
-  // ligado (tipologia da tabela não conta) não entra no feed — só aparece quando a
-  // pessoa pesquisa o nome dele (e no Google, pela página própria). A equipe logada vê tudo.
+  // Para o público, o card do CONDOMÍNIO (com ou sem foto) entra no feed (Todos e
+  // Lançamentos) se for LANÇAMENTO ou NOVO (entregue há até 36 meses) ou se tiver
+  // ANÚNCIO ligado. Sem anúncio, só aparece quando a pessoa pesquisa o nome (e no
+  // Google, pela página própria) — assim o feed não enche de condomínio vazio.
+  // A equipe logada vê todos.
   const pesquisandoNome = (filters.termos ?? []).length > 0 || (filters.locais ?? []).some((l) => l.tipo === 'condominio');
   if (!pesquisandoNome && !currentStaff())
-    devConds.push("(d.delivery_date > now() or jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) > 0 or coalesce(u.avulsos, 0) > 0)");
+    devConds.push(
+      "(d.delivery_date > now() - interval '3 years' or coalesce(u.avulsos, 0) > 0)"
+    );
   propConds.push('p.is_tipologia = false');
   // Anúncios PRIVADOS (portfólio, sem autorização do proprietário para publicar)
   // não entram no feed; aparecem só mascarados na seção "reservados" no fim da busca.
@@ -286,15 +291,17 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       a_max: string | null;
       n: string;
       unit_tipos: unknown;
+      anuncios: string;
     }
   >(
-    `select d.*, u.min_price, u.q_min, u.q_max, u.a_min, u.a_max, u.n, u.unit_tipos
+    `select d.*, u.min_price, u.q_min, u.q_max, u.a_min, u.a_max, u.n, u.unit_tipos, u.anuncios
        from developments d
        left join lateral (
          select min(x.price_value) filter (where x.price_value > 0) as min_price,
                 min(x.quartos) as q_min, max(x.quartos) as q_max,
                 min(x.area) as a_min, max(x.area) as a_max,
-                count(*) as n, jsonb_agg(distinct x.tipo_unidade) as unit_tipos
+                count(*) as n, jsonb_agg(distinct x.tipo_unidade) as unit_tipos,
+                count(*) filter (where not x.is_tipologia and x.vendido_em is null) as anuncios
            from properties x where x.empreendimento_id = d.id and x.visibilidade = 'publico'
        ) u on true
       where d.id = any($1::text[])`,
@@ -321,7 +328,8 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       aceitaTemporada: base.aceitaTemporada,
       height: heightFromId(base.id) + 40,
       visualizacoes: Number(row.visualizacoes) || 0,
-      tipo: base.tipo
+      tipo: base.tipo,
+      anuncios: Number(row.anuncios) || 0
     };
   });
 }
@@ -1569,4 +1577,34 @@ export async function contarImoveisAVenda(): Promise<number> {
           + (select count(*) from developments where status = 'publicado' and delivery_date > now() - interval '6 years') as n`
   );
   return Number(r[0]?.n) || 0;
+}
+
+/** O feed está mostrando a visão da equipe (todos os condomínios)? */
+export async function feedModoEquipe(): Promise<boolean> {
+  return !!currentStaff();
+}
+
+// "Condomínios neste bairro" (fim do feed quando a pessoa filtra por bairro):
+// todos os condomínios publicados do bairro, só com o nome — inclusive os que
+// não entram no feed — para quem quer explorar sem pesar a lista.
+export type CondoDoBairro = { id: string; nome: string; bairro: string; anuncios: number };
+export async function condominiosDosBairros(bairros: { nome: string; cidade: string }[]): Promise<CondoDoBairro[]> {
+  const lista = bairros.slice(0, 5);
+  if (!lista.length) return [];
+  const conds: string[] = [];
+  const params: unknown[] = [];
+  for (const b of lista) {
+    params.push(b.nome, b.cidade);
+    const n = params.length;
+    conds.push(`(${norm("coalesce(d.bairro, '')")} = ${norm(`$${n - 1}::text`)} and ${norm("coalesce(d.cidade, '')")} = ${norm(`$${n}::text`)})`);
+  }
+  const rows = await query<{ id: string; name: string; bairro: string; anuncios: string }>(
+    `select d.id, d.name, d.bairro,
+        (select count(*) from properties x where x.empreendimento_id = d.id and x.visibilidade = 'publico' and not x.is_tipologia and x.vendido_em is null) as anuncios
+       from developments d
+      where d.status = 'publicado' and (${conds.join(' or ')})
+      order by anuncios desc, d.name limit 600`,
+    params
+  );
+  return rows.map((r) => ({ id: r.id, nome: formatTitulo(r.name), bairro: r.bairro, anuncios: Number(r.anuncios) || 0 }));
 }
