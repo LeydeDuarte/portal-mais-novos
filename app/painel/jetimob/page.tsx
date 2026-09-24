@@ -158,7 +158,7 @@ export default function JetimobPage() {
           <div className={`mt-4 rounded-2xl border p-4 text-sm ${teste.ok ? 'border-emerald-300 bg-emerald-50' : 'border-red-300 bg-red-50'}`}>
             {teste.ok ? (
               <>
-                <strong>Conectado!</strong> A Jetimob tem {teste.condominios} condomínio(s), {teste.imoveis} imóvel(is) disponível(is) e {teste.ativos} publicado(s) no site.
+                <strong>Conectado!</strong> A Jetimob tem {teste.condominios} condomínio(s), {teste.imoveis} imóvel(is) disponível(is) no sistema e {teste.ativos} publicado(s) no site.
                 {teste.exemplo && (
                   <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
                     {Object.entries(teste.exemplo).map(([k, v]) => (

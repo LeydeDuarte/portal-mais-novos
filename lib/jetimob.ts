@@ -3,7 +3,8 @@
 // Rodar de novo só acrescenta o que ainda não veio (nunca sobrescreve o que
 // foi editado aqui).
 // - Condomínios: /condominios  → tabela developments (jetimob_id)
-// - Imóveis:     /imoveis      → tabela properties  (jetimob_id)
+// - Imóveis:     /imoveis/todos → tabela properties (jetimob_id) — TODOS os disponíveis do
+//                sistema, inclusive os que não estão marcados para publicar em site
 // - Publicados:  /imoveis-ativos → quem NÃO está aqui entra como PRIVADO no site
 // - Leads do site → /leads/{PUBLIC_KEY} (CRM da Jetimob)
 // As fotos são baixadas da Jetimob e guardadas no nosso R2 aos poucos
@@ -282,7 +283,7 @@ export async function sincronizarImoveis(
   email: string,
   opcoes: { ativos: Set<string>; start?: number; end?: number; sobrescrever?: boolean }
 ): Promise<ResumoPagina> {
-  const r = await jt<Pagina<JtImovel>>('imoveis', { v: 6, page: pagina, pageSize: 50, start: opcoes.start, end: opcoes.end });
+  const r = await jt<Pagina<JtImovel>>('imoveis/todos', { v: 6, page: pagina, pageSize: 50, start: opcoes.start, end: opcoes.end });
   const res: ResumoPagina = { pagina, totalPaginas: r.totalPages ?? 1, total: r.total ?? 0, criados: 0, atualizados: 0, vinculados: 0, erros: [] };
   if (!r.data?.length) return res;
 
@@ -523,7 +524,7 @@ export async function enviarLeadJetimob(l: {
 export async function previaJetimob(): Promise<{ condominios: number; imoveis: number; ativos: number; exemplo?: Record<string, unknown> }> {
   const [c, i, a] = await Promise.all([
     jt<Pagina<JtCondominio>>('condominios', { v: 6, page: 1, pageSize: 1 }),
-    jt<Pagina<JtImovel>>('imoveis', { v: 6, page: 1, pageSize: 1 }),
+    jt<Pagina<JtImovel>>('imoveis/todos', { v: 6, page: 1, pageSize: 1 }),
     idsAtivos()
   ]);
   const x = i.data?.[0];
