@@ -10,6 +10,7 @@ import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
 import ContarVisita from '@/components/ContarVisita';
+import CondominioTag from '@/components/CondominioTag';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getAveragePricePerM2, formatPricePerM2, type PropertyDetail } from '@/lib/property-details';
 import { getDevelopmentById, getRelatedListings } from '@/lib/actions';
@@ -102,10 +103,19 @@ export default async function PropertyDetailView({
           </div>
         )}
         <h1 className="font-serif text-2xl font-semibold">{titulo}</h1>
-        <p className="mb-5 mt-1 text-sm text-[var(--text-muted)]">
-          {property.condominio ? <strong className="font-semibold text-[var(--text)]">{property.condominio} · </strong> : null}
-          {property.location}
-        </p>
+        {nomeCondominio && (
+          <div className="mt-2">
+            {development ? (
+              <Link href={`/empreendimento/${development.id}`} className="inline-flex items-center gap-1.5 hover:opacity-80" title="Ver o condomínio">
+                <CondominioTag nome={nomeCondominio} grande />
+                <span className="text-sm font-semibold text-accent">Ver condomínio →</span>
+              </Link>
+            ) : (
+              <CondominioTag nome={nomeCondominio} grande />
+            )}
+          </div>
+        )}
+        <p className="mb-5 mt-1.5 text-sm text-[var(--text-muted)]">{property.location}</p>
 
         {property.vendidoEm && (
           <p className="mb-4 rounded-xl p-3 text-sm font-semibold text-white" style={{ background: '#e62f2f' }}>

@@ -3,6 +3,7 @@
 import TemporadaBadge from '@/components/TemporadaBadge';
 import SeloVendido from '@/components/SeloVendido';
 import Visualizacoes from '@/components/Visualizacoes';
+import CondominioTag from '@/components/CondominioTag';
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type { Property } from '@/lib/mock-properties';
@@ -165,10 +166,14 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
         </div>
 
         <div className="flex flex-col gap-0.5 pt-2">
+          {property.condominio && (
+            <div className="mb-0.5 min-w-0">
+              <CondominioTag nome={property.condominio} />
+            </div>
+          )}
           <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[property.tipoUnidade]}</div>
           <div className="font-sans tabular-nums text-sm font-bold tracking-tight md:text-base">{property.price}</div>
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">
-            {property.condominio ? `${property.condominio} · ` : ''}
             {property.location}
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-2.5">

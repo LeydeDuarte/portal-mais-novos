@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import CondominioTag from '@/components/CondominioTag';
 import ScrollRow from './ScrollRow';
 import { formatTitulo } from '@/lib/text';
 import type { PropertyDetail } from '@/lib/property-details';
@@ -52,10 +53,14 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
                   </span>
                 </div>
                 <div className="pt-2">
+                  {p.condominio && (
+                    <div className="mb-1 min-w-0">
+                      <CondominioTag nome={formatTitulo(p.condominio)} />
+                    </div>
+                  )}
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[p.tipoUnidade]}</div>
                   <div className="font-sans tabular-nums text-base font-bold tracking-tight">{p.price}</div>
                   <div className="truncate text-xs text-[var(--text-muted)]">
-                    {p.condominio ? `${formatTitulo(p.condominio)} · ` : ''}
                     {p.bairro || p.location}
                   </div>
                   <div className="text-xs text-[var(--text-muted)]">
