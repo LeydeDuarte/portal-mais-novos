@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
+import { veTudo } from '@/lib/papeis';
 import { listCondominios, type CondominioResumo } from '@/lib/actions';
 
 function normalize(t: string) {
@@ -102,7 +103,7 @@ export default function CondominiosPage() {
                   <span className="text-sm text-[var(--text-muted)]">{[c.bairro, c.cidade].filter(Boolean).join(', ') || 'Sem endereço'}</span>
                   <span className="text-xs text-[var(--text-faint)]">
                     {c.anuncios} imóvel(is) à venda · {c.tipologias} tipologia(s) · {c.temFotos ? 'com fotos' : 'sem fotos'}
-                    {staff.role === 'admin' && c.corretorEmail ? ` · ${c.corretorEmail}` : ''}
+                    {veTudo(staff.role) && c.corretorEmail ? ` · ${c.corretorEmail}` : ''}
                   </span>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">

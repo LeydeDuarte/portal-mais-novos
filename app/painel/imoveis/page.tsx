@@ -9,6 +9,9 @@ import { useStaffSession } from '@/lib/use-staff-session';
 import { getPropertiesByCorretor, deleteProperty, marcarComoVendido, getLinkPrivado } from '@/lib/actions';
 import type { PropertyDetail } from '@/lib/property-details';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
+import { veTudo } from '@/lib/papeis';
+
+const sa = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 export default function MeusImoveisPage() {
   const { staff, loaded } = useStaffSession();
@@ -22,7 +25,7 @@ export default function MeusImoveisPage() {
 
   useEffect(() => {
     if (staff) {
-      getPropertiesByCorretor(staff.email, staff.role === 'admin').then((rows) => {
+      getPropertiesByCorretor(staff.email, veTudo(staff.role)).then((rows) => {
         setItems(rows);
         setFetched(true);
       });
@@ -31,6 +34,16 @@ export default function MeusImoveisPage() {
 
   const [aviso, setAviso] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<'todos' | 'publico' | 'privado'>('todos');
+  const [corretor, setCorretor] = useState('');
+  const [busca, setBusca] = useState('');
+  const corretores = Array.from(new Set(items.map((p) => p.corretorEmail).filter((e): e is string => !!e))).sort();
+  const termo = sa(busca.trim());
+  const visiveis = items.filter(
+    (p) =>
+      (filtro === 'todos' || (p.visibilidade ?? 'publico') === filtro) &&
+      (!corretor || p.corretorEmail === corretor) &&
+      (!termo || sa(`${p.condominio ?? ''} ${p.location} ${p.codigo ?? ''}`).includes(termo))
+  );
 
   const handleVendido = async (id: string) => {
     const valor = window.prompt('Marcar como VENDIDO. Ele sai do ar e fica no histórico de mercado.\n\nValor de venda (opcional, só números):', '');
@@ -64,7 +77,7 @@ export default function MeusImoveisPage() {
       <PainelNav />
       <main className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8">
         <div className="flex items-center justify-between">
-          <h1 className="font-serif text-2xl font-semibold">Meus imóveis</h1>
+          <h1 className="font-serif text-2xl font-semibold">{veTudo(staff.role) ? 'Imóveis' : 'Meus imóveis'}</h1>
           <Link href="/painel/imoveis/novo" className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white hover:opacity-90">
             + Cadastrar
           </Link>
@@ -84,13 +97,32 @@ export default function MeusImoveisPage() {
           ))}
         </div>
 
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por condomínio, bairro ou código (ex.: CA0002)"
+            className="min-w-[220px] flex-1 rounded-full border border-[var(--border)] px-4 py-2 text-sm"
+          />
+          {veTudo(staff.role) && corretores.length > 1 && (
+            <select value={corretor} onChange={(e) => setCorretor(e.target.value)} className="rounded-full border border-[var(--border)] px-3 py-2 text-sm">
+              <option value="">Todos os corretores</option>
+              {corretores.map((c) => (
+                <option key={c} value={c}>
+                  {c === staff.email ? `${c} (você)` : c}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
         {!fetched ? (
           <p className="mt-8 text-sm text-[var(--text-muted)]">Carregando…</p>
         ) : items.length === 0 ? (
           <p className="mt-8 text-sm text-[var(--text-muted)]">Nenhum imóvel cadastrado ainda.</p>
         ) : (
           <div className="mt-6 flex flex-col gap-3">
-            {items.filter((p) => filtro === 'todos' || (p.visibilidade ?? 'publico') === filtro).map((p) => (
+            {visiveis.map((p) => (
               <div key={p.id} className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] p-4">
                 <div className="flex flex-col gap-0.5">
                   <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-accent">
@@ -101,9 +133,10 @@ export default function MeusImoveisPage() {
                   <span className="text-sm text-[var(--text-muted)]">
                     {p.condominio ? `${p.condominio} · ` : ''}
                     {p.location}
+                    {p.codigo ? ` · ${p.codigo}` : ''}
                   </span>
                   <span className="text-xs text-[var(--text-faint)]">{p.photos?.length ? `${p.photos.length} foto(s)` : 'Sem fotos — edite para adicionar'}</span>
-                  {staff.role === 'admin' && p.corretorEmail && (
+                  {veTudo(staff.role) && p.corretorEmail && (
                     <span className="text-xs text-[var(--text-faint)]">Cadastrado por {p.corretorEmail}</span>
                   )}
                 </div>

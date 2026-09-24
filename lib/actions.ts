@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { query } from './db';
 import { mapPropertyRow, mapDevelopmentRow, heightFromId, toStringArray, type PropertyRow, type DevelopmentRow } from './db-mappers';
-import { signSession, verifySession, type StaffSessionPayload } from './session';
+import { signSession, verifySession, veTudo, type StaffRole, type StaffSessionPayload } from './session';
 import type { PropertyDetail, Development } from './property-details';
 import type { FilterState } from './filters';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from './tipologias';
@@ -396,7 +396,7 @@ function requireStaff(): StaffSessionPayload {
 }
 // Admin mexe em tudo; corretor só no que ele mesmo cadastrou
 async function assertCanEdit(table: 'properties' | 'developments', id: string, staff: StaffSessionPayload) {
-  if (staff.role === 'admin') return;
+  if (veTudo(staff.role)) return;
   const rows = await query<{ corretor_email: string | null }>(`select corretor_email from ${table} where id = $1`, [id]);
   if (!rows[0] || rows[0].corretor_email !== staff.email) throw new Error('Você só pode editar o que cadastrou.');
 }
@@ -427,7 +427,7 @@ export async function getDevelopmentById(id: string): Promise<Development | null
 export async function getPropertiesByCorretor(email: string, isAdmin: boolean): Promise<PropertyDetail[]> {
   const staff = requireStaff();
   const rows =
-    staff.role === 'admin' && isAdmin
+    veTudo(staff.role) && isAdmin
       ? await query<PropertyRow>('select * from properties where corretor_email is not null and is_tipologia = false order by created_at desc')
       : await query<PropertyRow>('select * from properties where corretor_email = $1 and is_tipologia = false order by created_at desc', [staff.email]);
   return rows.map(mapPropertyRow);
@@ -1196,7 +1196,7 @@ async function avisarInteressados(propertyId: string): Promise<void> {
 
 // ---------------- Login da equipe ----------------
 export async function staffLogin(email: string, password: string): Promise<StaffSessionPayload | null> {
-  const rows = await query<{ email: string; name: string; role: 'admin' | 'corretor'; password_hash: string }>(
+  const rows = await query<{ email: string; name: string; role: StaffRole; password_hash: string }>(
     'select email, name, role, password_hash from staff_users where email = $1',
     [email]
   );
@@ -1473,4 +1473,57 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
     res.erros.push(e instanceof Error ? e.message.slice(0, 200) : 'Falha ao gravar o lote.');
   }
   return res;
+}
+
+// ---------------- Equipe (só o administrador gerencia) ----------------
+export type MembroEquipe = { email: string; name: string; role: StaffRole; criadoEm: string; imoveis: number };
+
+function requireAdmin(): StaffSessionPayload {
+  const s = requireStaff();
+  if (s.role !== 'admin') throw new Error('Só o administrador gerencia a equipe.');
+  return s;
+}
+
+export async function listarEquipe(): Promise<MembroEquipe[]> {
+  requireAdmin();
+  const rows = await query<{ email: string; name: string; role: StaffRole; created_at: string; imoveis: string }>(
+    `select u.email, u.name, u.role, u.created_at,
+        (select count(*) from properties p where p.corretor_email = u.email and p.is_tipologia = false) as imoveis
+       from staff_users u order by case u.role when 'admin' then 0 when 'analista' then 1 else 2 end, u.name`
+  );
+  return rows.map((r) => ({ email: r.email, name: r.name, role: r.role, criadoEm: String(r.created_at), imoveis: Number(r.imoveis) || 0 }));
+}
+
+/** Cria ou altera um membro. Senha em branco numa alteração = mantém a atual. */
+export async function salvarMembro(m: { email: string; name: string; role: StaffRole; senha?: string }): Promise<{ ok: boolean; erro?: string }> {
+  const eu = requireAdmin();
+  const email = m.email.trim().toLowerCase();
+  const name = m.name.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, erro: 'E-mail inválido.' };
+  if (!name) return { ok: false, erro: 'Informe o nome.' };
+  if (!['admin', 'analista', 'corretor'].includes(m.role)) return { ok: false, erro: 'Papel inválido.' };
+  if (email === eu.email && m.role !== 'admin') return { ok: false, erro: 'Você não pode tirar o seu próprio acesso de administrador.' };
+  const existe = (await query<{ email: string }>('select email from staff_users where email = $1', [email])).length > 0;
+  const senha = (m.senha ?? '').trim();
+  if (!existe && senha.length < 8) return { ok: false, erro: 'Defina uma senha com pelo menos 8 caracteres.' };
+  if (senha && senha.length < 8) return { ok: false, erro: 'A senha precisa ter pelo menos 8 caracteres.' };
+  const hash = senha ? await bcrypt.hash(senha, 10) : null;
+  if (existe) {
+    await query('update staff_users set name = $2, role = $3, password_hash = coalesce($4::text, password_hash) where email = $1', [email, name, m.role, hash]);
+  } else {
+    await query('insert into staff_users (email, name, role, password_hash) values ($1, $2, $3, $4)', [email, name, m.role, hash]);
+  }
+  return { ok: true };
+}
+
+/** Remove o acesso. Os imóveis que a pessoa cadastrou continuam no site (passam para quem removeu, se pedido). */
+export async function removerMembro(email: string, transferirPara?: string): Promise<{ ok: boolean; erro?: string }> {
+  const eu = requireAdmin();
+  if (email === eu.email) return { ok: false, erro: 'Você não pode remover a si mesmo.' };
+  if (transferirPara) {
+    await query('update properties set corretor_email = $2 where corretor_email = $1', [email, transferirPara]);
+    await query('update developments set corretor_email = $2 where corretor_email = $1', [email, transferirPara]);
+  }
+  await query('delete from staff_users where email = $1', [email]);
+  return { ok: true };
 }

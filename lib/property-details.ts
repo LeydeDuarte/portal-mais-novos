@@ -8,6 +8,7 @@ export type PropertyDetail = Property & {
   // Preenchido só nos imóveis cadastrados pelo painel do corretor — quem
   // cadastrou. Nos imóveis do catálogo de exemplo, fica indefinido.
   corretorEmail?: string;
+  codigo?: string; // código antigo da Jetimob (ex.: CA0002-MAIS), para achar no painel
 };
 
 export type Development = {

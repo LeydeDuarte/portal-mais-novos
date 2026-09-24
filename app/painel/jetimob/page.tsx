@@ -17,6 +17,7 @@ export default function JetimobPage() {
   const [teste, setTeste] = useState<Teste | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [rodando, setRodando] = useState(false);
+  const [trocarFotos, setTrocarFotos] = useState(false);
   const parar = useRef(false);
 
   useEffect(() => {
@@ -43,10 +44,11 @@ export default function JetimobPage() {
     try {
       if (!soFotos) {
         const s = await iniciarSync('completa');
+        if (trocarFotos) add('Trocando TODAS as fotos: serão baixadas de novo da Jetimob (as atuais continuam no ar até as novas chegarem).');
         let p = 1;
         let total = 1;
         do {
-          const r = await syncCondominiosPagina(p);
+          const r = await syncCondominiosPagina(p, trocarFotos);
           total = r.totalPaginas || 1;
           resumo.condominiosNovos += r.criados;
           resumo.condominiosAtualizados += r.atualizados;
@@ -58,7 +60,7 @@ export default function JetimobPage() {
         p = 1;
         total = 1;
         do {
-          const r = await syncImoveisPagina(p);
+          const r = await syncImoveisPagina(p, trocarFotos);
           total = r.totalPaginas || 1;
           resumo.imoveisNovos += r.criados;
           resumo.imoveisAtualizados += r.atualizados;
@@ -125,7 +127,15 @@ export default function JetimobPage() {
           <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">A chave da Jetimob ainda não está no ar (variável JETIMOB_WEBSERVICE_KEY na Vercel + novo deploy).</p>
         )}
 
-        <div className="mt-5 flex flex-wrap gap-2">
+        <label className="mt-5 flex items-start gap-2 rounded-xl border border-[var(--border)] p-3 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={trocarFotos} onChange={(e) => setTrocarFotos(e.target.checked)} disabled={rodando} />
+          <span>
+            <strong>Trocar todas as fotos</strong> — baixa de novo todas as fotos e plantas da Jetimob e substitui as que já vieram (use depois de tirar a marca
+            d&apos;água na Jetimob). As fotos atuais ficam no ar até as novas terminarem de chegar.
+          </span>
+        </label>
+
+        <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" onClick={testar} disabled={rodando} className="rounded-full border border-[var(--border)] px-4 py-2.5 text-sm font-bold hover:bg-[var(--pill-bg)] disabled:opacity-50">
             Testar conexão
           </button>

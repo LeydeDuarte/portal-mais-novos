@@ -193,7 +193,7 @@ export type ResumoPagina = { pagina: number; totalPaginas: number; total: number
 
 type DevExistente = { id: string; name: string; cep: string | null; bairro: string | null; cidade: string | null; jetimob_id: string | null; jetimob_fotos_src: unknown };
 
-export async function sincronizarCondominios(pagina: number, email: string): Promise<ResumoPagina> {
+export async function sincronizarCondominios(pagina: number, email: string, trocarFotos = false): Promise<ResumoPagina> {
   const r = await jt<Pagina<JtCondominio>>('condominios', { v: 6, page: pagina, pageSize: 100 });
   const res: ResumoPagina = { pagina, totalPaginas: r.totalPages ?? 1, total: r.total ?? 0, criados: 0, atualizados: 0, vinculados: 0, erros: [] };
   if (!r.data?.length) return res;
@@ -238,7 +238,8 @@ export async function sincronizarCondominios(pagina: number, email: string): Pro
         if (alvo) res.vinculados++;
       }
       const srcAntigo = JSON.stringify(Array.isArray(alvo?.jetimob_fotos_src) ? alvo!.jetimob_fotos_src : []);
-      const fotosMudaram = JSON.stringify(fotos) !== srcAntigo;
+      // trocarFotos: baixa tudo de novo (ex.: fotos antigas vieram com marca d'água)
+      const fotosMudaram = trocarFotos || JSON.stringify(fotos) !== srcAntigo;
       if (alvo) {
         // Já existe (cadastrado aqui, por planilha ou numa sincronização anterior):
         // liga à Jetimob e completa só o que estiver vazio — nada preenchido à mão é apagado.
@@ -298,7 +299,7 @@ type PropExistente = { id: string; jetimob_fotos_src: unknown; titulo: string | 
 export async function sincronizarImoveis(
   pagina: number,
   email: string,
-  opcoes: { ativos: Set<string>; start?: number; end?: number; sobrescrever?: boolean }
+  opcoes: { ativos: Set<string>; start?: number; end?: number; sobrescrever?: boolean; trocarFotos?: boolean }
 ): Promise<ResumoPagina> {
   const r = await jt<Pagina<JtImovel>>('imoveis/todos', { v: 6, page: pagina, pageSize: 50, start: opcoes.start, end: opcoes.end });
   const res: ResumoPagina = { pagina, totalPaginas: r.totalPages ?? 1, total: r.total ?? 0, criados: 0, atualizados: 0, vinculados: 0, erros: [] };
@@ -369,7 +370,7 @@ export async function sincronizarImoveis(
         aproximada: i.geoposicionamento_visivel === 2
       };
       const e = porJt.get(String(i.id_imovel));
-      const fotosMudaram = JSON.stringify(src) !== JSON.stringify(Array.isArray(e?.jetimob_fotos_src) ? e!.jetimob_fotos_src : []);
+      const fotosMudaram = !!opcoes.trocarFotos || JSON.stringify(src) !== JSON.stringify(Array.isArray(e?.jetimob_fotos_src) ? e!.jetimob_fotos_src : []);
       const p = [
         valores.titulo, valores.tipo_unidade, valores.finalidade, valores.delivery_date, valores.price_value, valores.price_period, valores.location,
         valores.quartos, valores.vagas, valores.banheiros, valores.area, valores.video_url, valores.aceita_temporada, valores.description,
@@ -378,7 +379,10 @@ export async function sincronizarImoveis(
       ];
       if (e && !opcoes.sobrescrever) {
         // já importado: o portal é a fonte agora — só recoloca as fotos se ainda não vieram
-        if (fotosMudaram && !(await query<{ n: number }>("select 1 as n from properties where id = $1 and jsonb_array_length(photos) > 0", [e.id])).length) {
+        if (
+          (fotosMudaram && src.length && opcoes.trocarFotos) ||
+          (fotosMudaram && !(await query<{ n: number }>("select 1 as n from properties where id = $1 and jsonb_array_length(photos) > 0", [e.id])).length)
+        ) {
           await query("update properties set fotos_pendentes = $2::jsonb, jetimob_fotos_src = $3::jsonb, jetimob_fotos_novas = '{}'::jsonb where id = $1", [
             e.id,
             JSON.stringify(filaDe(fotos, plantas)),
@@ -390,10 +394,10 @@ export async function sincronizarImoveis(
       if (e) {
         await query(
           `update properties set titulo = $1, tipo_unidade = $2, finalidade = $3, delivery_date = $4::date, price_value = $5, price_period = $6, location = $7,
-              quartos = $8, vagas = $9, banheiros = $10, area = $11, video_url = coalesce($12, video_url), video = ($12 is not null or video),
-              aceita_temporada = $13, description = case when $14 = '' then description else $14 end, amenities = $15::jsonb,
+              quartos = $8, vagas = $9, banheiros = $10, area = $11, video_url = coalesce($12::text, video_url), video = ($12::text is not null or video),
+              aceita_temporada = $13, description = case when $14::text = '' then description else $14::text end, amenities = $15::jsonb,
               empreendimento_id = coalesce($16, empreendimento_id), cep = $17, logradouro = $18, bairro = $19, cidade = $20, uf = $21, condominio = $22,
-              visibilidade = $23, lat = $24, lng = $25, localizacao_aproximada = $26, jetimob_codigo = $28, jetimob_atualizado_em = now()
+              visibilidade = $23, lat = $24, lng = $25, localizacao_aproximada = $26, jetimob_id = $27, jetimob_codigo = $28, jetimob_atualizado_em = now()
               ${fotosMudaram ? `, fotos_pendentes = $30::jsonb, jetimob_fotos_src = $31::jsonb, jetimob_fotos_novas = '{}'::jsonb` : ''}
             where id = $29`,
           fotosMudaram ? [...p, e.id, JSON.stringify(filaDe(fotos, plantas)), JSON.stringify(src)] : [...p, e.id]
@@ -406,7 +410,7 @@ export async function sincronizarImoveis(
               quartos, vagas, banheiros, area, video_url, video, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro,
               cidade, uf, condominio, video_vertical, plantas, visibilidade, lat, lng, localizacao_aproximada, jetimob_id, jetimob_codigo, jetimob_atualizado_em,
               fotos_pendentes, jetimob_fotos_src)
-           values ($29, $30, false, 50, $1, $2, $3, $4::date, $5, $6, $7, $8, $9, $10, $11, $12, $12 is not null, $13, $14, $15::jsonb, $16, '[]'::jsonb, $17, $18,
+           values ($29, $30, false, 50, $1, $2, $3, $4::date, $5, $6, $7, $8, $9, $10, $11, $12::text, $12::text is not null, $13, $14, $15::jsonb, $16, '[]'::jsonb, $17, $18,
               $19, $20, $21, $22, false, '[]'::jsonb, $23, $24, $25, $26, $27, $28, now(), $31::jsonb, $32::jsonb)
            on conflict (id) do nothing`,
           [...p, id, email, JSON.stringify(filaDe(fotos, plantas)), JSON.stringify(src)]

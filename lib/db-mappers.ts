@@ -33,6 +33,7 @@ export type PropertyRow = {
   photos?: unknown;
   plantas?: unknown;
   visibilidade?: string;
+  jetimob_codigo?: string | null;
   cep?: string | null;
   logradouro?: string | null;
   bairro?: string | null;
@@ -140,6 +141,7 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
     photos: toStringArray(row.photos),
     plantas: toStringArray(row.plantas),
     visibilidade: row.visibilidade === 'privado' ? 'privado' : 'publico',
+    codigo: row.jetimob_codigo ?? undefined,
     condominio: row.condominio ? formatTitulo(row.condominio) : undefined,
     bairro: row.bairro ?? undefined,
     cidade: row.cidade ?? undefined,

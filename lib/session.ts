@@ -6,7 +6,9 @@ import crypto from 'crypto';
 // como já fica registrado no documento de arquitetura.
 const SECRET = process.env.SESSION_SECRET || process.env.DATABASE_URL || 'dev-secret-fallback';
 
-export type StaffSessionPayload = { email: string; name: string; role: 'admin' | 'corretor' };
+import type { StaffRole } from './papeis';
+export { veTudo, ROLE_LABEL, type StaffRole } from './papeis';
+export type StaffSessionPayload = { email: string; name: string; role: StaffRole };
 
 export function signSession(payload: StaffSessionPayload): string {
   const base = Buffer.from(JSON.stringify(payload)).toString('base64url');

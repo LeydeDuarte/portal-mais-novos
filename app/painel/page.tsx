@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
+import { ROLE_LABEL, veTudo } from '@/lib/papeis';
 import { getPropertiesByCorretor } from '@/lib/actions';
 
 export default function PainelPage() {
@@ -18,7 +19,7 @@ export default function PainelPage() {
   }, [loaded, staff, router]);
 
   useEffect(() => {
-    if (staff) getPropertiesByCorretor(staff.email, staff.role === 'admin').then((rows) => setCount(rows.length));
+    if (staff) getPropertiesByCorretor(staff.email, veTudo(staff.role)).then((rows) => setCount(rows.length));
   }, [staff]);
 
   if (!loaded || !staff) return null;
@@ -32,7 +33,7 @@ export default function PainelPage() {
           <div>
             <h1 className="font-serif text-2xl font-semibold">Olá, {staff.name}</h1>
             <span className="text-sm text-[var(--text-muted)]">
-              {staff.role === 'admin' ? 'Administrador' : 'Corretor'} · {staff.email}
+              {ROLE_LABEL[staff.role] ?? 'Corretor'} · {staff.email}
             </span>
           </div>
           <button type="button" onClick={logout} className="text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text)]">
@@ -53,8 +54,8 @@ export default function PainelPage() {
             href="/painel/imoveis"
             className="flex flex-col gap-1 rounded-xl border border-[var(--border)] p-5 hover:bg-[var(--pill-bg)]"
           >
-            <span className="font-serif text-lg font-semibold">Meus imóveis</span>
-            <span className="text-sm text-[var(--text-muted)]">{count ?? '…'} cadastrado(s) por você.</span>
+            <span className="font-serif text-lg font-semibold">{veTudo(staff.role) ? 'Imóveis' : 'Meus imóveis'}</span>
+            <span className="text-sm text-[var(--text-muted)]">{count ?? '…'} {veTudo(staff.role) ? 'anúncio(s) de toda a equipe.' : 'cadastrado(s) por você.'}</span>
           </Link>
 
           <Link
@@ -74,10 +75,10 @@ export default function PainelPage() {
           </Link>
 
           {staff.role === 'admin' && (
-            <div className="flex flex-col gap-1 rounded-xl border border-dashed border-[var(--border)] p-5 opacity-60">
-              <span className="font-serif text-lg font-semibold">Gerenciar corretores</span>
-              <span className="text-sm text-[var(--text-muted)]">Em breve — convidar, desativar contas.</span>
-            </div>
+            <Link href="/painel/equipe" className="flex flex-col gap-1 rounded-xl border border-[var(--border)] p-5 hover:bg-[var(--pill-bg)]">
+              <span className="font-serif text-lg font-semibold">Equipe</span>
+              <span className="text-sm text-[var(--text-muted)]">Adicionar analistas e corretores, trocar senha, remover acesso.</span>
+            </Link>
           )}
         </div>
       </main>

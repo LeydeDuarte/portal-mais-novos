@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { query } from './db';
-import { verifySession, verificarAssinado } from './session';
+import { verifySession, verificarAssinado, veTudo } from './session';
 import type { MarketReference } from './market-mock';
 import type { TipoUnidade } from './tipologias';
 
@@ -134,7 +134,7 @@ const STATUSES: MarketLeadStatus[] = ['novo', 'contatado', 'descartado'];
 export async function getMarketLeads(): Promise<MarketLead[]> {
   const staff = requireStaff();
   const rows =
-    staff.role === 'admin'
+    veTudo(staff.role)
       ? await query<MarketLeadRow>('select * from market_leads order by created_at desc')
       : await query<MarketLeadRow>('select * from market_leads where corretor_email = $1 order by created_at desc', [staff.email]);
   return rows.map(mapLead);
@@ -175,7 +175,7 @@ export async function addMarketLead(ref: MarketReference): Promise<MarketLead | 
 export async function updateMarketLeadStatus(leadId: string, status: MarketLeadStatus): Promise<void> {
   const staff = requireStaff();
   if (!STATUSES.includes(status)) throw new Error('Status inválido.');
-  if (staff.role === 'admin') {
+  if (veTudo(staff.role)) {
     await query('update market_leads set status = $1 where id = $2::uuid', [status, leadId]);
   } else {
     await query('update market_leads set status = $1 where id = $2::uuid and corretor_email = $3', [status, leadId, staff.email]);

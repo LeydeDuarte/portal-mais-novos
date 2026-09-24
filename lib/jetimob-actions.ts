@@ -68,15 +68,15 @@ export async function iniciarSync(tipo: 'completa' | 'manual'): Promise<{ id: nu
   return { id: r[0].id, inicio: new Date(r[0].iniciado_em).toISOString() };
 }
 
-export async function syncCondominiosPagina(pagina: number): Promise<ResumoPagina> {
+export async function syncCondominiosPagina(pagina: number, trocarFotos = false): Promise<ResumoPagina> {
   const s = equipe();
-  return sincronizarCondominios(pagina, s.email);
+  return sincronizarCondominios(pagina, s.email, trocarFotos);
 }
 
-export async function syncImoveisPagina(pagina: number): Promise<ResumoPagina> {
+export async function syncImoveisPagina(pagina: number, trocarFotos = false): Promise<ResumoPagina> {
   const s = equipe();
   const ativos = await idsAtivos();
-  return sincronizarImoveis(pagina, s.email, { ativos });
+  return sincronizarImoveis(pagina, s.email, { ativos, trocarFotos });
 }
 
 // Migração: nada é apagado do portal quando some da Jetimob (ela vai ser desligada)

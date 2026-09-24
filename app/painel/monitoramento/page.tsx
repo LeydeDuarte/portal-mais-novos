@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
+import { veTudo } from '@/lib/papeis';
 import { useMarketLeads } from '@/lib/use-market-leads';
 import { CIDADES_MONITORADAS, MARKET_REFERENCES } from '@/lib/market-mock';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
@@ -25,7 +26,7 @@ export default function MonitoramentoPage() {
 
   const referencias = MARKET_REFERENCES.filter((r) => r.cidade === cidade);
   const myLeadIds = new Set(leads.map((l) => l.id));
-  const isAdmin = staff.role === 'admin';
+  const isAdmin = veTudo(staff.role);
 
   return (
     <div className="flex min-h-screen flex-col">
