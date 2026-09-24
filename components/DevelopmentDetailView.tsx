@@ -4,6 +4,7 @@ import Footer from '@/components/Footer';
 import PhotoGallery, { type GalleryVideo } from '@/components/PhotoGallery';
 import LocationCard from '@/components/LocationCard';
 import RichText from '@/components/RichText';
+import InterestForm from '@/components/InterestForm';
 import CollapsibleText from '@/components/CollapsibleText';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getRelatedListings } from '@/lib/actions';
@@ -31,7 +32,8 @@ export default async function DevelopmentDetailView({ development }: { developme
   const photos = development.photos ?? [];
   // Com vídeo, ele ocupa o lugar da foto principal da galeria; sem vídeo, a foto de capa.
   const hasGallery = photos.length > 0 || !!galleryVideo;
-  const showMediaBlock = !hasGallery;
+  // Sem foto nem vídeo: a página começa direto pelo nome (sem espaço de foto vazio)
+  const showMediaBlock = false;
   // Tipos e quartos do CONDOMÍNIO: o que foi marcado no cadastro dele + a tabela de vendas.
   // Os imóveis anunciados (revenda/aluguel) aparecem na seção deles, sem mudar isso.
   const tabela = development.units.filter((u) => u.isTipologia);
@@ -101,7 +103,12 @@ export default async function DevelopmentDetailView({ development }: { developme
         </div>
         )}
 
-        <div className="mt-6 flex flex-col gap-1">
+        <div className={`${hasGallery ? 'mt-6' : 'mt-2'} flex flex-col gap-1`}>
+          {!hasGallery && (
+            <span className="mb-1 w-fit rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
+              {badge.text}
+            </span>
+          )}
           <h1 className="font-serif text-2xl font-semibold">{development.name}</h1>
           <span className="text-sm text-[var(--text-muted)]">{development.location}</span>
           <span className="text-sm font-semibold text-accent">{development.deliveryNote}</span>
@@ -204,9 +211,11 @@ export default async function DevelopmentDetailView({ development }: { developme
         <RelatedListings
           title={`À venda no ${development.name}`}
           items={related.mesmoCondominio.filter((p) => p.finalidade === 'venda')}
-          emptyText={`Nenhum imóvel à venda no ${development.name} no momento. Fale com um corretor — avisamos quando surgir uma oportunidade.`}
+          emptyText={`Nenhum imóvel à venda no ${development.name} no momento — registre seu interesse abaixo e avisamos quando surgir uma oportunidade.`}
         />
         <RelatedListings title={`Para alugar no ${development.name}`} items={related.mesmoCondominio.filter((p) => p.finalidade === 'aluguel')} />
+
+        <InterestForm developmentId={development.id} condominio={development.name} destaque={related.mesmoCondominio.length === 0} />
 
         <RelatedListings title="Imóveis à venda nesta região" subtitle={faixaDePreco(related.precoReferencia)} items={related.regiao} />
 

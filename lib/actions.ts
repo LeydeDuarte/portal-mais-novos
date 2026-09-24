@@ -10,6 +10,8 @@ import type { FilterState } from './filters';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from './tipologias';
 import { r2PublicBase, cleanPhotoUrl } from './r2-url';
 import { formatTitulo } from './text';
+import { enviarEmail, emailConfigurado, emailLayout, escapeHtml } from './email';
+import { SITE_URL } from './seo';
 
 const PAGE_SIZE = 12;
 const STAFF_COOKIE = 'mn_staff';
@@ -108,6 +110,10 @@ export async function getFeedPage(page: number, filters: FilterState): Promise<{
   if (filters.aceitaTemporada === 'sim') devConds.push('d.aceita_temporada = true');
   // Só condomínios publicados; as tipologias da tabela de vendas aparecem dentro do card do empreendimento
   devConds.push("d.status = 'publicado' and d.delivery_date is not null");
+  // Condomínio sem fotos e sem nenhum imóvel/tipologia não entra no feed geral —
+  // só aparece quando a pessoa pesquisa (por local ou palavra-chave).
+  const pesquisando = (filters.termos ?? []).length > 0 || (filters.locais ?? []).length > 0;
+  if (!pesquisando) devConds.push("(jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) > 0 or coalesce(u.n, 0) > 0)");
   propConds.push('p.is_tipologia = false');
 
   // ---- Condições que valem para os dois ----
@@ -209,6 +215,7 @@ export async function getFeedPage(page: number, filters: FilterState): Promise<{
                   max(x.quartos) as max_quartos,
                   max(x.vagas) as max_vagas,
                   jsonb_agg(distinct x.tipo_unidade) as tipos,
+                  count(x.id) as n,
                   string_agg(distinct xtl.label, ' ') as tipos_texto
              from properties x left join tl xtl on xtl.k = x.tipo_unidade
             where x.empreendimento_id = d.id
@@ -614,6 +621,7 @@ export async function createProperty(input: CreatePropertyInput): Promise<void> 
     `insert into properties (id, corretor_email, is_tipologia, match_score, ${PROPERTY_COLS}) values ($1, $2, $3, 50, ${placeholders})`,
     [input.id, staff.email, !!input.isTipologia, ...values]
   );
+  if (!input.isTipologia) await avisarInteressados(input.id).catch((err) => console.error('Aviso a interessados falhou', err));
 }
 
 export async function updateProperty(id: string, input: PropertyFields): Promise<void> {
@@ -914,6 +922,154 @@ export async function listCondominios(): Promise<CondominioResumo[]> {
     temFotos: toStringArray(d.photos).length > 0,
     corretorEmail: d.corretor_email
   }));
+}
+
+// ---------------- Interessados em condomínios ("Registre seu interesse") ----------------
+export type InteresseInput = {
+  developmentId?: string;
+  condominio: string;
+  nome: string;
+  email?: string;
+  telefone?: string;
+  finalidade: 'venda' | 'aluguel';
+  areaMin?: number;
+  areaMax?: number;
+  valorMax?: number;
+  quartos?: number;
+  mensagem?: string;
+  aceitaContato: boolean;
+};
+
+export async function registrarInteresse(input: InteresseInput): Promise<{ ok: boolean; erro?: string }> {
+  const nome = (input.nome ?? '').trim().slice(0, 120);
+  const email = (input.email ?? '').trim().toLowerCase().slice(0, 160);
+  const telefone = (input.telefone ?? '').replace(/[^\d+]/g, '').slice(0, 20);
+  if (nome.length < 2) return { ok: false, erro: 'Informe seu nome.' };
+  if (!email && telefone.length < 10) return { ok: false, erro: 'Informe um e-mail ou um WhatsApp com DDD.' };
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, erro: 'Confira o e-mail digitado.' };
+  if (!input.aceitaContato) return { ok: false, erro: 'Para avisarmos você, é preciso autorizar o contato.' };
+  const condominio = formatTitulo((input.condominio ?? '').slice(0, 160));
+  const devId = input.developmentId && /^[\w-]{1,80}$/.test(input.developmentId) ? input.developmentId : null;
+
+  // Evita cadastro repetido em sequência (mesma pessoa, mesmo condomínio, últimos 10 min)
+  const dup = await query<{ id: string }>(
+    `select id from interest_leads where condominio = $1 and ((email is not null and email = $2) or (telefone is not null and telefone = $3))
+       and created_at > now() - interval '10 minutes' limit 1`,
+    [condominio, email || null, telefone || null]
+  );
+  if (dup[0]) return { ok: true };
+
+  const num = (n?: number) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null);
+  await query(
+    `insert into interest_leads (development_id, condominio, nome, email, telefone, finalidade, area_min, area_max, valor_max, quartos, mensagem, aceita_contato)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+    [devId, condominio, nome, email || null, telefone || null, input.finalidade === 'aluguel' ? 'aluguel' : 'venda', num(input.areaMin), num(input.areaMax), num(input.valorMax), num(input.quartos), (input.mensagem ?? '').trim().slice(0, 1000) || null, true]
+  );
+
+  // Aviso para a equipe (se o e-mail estiver configurado)
+  const equipe = process.env.EMAIL_EQUIPE;
+  if (equipe) {
+    const linha = (rotulo: string, valor?: string | number | null) =>
+      valor ? `<tr><td style="padding:4px 12px 4px 0;color:#6b6f76">${rotulo}</td><td style="padding:4px 0"><strong>${escapeHtml(String(valor))}</strong></td></tr>` : '';
+    const brl = (n?: number) => (n ? n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : null);
+    await enviarEmail(
+      equipe,
+      `Novo interessado no ${condominio}`,
+      emailLayout(
+        `Novo interessado no ${escapeHtml(condominio)}`,
+        `<table style="font-size:14px">${linha('Nome', nome)}${linha('WhatsApp', telefone)}${linha('E-mail', email)}${linha('Quer', input.finalidade === 'aluguel' ? 'Alugar' : 'Comprar')}${linha('Metragem', input.areaMin || input.areaMax ? `${input.areaMin ?? '?'} a ${input.areaMax ?? '?'} m²` : null)}${linha('Até', brl(input.valorMax))}${linha('Quartos', input.quartos)}${linha('Mensagem', input.mensagem)}</table>
+         <p style="font-size:13px;color:#6b6f76;margin-top:16px">Veja todos em Painel → Interessados.</p>`
+      )
+    );
+  }
+  return { ok: true };
+}
+
+export type InteresseLead = {
+  id: string;
+  developmentId: string | null;
+  condominio: string;
+  nome: string;
+  email: string | null;
+  telefone: string | null;
+  finalidade: 'venda' | 'aluguel';
+  areaMin: number | null;
+  areaMax: number | null;
+  valorMax: number | null;
+  quartos: number | null;
+  mensagem: string | null;
+  status: 'novo' | 'contatado' | 'descartado';
+  descadastrado: boolean;
+  ultimoAviso: string | null;
+  criadoEm: string;
+};
+
+export async function listInteresses(): Promise<InteresseLead[]> {
+  requireStaff();
+  const rows = await query<Record<string, unknown>>('select * from interest_leads order by created_at desc limit 500');
+  const n = (v: unknown) => (v == null ? null : Number(v));
+  const d = (v: unknown) => (v == null ? null : new Date(v as string).toISOString());
+  return rows.map((r) => ({
+    id: String(r.id),
+    developmentId: (r.development_id as string) ?? null,
+    condominio: String(r.condominio),
+    nome: String(r.nome),
+    email: (r.email as string) ?? null,
+    telefone: (r.telefone as string) ?? null,
+    finalidade: r.finalidade === 'aluguel' ? 'aluguel' : 'venda',
+    areaMin: n(r.area_min),
+    areaMax: n(r.area_max),
+    valorMax: n(r.valor_max),
+    quartos: n(r.quartos),
+    mensagem: (r.mensagem as string) ?? null,
+    status: (r.status as InteresseLead['status']) ?? 'novo',
+    descadastrado: !!r.descadastrado_em,
+    ultimoAviso: d(r.ultimo_aviso_em),
+    criadoEm: d(r.created_at) ?? ''
+  }));
+}
+
+export async function updateInteresseStatus(id: string, status: InteresseLead['status']): Promise<void> {
+  requireStaff();
+  if (!['novo', 'contatado', 'descartado'].includes(status)) throw new Error('Status inválido.');
+  await query('update interest_leads set status = $1 where id = $2::uuid', [status, id]);
+}
+
+// Quando um imóvel entra num condomínio, avisa por e-mail quem registrou interesse nele
+async function avisarInteressados(propertyId: string): Promise<void> {
+  if (!emailConfigurado()) return;
+  const props = await query<PropertyRow>('select * from properties where id = $1 and is_tipologia = false', [propertyId]);
+  const p = props[0];
+  if (!p) return;
+  const devRows = p.empreendimento_id ? await query<{ name: string }>('select name from developments where id = $1', [p.empreendimento_id]) : [];
+  const nomeCondo = devRows[0]?.name ?? p.condominio;
+  if (!nomeCondo && !p.empreendimento_id) return;
+  const leads = await query<{ id: string; nome: string; email: string; unsubscribe_token: string; valor_max: string | null }>(
+    `select id, nome, email, unsubscribe_token, valor_max from interest_leads
+      where email is not null and aceita_contato and descadastrado_em is null and finalidade = $1
+        and (($2::text is not null and development_id = $2) or ($3::text is not null and ${norm('condominio')} = ${norm('$3::text')}))`,
+    [p.finalidade, p.empreendimento_id, nomeCondo ?? null]
+  );
+  if (!leads.length) return;
+  const imovel = mapPropertyRow(p);
+  const titulo = imovel.titulo || `${TIPO_UNIDADE_LABEL[imovel.tipoUnidade]} em ${imovel.location}`;
+  const link = `${SITE_URL}/imovel/${p.id}`;
+  for (const l of leads) {
+    const preco = Number(p.price_value);
+    if (l.valor_max && preco > Number(l.valor_max) * 1.35) continue; // bem acima do que a pessoa quer investir
+    const ok = await enviarEmail(
+      l.email,
+      `Novo imóvel no ${formatTitulo(nomeCondo ?? '')}`,
+      emailLayout(
+        `Surgiu um imóvel no ${escapeHtml(formatTitulo(nomeCondo ?? ''))}`,
+        `<p style="font-size:15px">Olá, ${escapeHtml(l.nome.split(' ')[0])}! Você pediu para ser avisado(a), e acabou de entrar:</p>
+         <p style="font-size:16px"><strong>${escapeHtml(titulo)}</strong><br>${escapeHtml(imovel.price)} · ${escapeHtml(imovel.beds)} · ${escapeHtml(imovel.area)}</p>
+         <p><a href="${link}" style="display:inline-block;background:#14161a;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:bold">Ver o imóvel</a></p>
+         <p style="font-size:11px;color:#9aa0a8;margin-top:20px">Não quer mais receber avisos deste condomínio? <a href="${SITE_URL}/api/interesse/cancelar?t=${l.unsubscribe_token}" style="color:#9aa0a8">Cancelar avisos</a></p>`
+      )
+    );
+    if (ok) await query('update interest_leads set ultimo_aviso_em = now() where id = $1::uuid', [l.id]);
+  }
 }
 
 // ---------------- Login da equipe ----------------

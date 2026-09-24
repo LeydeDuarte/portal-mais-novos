@@ -150,7 +150,11 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     name: formatTitulo(row.name),
     location: row.location,
     deliveryDate: deliveryDateFormatted,
-    deliveryNote: deliveryDateFormatted ? `Previsão de entrega: ${MESES[Number(month) - 1] ?? month} de ${year}` : 'Data de entrega a confirmar',
+    deliveryNote: deliveryDateFormatted
+      ? `${new Date(`${deliveryDateFormatted}-01T00:00:00`) > new Date() ? 'Previsão de entrega' : 'Entregue em'}${
+          new Date(`${deliveryDateFormatted}-01T00:00:00`) > new Date() ? ':' : ''
+        } ${MESES[Number(month) - 1] ?? month} de ${year}`
+      : 'Data de entrega a confirmar',
     description: row.description,
     tipo: row.tipo,
     pavimentos: row.pavimentos ?? undefined,

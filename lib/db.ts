@@ -12,7 +12,10 @@ function getSql(): NeonQueryFunction<false, false> {
     if (!process.env.DATABASE_URL) {
       throw new Error('DATABASE_URL não configurada — confira as variáveis de ambiente na Vercel.');
     }
-    sqlClient = neon(process.env.DATABASE_URL);
+    // cache: 'no-store' — o Next guardava em cache as respostas do banco (ex: um
+    // condomínio que foi rascunho continuava dando 404 depois de publicado).
+    // Dado de imóvel precisa estar sempre atualizado.
+    sqlClient = neon(process.env.DATABASE_URL, { fetchOptions: { cache: 'no-store' } });
   }
   return sqlClient;
 }

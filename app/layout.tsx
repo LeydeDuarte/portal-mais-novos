@@ -3,6 +3,9 @@ import { Playfair_Display, Inter } from 'next/font/google';
 import './globals.css';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
 
+// Nunca reaproveitar respostas antigas do banco em nenhuma página
+export const fetchCache = 'default-no-store';
+
 const playfair = Playfair_Display({
   subsets: ['latin'],
   weight: ['500', '600', '700'],

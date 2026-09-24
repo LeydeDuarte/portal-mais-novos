@@ -37,6 +37,31 @@ export default function DevelopmentCard({ development }: { development: Developm
     ' m²'
   );
 
+  // Sem foto: card compacto, só com as informações (não mostra espaço de foto vazio)
+  if (!cover) {
+    return (
+      <div className="mb-2.5 inline-block w-full break-inside-avoid md:mb-4">
+        <Link href={`/empreendimento/${development.id}`} className="block rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4 transition-colors hover:bg-[var(--pill-bg)]">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
+              {badge.text}
+            </span>
+            <span className="rounded-md bg-[var(--pill-bg)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">Condomínio</span>
+          </div>
+          <div className="mt-2.5 font-serif text-base font-semibold leading-tight md:text-lg">{development.name}</div>
+          <div className="text-xs text-[var(--text-muted)] md:text-[13px]">{development.location}</div>
+          {tipos.length > 0 && <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-accent">{tipos.slice(0, 4).join(' · ')}</div>}
+          <div className="mt-1 text-xs text-[var(--text-muted)]">
+            {development.unitsCount > 0
+              ? [development.minPrice ? `A partir de ${formatBRL(development.minPrice)}` : null, quartos, area].filter(Boolean).join(' · ')
+              : 'Sem anúncios no momento — registre seu interesse'}
+          </div>
+          <span className="mt-2 inline-block text-xs font-semibold text-accent">Ver condomínio →</span>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="mb-2.5 inline-block w-full break-inside-avoid md:mb-4">
       <Link href={`/empreendimento/${development.id}`} className="block">
