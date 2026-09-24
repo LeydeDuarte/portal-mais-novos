@@ -14,7 +14,8 @@ const LINKS = [
   { href: '/painel/condominios', label: 'Condomínios' },
   { href: '/painel/interessados', label: 'Interessados' },
   { href: '/painel/clientes', label: 'Clientes' },
-  { href: '/painel/mercado', label: 'Mercado' }
+  { href: '/painel/mercado', label: 'Mercado' },
+  { href: '/painel/jetimob', label: 'Migração Jetimob' }
 ];
 
 // Menu de ferramentas do painel — aparece em toda página interna, pra nunca

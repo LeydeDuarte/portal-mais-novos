@@ -44,7 +44,7 @@ export const CAMPOS: { campo: CampoPlanilha; rotulo: string; obrigatorio?: boole
   { campo: 'quadra', rotulo: 'Quadra', re: /^(quadra|qd)/ },
   { campo: 'lote', rotulo: 'Lote', re: /^(lote|lt)$/ },
   { campo: 'excluido', rotulo: 'Excluído (1 = ignorar)', re: /isdeleted|^excluid|^deletad|^removid/ },
-  { campo: 'publicado', rotulo: 'Publicado (0 = rascunho)', re: /^publicad|^ativo$/ },
+  { campo: 'publicado', rotulo: 'Publicado (0 = rascunho)', re: /^publicad|^ativo$|^status/ },
   { campo: 'lat', rotulo: 'Latitude', re: /^lat/ },
   { campo: 'lng', rotulo: 'Longitude', re: /^(lon|lng)/ },
   { campo: 'video', rotulo: 'Vídeo (YouTube)', re: /youtube|^video/ },
@@ -368,7 +368,7 @@ export function linhasParaCondominios(linhas: unknown[][], mapa: Partial<Record<
       construtora: txt(get(row, 'construtora')) ? padronizarNome(txt(get(row, 'construtora'))) : undefined,
       problemas,
       duplicadaNaPlanilha: dup,
-      rascunho: pub === '0' || pub === 'nao' || pub === 'false',
+      rascunho: pub === '0' || pub === 'nao' || pub === 'false' || pub === 'rascunho',
       lat,
       lng,
       videoUrl: /youtu|instagram|vimeo/.test(video) ? video : undefined

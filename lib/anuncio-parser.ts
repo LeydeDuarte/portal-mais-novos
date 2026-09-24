@@ -29,7 +29,7 @@ export type AnuncioExtraido = {
   encontrados: string[]; // o que foi reconhecido (para mostrar na tela)
 };
 
-const TIPOS: [TipoUnidade, RegExp][] = [
+export const TIPOS: [TipoUnidade, RegExp][] = [
   ['cobertura_duplex', /cobertura\s+duplex/],
   ['apartamento_garden', /(apartamento|apto)\.?\s+garden|\bgarden\b/],
   ['apartamento_triplex', /triplex/],

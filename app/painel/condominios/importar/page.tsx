@@ -70,7 +70,7 @@ export default function ImportarCondominiosPage() {
         const { cabecalho, linhas: ls } = await lerArquivo(f);
         novos.push({ nome: f.name, cabecalho, linhas: ls, mapa: mapearCabecalho(cabecalho) });
       } catch {
-        setErro(`Não foi possível ler "${f.name}".`);
+        setErro(`Não foi possível ler "${f.name}". Abra no Excel e use Salvar como (.xlsx) de novo, ou salve como CSV.`);
       }
     }
     setStatus(null);

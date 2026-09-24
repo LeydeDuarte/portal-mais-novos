@@ -88,6 +88,7 @@ function toNumberArray(value: unknown): number[] {
 }
 
 function formatPrice(value: string, period: 'unico' | 'mensal'): string {
+  if (!Number(value)) return 'Valor sob consulta';
   const formatted = Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
   return period === 'mensal' ? `${formatted}/mês` : formatted;
 }
