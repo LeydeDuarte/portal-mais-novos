@@ -9,7 +9,8 @@ const LINKS = [
   { href: '/painel/imoveis/novo', label: 'Cadastrar' },
   { href: '/painel/cadastro-ia', label: 'Cadastro IA' },
   { href: '/painel/monitoramento', label: 'Monitoramento' },
-  { href: '/painel/imoveis', label: 'Meus imóveis' }
+  { href: '/painel/imoveis', label: 'Meus imóveis' },
+  { href: '/painel/condominios', label: 'Condomínios' }
 ];
 
 // Menu de ferramentas do painel — aparece em toda página interna, pra nunca

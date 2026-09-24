@@ -3,13 +3,20 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import PhotoGallery, { type GalleryVideo } from '@/components/PhotoGallery';
 import LocationCard from '@/components/LocationCard';
+import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
+import { getRelatedListings } from '@/lib/actions';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
 import { getStatusBadge } from '@/lib/classification';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 
 export default async function DevelopmentDetailView({ development }: { development: Development }) {
-  const badge = getStatusBadge(development.deliveryDate);
+  const badge = development.deliveryDate
+    ? getStatusBadge(development.deliveryDate)
+    : { text: 'Entrega a confirmar', bg: 'rgba(20,22,26,0.72)', color: '#fff', bucket: 'usado' as const, label: '', year: 0 };
+  const tipologias = development.units.filter((u) => u.isTipologia);
+  const related = await getRelatedListings({ developmentId: development.id }).catch(() => ({ mesmoCondominio: [], regiao: [], precoReferencia: null }));
+  const futuro = !!development.deliveryDate && badge.bucket === 'lancamento';
   const embed = development.videoUrl ? getEmbedInfo(development.videoUrl) : null;
   const avgPricePerM2 = getAveragePricePerM2(development.units);
 
@@ -35,6 +42,17 @@ export default async function DevelopmentDetailView({ development }: { developme
         <Link href="/" className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text)]">
           ← Voltar para a Home
         </Link>
+
+        {development.status === 'rascunho' && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <span>
+              <strong>Rascunho — não aparece no site.</strong> Só a equipe logada vê esta página.
+            </span>
+            <Link href={`/painel/condominios/${development.id}/editar`} className="rounded-full bg-ink px-4 py-2 text-xs font-bold text-white">
+              Finalizar e publicar
+            </Link>
+          </div>
+        )}
 
         {hasGallery && (
           <section aria-label="Fotos do empreendimento" className={showMediaBlock ? 'mb-6' : ''}>
@@ -139,17 +157,18 @@ export default async function DevelopmentDetailView({ development }: { developme
           </ul>
         </div>
 
+        {(tipologias.length > 0 || futuro) && (
         <div className="mt-8">
           <h2 className="mb-4 text-lg font-bold">
-            {development.units.length > 0 ? 'Tipologias e unidades' : 'Tipologias em breve'}
+            {tipologias.length > 0 ? 'Tipologias' : 'Tipologias em breve'}
           </h2>
-          {development.units.length === 0 ? (
+          {tipologias.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)]">
               As metragens e valores de cada tipologia ainda não foram divulgados. Fale com um corretor para receber a tabela de vendas.
             </p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-              {[...development.units]
+              {[...tipologias]
                 .sort((a, b) => parseFloat(a.area) - parseFloat(b.area))
                 .map((unit) => (
                 <Link
@@ -167,6 +186,16 @@ export default async function DevelopmentDetailView({ development }: { developme
             </div>
           )}
         </div>
+        )}
+
+        <RelatedListings
+          title="Imóveis disponíveis neste condomínio"
+          items={related.mesmoCondominio}
+          emptyText="Nenhum imóvel à venda neste condomínio no momento. Fale com um corretor — avisamos quando surgir uma oportunidade."
+        />
+
+        <RelatedListings title="Imóveis à venda nesta região" subtitle={faixaDePreco(related.precoReferencia)} items={related.regiao} />
+
         <LocationCard
           title={development.name}
           subtitle={development.location}

@@ -34,6 +34,7 @@ export type Development = {
   bairro?: string;
   cidade?: string;
   cep?: string;
+  status?: 'rascunho' | 'publicado';
   corretorEmail?: string; // preenchido só nos condomínios cadastrados pelo painel
   units: PropertyDetail[]; // cada unit = uma tipologia (metragem/quartos/valor próprios) — inclui as vinculadas depois via imóvel avulso
 };

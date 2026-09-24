@@ -92,6 +92,9 @@ export async function getFeedPage(page: number, filters: FilterState): Promise<{
   if (filters.quartosMin !== 'todas') devConds.push(`greatest(u.max_quartos, dq.max_quartos) >= ${p(filters.quartosMin)}`);
   if (filters.vagasMin !== 'todas') devConds.push(`u.max_vagas >= ${p(filters.vagasMin)}`);
   if (filters.aceitaTemporada === 'sim') devConds.push('d.aceita_temporada = true');
+  // Só condomínios publicados; as tipologias da tabela de vendas aparecem dentro do card do empreendimento
+  devConds.push("d.status = 'publicado' and d.delivery_date is not null");
+  propConds.push('p.is_tipologia = false');
 
   // ---- Condições que valem para os dois ----
   const situacaoSql = (col: string) => {
@@ -265,35 +268,47 @@ export async function findCondominiosByCep(cep: string): Promise<CondominioSuges
   ];
 }
 
+// ---------------- Sessão da equipe (servidor) ----------------
+function currentStaff(): StaffSessionPayload | null {
+  return verifySession(cookies().get(STAFF_COOKIE)?.value);
+}
+function requireStaff(): StaffSessionPayload {
+  const staff = currentStaff();
+  if (!staff) throw new Error('Sessão da equipe expirada — faça login novamente no painel.');
+  return staff;
+}
+// Admin mexe em tudo; corretor só no que ele mesmo cadastrou
+async function assertCanEdit(table: 'properties' | 'developments', id: string, staff: StaffSessionPayload) {
+  if (staff.role === 'admin') return;
+  const rows = await query<{ corretor_email: string | null }>(`select corretor_email from ${table} where id = $1`, [id]);
+  if (!rows[0] || rows[0].corretor_email !== staff.email) throw new Error('Você só pode editar o que cadastrou.');
+}
+
+// ---------------- Leitura para as páginas públicas ----------------
 export async function getPropertyById(id: string): Promise<PropertyDetail | null> {
   const rows = await query<PropertyRow>('select * from properties where id = $1', [id]);
   return rows[0] ? mapPropertyRow(rows[0]) : null;
 }
 
+// Condomínio em rascunho só aparece para quem está logado no painel
 export async function getDevelopmentById(id: string): Promise<Development | null> {
   const devRows = await query<DevelopmentRow>('select * from developments where id = $1', [id]);
-  if (!devRows[0]) return null;
+  const dev = devRows[0];
+  if (!dev) return null;
+  if (dev.status === 'rascunho' && !currentStaff()) return null;
   const unitRows = await query<PropertyRow>(
-    'select * from properties where empreendimento_id = $1 order by area asc nulls last',
+    'select * from properties where empreendimento_id = $1 order by is_tipologia desc, area asc nulls last',
     [id]
   );
-  return mapDevelopmentRow(devRows[0], unitRows.map(mapPropertyRow));
-}
-
-export async function getAllDevelopments(): Promise<Development[]> {
-  const devRows = await query<DevelopmentRow>('select * from developments order by delivery_date asc');
-  const results: Development[] = [];
-  for (const dev of devRows) {
-    const unitRows = await query<PropertyRow>('select * from properties where empreendimento_id = $1', [dev.id]);
-    results.push(mapDevelopmentRow(dev, unitRows.map(mapPropertyRow)));
-  }
-  return results;
+  return mapDevelopmentRow(dev, unitRows.map(mapPropertyRow));
 }
 
 export async function getPropertiesByCorretor(email: string, isAdmin: boolean): Promise<PropertyDetail[]> {
-  const rows = isAdmin
-    ? await query<PropertyRow>('select * from properties where corretor_email is not null order by created_at desc')
-    : await query<PropertyRow>('select * from properties where corretor_email = $1 order by created_at desc', [email]);
+  const staff = requireStaff();
+  const rows =
+    staff.role === 'admin' && isAdmin
+      ? await query<PropertyRow>('select * from properties where corretor_email is not null and is_tipologia = false order by created_at desc')
+      : await query<PropertyRow>('select * from properties where corretor_email = $1 and is_tipologia = false order by created_at desc', [staff.email]);
   return rows.map(mapPropertyRow);
 }
 
@@ -303,8 +318,112 @@ export async function getAllPropertyIds(): Promise<string[]> {
 }
 
 export async function getAllDevelopmentIds(): Promise<string[]> {
-  const rows = await query<{ id: string }>('select id from developments');
+  const rows = await query<{ id: string }>("select id from developments where status = 'publicado'");
   return rows.map((r) => r.id);
+}
+
+// ---------------- Relacionados (fim das páginas) ----------------
+// "Imóveis disponíveis neste condomínio" e "Imóveis nesta região".
+// Região = mesma cidade, mesma finalidade, mesmo grupo de tipo (apartamentos
+// com apartamentos, casas com casas...), preço até 35% abaixo ou acima.
+// Dentro disso, ordena pelo PERFIL do imóvel que a pessoa está vendo:
+// quantidade de quartos pesa mais, depois metragem parecida, depois mesmo
+// bairro e preço mais próximo. A idade do imóvel não conta (de propósito:
+// um usado bem parecido pode ser uma ótima sugestão para quem olha um novo).
+export type RelatedListings = { mesmoCondominio: PropertyDetail[]; regiao: PropertyDetail[]; precoReferencia: number | null };
+
+const GRUPO_TIPO: Record<string, string> = {
+  studio: 'vertical', flat: 'vertical', loft: 'vertical', apartamento: 'vertical', apartamento_garden: 'vertical',
+  apartamento_duplex: 'vertical', apartamento_triplex: 'vertical', cobertura: 'vertical', cobertura_duplex: 'vertical', penthouse: 'vertical',
+  casa: 'casa', casa_condominio: 'casa', sobrado: 'casa',
+  chacara_sitio_fazenda: 'terra', terreno_lote: 'terra',
+  sala_comercial: 'comercial', loja_ponto_comercial: 'comercial', galpao: 'comercial', predio_comercial: 'comercial'
+};
+const MARGEM_PRECO = 0.35;
+
+export async function getRelatedListings(target: { propertyId?: string; developmentId?: string }): Promise<RelatedListings> {
+  type Base = { id?: string; devId: string | null; condominio: string | null; bairro: string | null; cidade: string | null; finalidade: string; price: number | null; quartos: number | null; area: number | null; grupos: string[] };
+  let base: Base | null = null;
+  const vazio: RelatedListings = { mesmoCondominio: [], regiao: [], precoReferencia: null };
+
+  if (target.propertyId) {
+    const r = await query<{ id: string; empreendimento_id: string | null; condominio: string | null; bairro: string | null; cidade: string | null; finalidade: string; price_value: string; quartos: number | null; area: string | null; tipo_unidade: string }>(
+      'select id, empreendimento_id, condominio, bairro, cidade, finalidade, price_value, quartos, area, tipo_unidade from properties where id = $1',
+      [target.propertyId]
+    );
+    if (!r[0]) return vazio;
+    base = {
+      id: r[0].id, devId: r[0].empreendimento_id, condominio: r[0].condominio, bairro: r[0].bairro, cidade: r[0].cidade, finalidade: r[0].finalidade,
+      price: Number(r[0].price_value) || null, quartos: r[0].quartos, area: r[0].area != null ? Number(r[0].area) : null,
+      grupos: [GRUPO_TIPO[r[0].tipo_unidade] ?? 'vertical']
+    };
+  } else if (target.developmentId) {
+    const r = await query<{ id: string; name: string; bairro: string | null; cidade: string | null; tipos_unidade: unknown; min_price: string | null; q: string | null; a: string | null; unit_tipos: unknown }>(
+      `select d.id, d.name, d.bairro, d.cidade, d.tipos_unidade,
+              (select min(price_value) filter (where price_value > 0) from properties where empreendimento_id = d.id) as min_price,
+              (select round(avg(quartos)) from properties where empreendimento_id = d.id) as q,
+              (select avg(area) from properties where empreendimento_id = d.id) as a,
+              (select jsonb_agg(distinct tipo_unidade) from properties where empreendimento_id = d.id) as unit_tipos
+         from developments d where d.id = $1`,
+      [target.developmentId]
+    );
+    if (!r[0]) return vazio;
+    const tipos = [...toStringArray(r[0].tipos_unidade), ...toStringArray(r[0].unit_tipos)];
+    base = {
+      devId: r[0].id, condominio: r[0].name, bairro: r[0].bairro, cidade: r[0].cidade, finalidade: 'venda',
+      price: r[0].min_price ? Number(r[0].min_price) : null, quartos: r[0].q ? Number(r[0].q) : null, area: r[0].a ? Number(r[0].a) : null,
+      grupos: Array.from(new Set(tipos.map((t) => GRUPO_TIPO[t]).filter(Boolean)))
+    };
+  }
+  if (!base) return vazio;
+
+  // Mesmo condomínio: vinculados ao empreendimento ou com o mesmo nome de condomínio na mesma cidade
+  const condoRows = await query<PropertyRow>(
+    `select * from properties
+      where is_tipologia = false and id <> $1
+        and (($2::text is not null and empreendimento_id = $2)
+          or ($3::text is not null and ${norm('condominio')} = ${norm('$3::text')} and ${norm("coalesce(cidade, '')")} = ${norm("coalesce($4::text, '')")}))
+      order by created_at desc limit 12`,
+    [base.id ?? '', base.devId, base.condominio, base.cidade]
+  );
+  if (!base.cidade) return { mesmoCondominio: condoRows.map(mapPropertyRow), regiao: [], precoReferencia: base.price };
+
+  const excluir = [base.id ?? '', ...condoRows.map((r) => r.id)];
+  const tiposDoGrupo = Object.entries(GRUPO_TIPO)
+    .filter(([, g]) => !base!.grupos.length || base!.grupos.includes(g))
+    .map(([t]) => t);
+
+  const params: unknown[] = [excluir, base.cidade, base.bairro, base.finalidade, tiposDoGrupo];
+  const p = (v: unknown) => {
+    params.push(v);
+    return `$${params.length}`;
+  };
+  const conds = [
+    'is_tipologia = false',
+    'not (id = any($1::text[]))',
+    `${norm("coalesce(cidade, '')")} = ${norm('$2::text')}`,
+    'finalidade = $4',
+    'tipo_unidade = any($5::text[])'
+  ];
+  const score: string[] = [`(case when ${norm("coalesce(bairro, '')")} = ${norm("coalesce($3::text, '')")} then 0 else 1 end)`];
+  if (base.price) {
+    const pr = p(base.price);
+    conds.push(`price_value between ${pr} * ${1 - MARGEM_PRECO} and ${pr} * ${1 + MARGEM_PRECO}`);
+    score.push(`abs(price_value - ${pr}) / ${pr} * 2`);
+  }
+  if (base.quartos) {
+    const q = p(base.quartos);
+    score.push(`coalesce(abs(quartos - ${q}), 2) * 3`); // cada quarto de diferença pesa muito
+  }
+  if (base.area) {
+    const a = p(base.area);
+    score.push(`coalesce(abs(area - ${a}) / ${a}, 0.5) * 4`); // 25% de diferença na metragem ≈ 1 quarto
+  }
+  const regiaoRows = await query<PropertyRow>(
+    `select * from properties where ${conds.join(' and ')} order by (${score.join(' + ')}) asc, created_at desc limit 8`,
+    params
+  );
+  return { mesmoCondominio: condoRows.map(mapPropertyRow), regiao: regiaoRows.map(mapPropertyRow), precoReferencia: base.price };
 }
 
 // ---------------- Cadastro (painel) — escrita ----------------
@@ -328,7 +447,7 @@ export type CreatePropertyInput = {
   description: string;
   amenities: string[];
   empreendimentoId?: string;
-  corretorEmail: string;
+  corretorEmail?: string; // ignorado — o corretor vem sempre do login
   photos?: string[];
   cep?: string;
   logradouro?: string;
@@ -336,7 +455,9 @@ export type CreatePropertyInput = {
   cidade?: string;
   uf?: string;
   condominio?: string;
+  isTipologia?: boolean;
 };
+export type PropertyFields = Omit<CreatePropertyInput, 'id' | 'corretorEmail' | 'isTipologia'>;
 
 // Aceita só fotos do nosso próprio armazenamento (R2) — nunca link de terceiros
 function sanitizePhotos(photos: string[] | undefined): string[] {
@@ -346,51 +467,115 @@ function sanitizePhotos(photos: string[] | undefined): string[] {
     .slice(0, 60);
 }
 
-const clean = (v?: string) => (v && v.trim() ? v.trim() : null);
+const clean = (v?: string | null) => (v && v.trim() ? v.trim() : null);
+
+function propertyValues(input: PropertyFields) {
+  return [
+    input.titulo ?? null,
+    input.tipoUnidade,
+    input.finalidade,
+    `${input.deliveryDate}-01`,
+    input.priceValue,
+    input.pricePeriod,
+    input.location,
+    input.quartos ?? null,
+    input.vagas ?? null,
+    input.banheiros ?? null,
+    input.escaninhos ?? null,
+    input.area ?? null,
+    input.video,
+    input.videoUrl ?? null,
+    input.aceitaTemporada,
+    input.description,
+    JSON.stringify(input.amenities),
+    input.empreendimentoId ?? null,
+    JSON.stringify(sanitizePhotos(input.photos)),
+    clean(input.cep?.replace(/\D/g, '')),
+    clean(input.logradouro),
+    clean(input.bairro),
+    clean(input.cidade),
+    clean(input.uf?.toUpperCase()),
+    clean(input.condominio)
+  ];
+}
+const PROPERTY_COLS =
+  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio';
+const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', ''];
 
 export async function createProperty(input: CreatePropertyInput): Promise<void> {
+  const staff = requireStaff();
+  const values = propertyValues(input);
+  const placeholders = values.map((_, i) => `$${i + 4}${PROPERTY_CASTS[i]}`).join(',');
   await query(
-    `insert into properties
-      (id, titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, match_score, description, amenities, empreendimento_id, corretor_email,
-       photos, cep, logradouro, bairro, cidade, uf, condominio)
-     values ($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,50,$17,$18::jsonb,$19,$20,$21::jsonb,$22,$23,$24,$25,$26,$27)`,
-    [
-      input.id,
-      input.titulo ?? null,
-      input.tipoUnidade,
-      input.finalidade,
-      `${input.deliveryDate}-01`,
-      input.priceValue,
-      input.pricePeriod,
-      input.location,
-      input.quartos ?? null,
-      input.vagas ?? null,
-      input.banheiros ?? null,
-      input.escaninhos ?? null,
-      input.area ?? null,
-      input.video,
-      input.videoUrl ?? null,
-      input.aceitaTemporada,
-      input.description,
-      JSON.stringify(input.amenities),
-      input.empreendimentoId ?? null,
-      input.corretorEmail,
-      JSON.stringify(sanitizePhotos(input.photos)),
-      clean(input.cep?.replace(/\D/g, '')),
-      clean(input.logradouro),
-      clean(input.bairro),
-      clean(input.cidade),
-      clean(input.uf?.toUpperCase()),
-      clean(input.condominio)
-    ]
+    `insert into properties (id, corretor_email, is_tipologia, match_score, ${PROPERTY_COLS}) values ($1, $2, $3, 50, ${placeholders})`,
+    [input.id, staff.email, !!input.isTipologia, ...values]
   );
 }
 
-export type CreateDevelopmentInput = {
-  id: string;
+export async function updateProperty(id: string, input: PropertyFields): Promise<void> {
+  const staff = requireStaff();
+  await assertCanEdit('properties', id, staff);
+  const values = propertyValues(input);
+  const sets = PROPERTY_COLS.split(', ')
+    .map((col, i) => `${col} = $${i + 2}${PROPERTY_CASTS[i]}`)
+    .join(', ');
+  await query(`update properties set ${sets} where id = $1`, [id, ...values]);
+}
+
+export async function deleteProperty(id: string): Promise<void> {
+  const staff = requireStaff();
+  await assertCanEdit('properties', id, staff);
+  await query('delete from properties where id = $1', [id]);
+}
+
+// Dados crus para preencher o formulário de edição
+export type PropertyEditData = PropertyFields & { id: string; corretorEmail: string | null };
+
+export async function getPropertyForEdit(id: string): Promise<PropertyEditData | null> {
+  const staff = requireStaff();
+  await assertCanEdit('properties', id, staff);
+  const rows = await query<PropertyRow & { price_value: string; delivery_date: string | Date }>('select * from properties where id = $1', [id]);
+  const r = rows[0];
+  if (!r) return null;
+  const d = r.delivery_date instanceof Date ? r.delivery_date.toISOString() : String(r.delivery_date);
+  return {
+    id: r.id,
+    corretorEmail: r.corretor_email,
+    titulo: r.titulo ?? undefined,
+    tipoUnidade: r.tipo_unidade as TipoUnidade,
+    finalidade: r.finalidade,
+    deliveryDate: d.slice(0, 7),
+    priceValue: Number(r.price_value) || 0,
+    pricePeriod: r.price_period,
+    location: r.location,
+    quartos: r.quartos ?? undefined,
+    vagas: r.vagas ?? undefined,
+    banheiros: r.banheiros ?? undefined,
+    escaninhos: r.escaninhos ?? undefined,
+    area: r.area != null ? Number(r.area) : undefined,
+    video: r.video,
+    videoUrl: r.video_url ?? undefined,
+    aceitaTemporada: r.aceita_temporada,
+    description: r.description,
+    amenities: toStringArray(r.amenities),
+    empreendimentoId: r.empreendimento_id ?? undefined,
+    photos: toStringArray(r.photos),
+    cep: r.cep ?? undefined,
+    logradouro: r.logradouro ?? undefined,
+    bairro: r.bairro ?? undefined,
+    cidade: r.cidade ?? undefined,
+    uf: r.uf ?? undefined,
+    condominio: r.condominio ?? undefined
+  };
+}
+
+// ---------------- Condomínios / empreendimentos ----------------
+export type DevelopmentStatus = 'rascunho' | 'publicado';
+
+export type DevelopmentFields = {
   name: string;
   location: string;
-  deliveryDate: string;
+  deliveryDate?: string; // "AAAA-MM" — obrigatório só para publicar
   description: string;
   tipo: 'vertical' | 'horizontal';
   pavimentos?: number;
@@ -398,7 +583,6 @@ export type CreateDevelopmentInput = {
   amenities: string[];
   aceitaTemporada: boolean;
   videoUrl?: string;
-  corretorEmail: string;
   heroHeight?: number;
   photos?: string[];
   tiposUnidade?: TipoUnidade[];
@@ -408,42 +592,221 @@ export type CreateDevelopmentInput = {
   bairro?: string;
   cidade?: string;
   uf?: string;
+  status?: DevelopmentStatus;
 };
+export type CreateDevelopmentInput = DevelopmentFields & { id: string; corretorEmail?: string };
 
-export async function createDevelopment(input: CreateDevelopmentInput): Promise<void> {
-  await query(
-    `insert into developments
-      (id, name, location, delivery_date, description, tipo, pavimentos, area_terreno, amenities, aceita_temporada, hero_height, video_url, corretor_email,
-       photos, tipos_unidade, quartos_opcoes, cep, logradouro, bairro, cidade, uf)
-     values ($1,$2,$3,$4::date,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14::jsonb,$15::jsonb,$16::jsonb,$17,$18,$19,$20,$21)`,
-    [
-      input.id,
-      input.name,
-      input.location,
-      `${input.deliveryDate}-01`,
-      input.description,
-      input.tipo,
-      input.pavimentos ?? null,
-      input.areaTerreno ?? null,
-      JSON.stringify(input.amenities),
-      input.aceitaTemporada,
-      input.heroHeight ?? 300,
-      input.videoUrl ?? null,
-      input.corretorEmail,
-      JSON.stringify(sanitizePhotos(input.photos)),
-      JSON.stringify(Array.from(new Set((input.tiposUnidade ?? []).filter((t) => t in TIPO_UNIDADE_LABEL)))),
-      JSON.stringify(Array.from(new Set((input.quartosOpcoes ?? []).filter((n) => Number.isInteger(n) && n > 0 && n < 20))).sort((a, b) => a - b)),
-      clean(input.cep?.replace(/\D/g, '')),
-      clean(input.logradouro),
-      clean(input.bairro),
-      clean(input.cidade),
-      clean(input.uf?.toUpperCase())
-    ]
-  );
+// O que falta para um condomínio poder ser publicado (vazio = pode publicar)
+export async function pendenciasParaPublicar(f: DevelopmentFields): Promise<string[]> {
+  const faltando: string[] = [];
+  if (!f.name?.trim()) faltando.push('nome');
+  if (!f.bairro?.trim() || !f.cidade?.trim()) faltando.push('endereço (bairro e cidade)');
+  if (!f.deliveryDate) faltando.push('data de entrega');
+  if (!f.description?.trim() || f.description.trim().length < 60) faltando.push('narrativa (descrição com pelo menos 60 caracteres)');
+  if (!f.tiposUnidade?.length) faltando.push('tipos de imóvel que existem no condomínio');
+  return faltando;
 }
 
-export async function deleteProperty(id: string): Promise<void> {
-  await query('delete from properties where id = $1', [id]);
+function developmentValues(input: DevelopmentFields) {
+  return [
+    input.name,
+    input.location,
+    input.deliveryDate ? `${input.deliveryDate}-01` : null,
+    input.description,
+    input.tipo,
+    input.pavimentos ?? null,
+    input.areaTerreno ?? null,
+    JSON.stringify(input.amenities),
+    input.aceitaTemporada,
+    input.heroHeight ?? 300,
+    input.videoUrl ?? null,
+    JSON.stringify(sanitizePhotos(input.photos)),
+    JSON.stringify(Array.from(new Set((input.tiposUnidade ?? []).filter((t) => t in TIPO_UNIDADE_LABEL)))),
+    JSON.stringify(Array.from(new Set((input.quartosOpcoes ?? []).filter((n) => Number.isInteger(n) && n > 0 && n < 20))).sort((a, b) => a - b)),
+    clean(input.cep?.replace(/\D/g, '')),
+    clean(input.logradouro),
+    clean(input.bairro),
+    clean(input.cidade),
+    clean(input.uf?.toUpperCase()),
+    input.status === 'rascunho' ? 'rascunho' : 'publicado'
+  ];
+}
+const DEV_COLS =
+  'name, location, delivery_date, description, tipo, pavimentos, area_terreno, amenities, aceita_temporada, hero_height, video_url, photos, tipos_unidade, quartos_opcoes, cep, logradouro, bairro, cidade, uf, status';
+const DEV_CASTS = ['', '', '::date', '', '', '', '', '::jsonb', '', '', '', '::jsonb', '::jsonb', '::jsonb', '', '', '', '', '', ''];
+
+export async function createDevelopment(input: CreateDevelopmentInput): Promise<{ ok: true } | { ok: false; faltando: string[] }> {
+  const staff = requireStaff();
+  if (input.status !== 'rascunho') {
+    const faltando = await pendenciasParaPublicar(input);
+    if (faltando.length) return { ok: false, faltando };
+  }
+  const values = developmentValues(input);
+  const placeholders = values.map((_, i) => `$${i + 3}${DEV_CASTS[i]}`).join(',');
+  await query(`insert into developments (id, corretor_email, ${DEV_COLS}) values ($1, $2, ${placeholders})`, [input.id, staff.email, ...values]);
+  return { ok: true };
+}
+
+export async function updateDevelopment(id: string, input: DevelopmentFields): Promise<{ ok: true } | { ok: false; faltando: string[] }> {
+  const staff = requireStaff();
+  await assertCanEdit('developments', id, staff);
+  if (input.status !== 'rascunho') {
+    const faltando = await pendenciasParaPublicar(input);
+    if (faltando.length) return { ok: false, faltando };
+  }
+  const values = developmentValues(input);
+  const sets = DEV_COLS.split(', ')
+    .map((col, i) => `${col} = $${i + 2}${DEV_CASTS[i]}`)
+    .join(', ');
+  await query(`update developments set ${sets} where id = $1`, [id, ...values]);
+  // As tipologias da tabela de vendas acompanham o endereço, as fotos e a entrega do condomínio
+  if (input.deliveryDate) {
+    await query(
+      `update properties set location = $2, bairro = $3, cidade = $4, uf = $5, cep = $6, condominio = $7, delivery_date = $8::date, photos = $9::jsonb
+        where empreendimento_id = $1 and is_tipologia = true`,
+      [id, input.location, clean(input.bairro), clean(input.cidade), clean(input.uf), clean(input.cep?.replace(/\D/g, '')), input.name, `${input.deliveryDate}-01`, JSON.stringify(sanitizePhotos(input.photos))]
+    );
+  }
+  return { ok: true };
+}
+
+// Tipologias da tabela de vendas: cria as novas, atualiza as existentes e remove as que saíram da lista
+export type TipologiaInput = { id?: string; tipoUnidade: TipoUnidade; quartos?: number; vagas?: number; area?: number; priceValue: number };
+
+export async function saveTipologias(developmentId: string, tipologias: TipologiaInput[]): Promise<void> {
+  const staff = requireStaff();
+  await assertCanEdit('developments', developmentId, staff);
+  const devRows = await query<DevelopmentRow>('select * from developments where id = $1', [developmentId]);
+  const dev = devRows[0];
+  if (!dev) throw new Error('Condomínio não encontrado.');
+  const existing = await query<{ id: string }>('select id from properties where empreendimento_id = $1 and is_tipologia = true', [developmentId]);
+  const keep = new Set(tipologias.map((t) => t.id).filter(Boolean) as string[]);
+  for (const e of existing) if (!keep.has(e.id)) await query('delete from properties where id = $1 and is_tipologia = true', [e.id]);
+
+  const delivery = dev.delivery_date ? (dev.delivery_date instanceof Date ? dev.delivery_date.toISOString() : String(dev.delivery_date)).slice(0, 7) : new Date().toISOString().slice(0, 7);
+  for (const [i, t] of tipologias.entries()) {
+    const fields: PropertyFields = {
+      tipoUnidade: t.tipoUnidade,
+      finalidade: 'venda',
+      deliveryDate: delivery,
+      priceValue: t.priceValue || 0,
+      pricePeriod: 'unico',
+      location: dev.location,
+      quartos: t.quartos,
+      vagas: t.vagas,
+      area: t.area,
+      video: false,
+      aceitaTemporada: dev.aceita_temporada,
+      description: `${TIPO_UNIDADE_LABEL[t.tipoUnidade]}${t.quartos ? ` de ${t.quartos} quartos` : ''}${t.area ? `, ${t.area} m²` : ''} no ${dev.name}, em ${dev.location}.`,
+      amenities: toStringArray(dev.amenities),
+      empreendimentoId: developmentId,
+      photos: toStringArray(dev.photos),
+      cep: dev.cep ?? undefined,
+      bairro: dev.bairro ?? undefined,
+      cidade: dev.cidade ?? undefined,
+      uf: dev.uf ?? undefined,
+      condominio: dev.name
+    };
+    if (t.id && existing.some((e) => e.id === t.id)) {
+      const values = propertyValues(fields);
+      const sets = PROPERTY_COLS.split(', ')
+        .map((col, k) => `${col} = $${k + 2}${PROPERTY_CASTS[k]}`)
+        .join(', ');
+      await query(`update properties set ${sets} where id = $1 and is_tipologia = true`, [t.id, ...values]);
+    } else {
+      await createProperty({ ...fields, id: `${developmentId}-tip-${Date.now()}-${i}`, isTipologia: true });
+    }
+  }
+}
+
+export type DevelopmentEditData = DevelopmentFields & { id: string; tipologias: (TipologiaInput & { id: string })[] };
+
+export async function getDevelopmentForEdit(id: string): Promise<DevelopmentEditData | null> {
+  const staff = requireStaff();
+  await assertCanEdit('developments', id, staff);
+  const rows = await query<DevelopmentRow>('select * from developments where id = $1', [id]);
+  const d = rows[0];
+  if (!d) return null;
+  const tips = await query<{ id: string; tipo_unidade: string; quartos: number | null; vagas: number | null; area: string | null; price_value: string }>(
+    'select id, tipo_unidade, quartos, vagas, area, price_value from properties where empreendimento_id = $1 and is_tipologia = true order by area asc nulls last',
+    [id]
+  );
+  const dd = d.delivery_date ? (d.delivery_date instanceof Date ? d.delivery_date.toISOString() : String(d.delivery_date)).slice(0, 7) : undefined;
+  return {
+    id: d.id,
+    name: d.name,
+    location: d.location,
+    deliveryDate: dd,
+    description: d.description,
+    tipo: d.tipo,
+    pavimentos: d.pavimentos ?? undefined,
+    areaTerreno: d.area_terreno ?? undefined,
+    amenities: toStringArray(d.amenities),
+    aceitaTemporada: d.aceita_temporada,
+    videoUrl: d.video_url ?? undefined,
+    heroHeight: d.hero_height,
+    photos: toStringArray(d.photos),
+    tiposUnidade: toStringArray(d.tipos_unidade) as TipoUnidade[],
+    quartosOpcoes: (Array.isArray(d.quartos_opcoes) ? (d.quartos_opcoes as unknown[]) : []).map(Number).filter((n) => n > 0),
+    cep: d.cep ?? undefined,
+    logradouro: d.logradouro ?? undefined,
+    bairro: d.bairro ?? undefined,
+    cidade: d.cidade ?? undefined,
+    uf: d.uf ?? undefined,
+    status: d.status === 'rascunho' ? 'rascunho' : 'publicado',
+    tipologias: tips.map((t) => ({
+      id: t.id,
+      tipoUnidade: t.tipo_unidade as TipoUnidade,
+      quartos: t.quartos ?? undefined,
+      vagas: t.vagas ?? undefined,
+      area: t.area != null ? Number(t.area) : undefined,
+      priceValue: Number(t.price_value) || 0
+    }))
+  };
+}
+
+// Lista leve para o seletor de condomínio no cadastro e para o painel
+export type CondominioResumo = {
+  id: string;
+  name: string;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+  cep: string | null;
+  logradouro: string | null;
+  status: DevelopmentStatus;
+  amenities: string[];
+  deliveryDate: string | null;
+  anuncios: number;
+  tipologias: number;
+  temFotos: boolean;
+  corretorEmail: string | null;
+};
+
+export async function listCondominios(): Promise<CondominioResumo[]> {
+  requireStaff();
+  const rows = await query<DevelopmentRow & { anuncios: string; tipologias: string }>(
+    `select d.*,
+            (select count(*) from properties p where p.empreendimento_id = d.id and p.is_tipologia = false) as anuncios,
+            (select count(*) from properties p where p.empreendimento_id = d.id and p.is_tipologia = true) as tipologias
+       from developments d order by d.name`
+  );
+  return rows.map((d) => ({
+    id: d.id,
+    name: d.name,
+    bairro: d.bairro ?? null,
+    cidade: d.cidade ?? null,
+    uf: d.uf ?? null,
+    cep: d.cep ?? null,
+    logradouro: d.logradouro ?? null,
+    status: d.status === 'rascunho' ? 'rascunho' : 'publicado',
+    amenities: toStringArray(d.amenities),
+    deliveryDate: d.delivery_date ? (d.delivery_date instanceof Date ? d.delivery_date.toISOString() : String(d.delivery_date)).slice(0, 7) : null,
+    anuncios: Number(d.anuncios) || 0,
+    tipologias: Number(d.tipologias) || 0,
+    temFotos: toStringArray(d.photos).length > 0,
+    corretorEmail: d.corretor_email
+  }));
 }
 
 // ---------------- Login da equipe ----------------

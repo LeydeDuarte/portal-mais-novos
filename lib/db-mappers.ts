@@ -35,13 +35,14 @@ export type PropertyRow = {
   cidade?: string | null;
   uf?: string | null;
   condominio?: string | null;
+  is_tipologia?: boolean;
 };
 
 export type DevelopmentRow = {
   id: string;
   name: string;
   location: string;
-  delivery_date: string | Date;
+  delivery_date: string | Date | null; // vazio em condomínio ainda em rascunho
   description: string;
   tipo: 'vertical' | 'horizontal';
   pavimentos: number | null;
@@ -59,6 +60,7 @@ export type DevelopmentRow = {
   uf?: string | null;
   tipos_unidade?: unknown;
   quartos_opcoes?: unknown;
+  status?: string;
 };
 
 // jsonb pode chegar como array ou (em casos raros) como texto — normaliza
@@ -129,12 +131,13 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
     photos: toStringArray(row.photos),
     condominio: row.condominio ?? undefined,
     bairro: row.bairro ?? undefined,
-    cidade: row.cidade ?? undefined
+    cidade: row.cidade ?? undefined,
+    isTipologia: !!row.is_tipologia
   };
 }
 
 export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]): Development {
-  const deliveryDateFormatted = formatDeliveryDate(row.delivery_date);
+  const deliveryDateFormatted = row.delivery_date ? formatDeliveryDate(row.delivery_date) : '';
   const [year, month] = deliveryDateFormatted.split('-');
   const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
   return {
@@ -142,7 +145,7 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     name: row.name,
     location: row.location,
     deliveryDate: deliveryDateFormatted,
-    deliveryNote: `Previsão de entrega: ${MESES[Number(month) - 1] ?? month} de ${year}`,
+    deliveryNote: deliveryDateFormatted ? `Previsão de entrega: ${MESES[Number(month) - 1] ?? month} de ${year}` : 'Data de entrega a confirmar',
     description: row.description,
     tipo: row.tipo,
     pavimentos: row.pavimentos ?? undefined,
@@ -158,6 +161,7 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     bairro: row.bairro ?? undefined,
     cidade: row.cidade ?? undefined,
     cep: row.cep ?? undefined,
+    status: row.status === 'rascunho' ? 'rascunho' : 'publicado',
     units
   };
 }

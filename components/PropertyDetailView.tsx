@@ -4,8 +4,9 @@ import Footer from '@/components/Footer';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import PhotoGallery, { type GalleryVideo } from '@/components/PhotoGallery';
 import LocationCard from '@/components/LocationCard';
+import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import type { PropertyDetail } from '@/lib/property-details';
-import { getDevelopmentById } from '@/lib/actions';
+import { getDevelopmentById, getRelatedListings } from '@/lib/actions';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
@@ -15,7 +16,7 @@ const BED_PATH = 'M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6 M3 18h18 M5 10V7a2 2
 // Visualização do imóvel — Server Component, busca no banco de dados.
 export default async function PropertyDetailView({ property }: { property: PropertyDetail }) {
   const development = property.empreendimentoId ? await getDevelopmentById(property.empreendimentoId) : null;
-  const siblings = development ? development.units.filter((u) => u.id !== property.id) : [];
+  const related = await getRelatedListings({ propertyId: property.id }).catch(() => ({ mesmoCondominio: [], regiao: [], precoReferencia: null }));
   const badge = getStatusBadge(property.deliveryDate);
   const embed = property.videoUrl ? getEmbedInfo(property.videoUrl) : null;
 
@@ -128,27 +129,12 @@ export default async function PropertyDetailView({ property }: { property: Prope
             </div>
 
             {development && (
-              <div className="mt-6">
-                <h2 className="mb-1 text-lg font-bold">Faz parte de um lançamento</h2>
-                <Link href={`/empreendimento/${development.id}`} className="text-sm font-semibold text-accent hover:underline">
-                  Ver o empreendimento {development.name} →
+              <div className="mt-6 rounded-xl border border-[var(--border)] p-4">
+                <h2 className="text-base font-bold">Fica no {development.name}</h2>
+                <p className="mt-0.5 text-sm text-[var(--text-muted)]">Veja lazer, tipologias e todos os imóveis disponíveis neste condomínio.</p>
+                <Link href={`/empreendimento/${development.id}`} className="mt-2 inline-block text-sm font-semibold text-accent hover:underline">
+                  Ver o condomínio →
                 </Link>
-
-                {siblings.length > 0 && (
-                  <div className="mt-4 flex flex-col gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-faint)]">Outras unidades deste empreendimento</span>
-                    {siblings.map((s) => (
-                      <Link
-                        key={s.id}
-                        href={`/imovel/${s.id}`}
-                        className="flex items-center justify-between rounded-lg border border-[var(--border)] px-4 py-3 text-sm hover:bg-[var(--pill-bg)]"
-                      >
-                        <span>{s.beds} · {s.area}</span>
-                        <span className="font-semibold">{s.price}</span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -215,6 +201,17 @@ export default async function PropertyDetailView({ property }: { property: Prope
             </div>
           </aside>
         </div>
+        <RelatedListings
+          title={nomeCondominio ? `Outros imóveis disponíveis no ${nomeCondominio}` : 'Outros imóveis neste condomínio'}
+          items={related.mesmoCondominio}
+        />
+
+        <RelatedListings
+          title={`Imóveis ${property.finalidade === 'aluguel' ? 'para alugar' : 'à venda'} nesta região`}
+          subtitle={faixaDePreco(related.precoReferencia)}
+          items={related.regiao}
+        />
+
         <LocationCard
           title={nomeCondominio || property.bairro || property.location.split(',')[0]}
           subtitle={property.location}

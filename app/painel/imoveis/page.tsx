@@ -30,6 +30,7 @@ export default function MeusImoveisPage() {
   }, [staff]);
 
   const handleRemove = async (id: string) => {
+    if (!window.confirm('Excluir este imóvel? Isso não pode ser desfeito.')) return;
     await deleteProperty(id);
     setItems((prev) => prev.filter((p) => p.id !== id));
   };
@@ -59,7 +60,11 @@ export default function MeusImoveisPage() {
                 <div className="flex flex-col gap-0.5">
                   <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[p.tipoUnidade]}</span>
                   <span className="font-serif text-base font-semibold">{p.price}</span>
-                  <span className="text-sm text-[var(--text-muted)]">{p.location}</span>
+                  <span className="text-sm text-[var(--text-muted)]">
+                    {p.condominio ? `${p.condominio} · ` : ''}
+                    {p.location}
+                  </span>
+                  <span className="text-xs text-[var(--text-faint)]">{p.photos?.length ? `${p.photos.length} foto(s)` : 'Sem fotos — edite para adicionar'}</span>
                   {staff.role === 'admin' && p.corretorEmail && (
                     <span className="text-xs text-[var(--text-faint)]">Cadastrado por {p.corretorEmail}</span>
                   )}
@@ -67,6 +72,9 @@ export default function MeusImoveisPage() {
                 <div className="flex shrink-0 items-center gap-3">
                   <Link href={`/imovel/${p.id}`} className="text-sm font-semibold text-accent hover:underline">
                     Ver
+                  </Link>
+                  <Link href={`/painel/imoveis/${p.id}/editar`} className="rounded-full bg-ink px-3.5 py-1.5 text-sm font-bold text-white hover:opacity-90">
+                    Editar
                   </Link>
                   <button type="button" onClick={() => handleRemove(p.id)} className="text-sm font-semibold text-red-600 hover:underline">
                     Excluir
