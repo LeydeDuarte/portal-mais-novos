@@ -171,6 +171,23 @@ function filaDe(fotos: string[], plantas: string[]): FilaFoto[] {
   return [...fotos.map((url, i) => ({ url, tipo: 'foto' as const, i })), ...plantas.map((url, i) => ({ url, tipo: 'planta' as const, i }))];
 }
 
+// Na Jetimob da Leyde o ano de ENTREGA foi gravado no fim do nome do condomínio,
+// depois da vírgula ("Jardins Florença, 1999"). Aqui o nome fica limpo e o ano
+// vira a data de entrega (quando a Jetimob não tem entrega_ano preenchido).
+export function limparNomeCondo(n: string): string {
+  return separarAnoDoNome(n).nome;
+}
+export function separarAnoDoNome(n: string): { nome: string; ano: number | null } {
+  const bruto = String(n ?? '').trim();
+  const m = bruto.match(/^(.*?)\s*,\s*((?:19|20)\d{2})\s*$/);
+  if (m && m[1].trim()) return { nome: m[1].trim(), ano: Number(m[2]) };
+  return { nome: bruto, ano: null };
+}
+const entregaDoNome = (n?: string | null) => {
+  const ano = n ? separarAnoDoNome(n).ano : null;
+  return ano && ano <= new Date().getFullYear() + 8 ? `${ano}-01-01` : null;
+};
+
 // ---------- Condomínios ----------
 export type ResumoPagina = { pagina: number; totalPaginas: number; total: number; criados: number; atualizados: number; vinculados: number; erros: string[] };
 
@@ -189,13 +206,13 @@ export async function sincronizarCondominios(pagina: number, email: string): Pro
   for (const c of r.data) {
     try {
       if (!c?.nome || !c.id_condominio) continue;
-      const nome = formatTitulo(c.nome).slice(0, 160);
+      const nome = formatTitulo(limparNomeCondo(c.nome)).slice(0, 160);
       const bairro = typeof c.endereco_bairro === 'string' ? padronizarBairro(c.endereco_bairro) : null;
       const cidade = typeof c.endereco_cidade === 'string' ? formatTitulo(c.endereco_cidade) : null;
       const estado = uf(c.endereco_estado);
       const cep = cepDig(c.endereco_cep);
       const logradouro = [txt(c.endereco_logradouro), txt(c.endereco_numero) ? `nº ${c.endereco_numero}` : null].filter(Boolean).join(', ') || null;
-      const entrega = entregaDe(c.entrega_ano, c.entrega_mes);
+      const entrega = entregaDe(c.entrega_ano, c.entrega_mes) ?? entregaDoNome(c.nome);
       const fotos = linksDe(c.imagens);
       const desc = txt(c.observacoes) ? formatarDescricao(c.observacoes!) : '';
       const reg = {
@@ -315,7 +332,7 @@ export async function sincronizarImoveis(
       const area = areaBruta ? Math.round(areaBruta * fator * 100) / 100 : null;
       const condo = i.id_condominio ? condoPorJt.get(String(i.id_condominio)) : undefined;
       const condoData = condo?.delivery_date ? new Date(condo.delivery_date).toISOString().slice(0, 10) : null;
-      const entrega = entregaDe(i.entrega_ano, i.entrega_mes) ?? condoData ?? entregaEstimada(i.status, i.data_cadastro);
+      const entrega = entregaDe(i.entrega_ano, i.entrega_mes) ?? condoData ?? entregaDoNome(i.condominio_nome) ?? entregaEstimada(i.status, i.data_cadastro);
       const bairro = txt(i.endereco_bairro) ? padronizarBairro(i.endereco_bairro!) : null;
       const cidade = txt(i.endereco_cidade) ? formatTitulo(i.endereco_cidade!) : null;
       const estado = uf(i.endereco_estado);
@@ -345,7 +362,7 @@ export async function sincronizarImoveis(
         bairro,
         cidade,
         uf: estado,
-        condominio: condo?.name ?? (txt(i.condominio_nome) ? formatTitulo(i.condominio_nome!) : null),
+        condominio: condo?.name ?? (txt(i.condominio_nome) ? formatTitulo(limparNomeCondo(i.condominio_nome!)) : null),
         visibilidade: opcoes.ativos.has(String(i.id_imovel)) ? 'publico' : 'privado',
         lat: typeof i.latitude === 'number' ? i.latitude : null,
         lng: typeof i.longitude === 'number' ? i.longitude : null,
