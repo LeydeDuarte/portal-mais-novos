@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import CondominioTag from '@/components/CondominioTag';
+import ImagemCapa from '@/components/ImagemCapa';
 import ScrollRow from './ScrollRow';
 import { formatTitulo } from '@/lib/text';
 import type { PropertyDetail } from '@/lib/property-details';
@@ -34,7 +35,12 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
                 <div className="relative h-[160px] overflow-hidden rounded-2xl bg-[var(--card-img-bg)]">
                   {cover ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+                    <ImagemCapa
+                      mini={p.capaMini}
+                      original={cover}
+                      alt={`${TIPO_UNIDADE_LABEL[p.tipoUnidade]}${p.condominio ? ` no ${formatTitulo(p.condominio)}` : ''} — ${p.bairro || p.location}`}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                    />
                   ) : (
                     <span className="flex h-full items-center justify-center text-[11px] text-[var(--text-faint)]">[FOTO]</span>
                   )}

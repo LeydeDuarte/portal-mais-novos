@@ -8,6 +8,7 @@ import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { ROLE_LABEL, veTudo } from '@/lib/papeis';
 import InstalarApp from '@/components/InstalarApp';
+import OtimizarFotos from '@/components/OtimizarFotos';
 import { getPropertiesByCorretor } from '@/lib/actions';
 
 export default function PainelPage() {
@@ -76,6 +77,8 @@ export default function PainelPage() {
           </Link>
 
           <InstalarApp />
+
+          {veTudo(staff.role) && <OtimizarFotos />}
 
           {staff.role === 'admin' && (
             <Link href="/painel/equipe" className="flex flex-col gap-1 rounded-xl border border-[var(--border)] p-5 hover:bg-[var(--pill-bg)]">

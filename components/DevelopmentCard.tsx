@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Visualizacoes from '@/components/Visualizacoes';
 import AnunciosBadge from '@/components/AnunciosBadge';
+import ImagemCapa from '@/components/ImagemCapa';
 import TemporadaBadge from '@/components/TemporadaBadge';
 import type { DevelopmentCardData } from '@/lib/actions';
 import { getBadgeCondominio } from '@/lib/classification';
@@ -28,7 +29,7 @@ function range(min: number | null, max: number | null, suffix: string): string |
 // Card de empreendimento/condomínio no feed — mesmo estilo do card de imóvel,
 // mas mostrando o resumo do condomínio: tipos que existem, faixa de quartos e
 // metragem, "a partir de" e a data de entrega.
-export default function DevelopmentCard({ development }: { development: DevelopmentCardData }) {
+export default function DevelopmentCard({ development, prioridade = false }: { development: DevelopmentCardData; prioridade?: boolean }) {
   const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
   const cover = development.photos[0];
   const [ano, mes] = development.deliveryDate.split('-');
@@ -44,7 +45,7 @@ export default function DevelopmentCard({ development }: { development: Developm
   if (!cover) {
     return (
       <div className="mb-2.5 inline-block w-full break-inside-avoid md:mb-4">
-        <Link href={`/empreendimento/${development.id}`} className="block rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4 transition-colors hover:bg-[var(--pill-bg)]">
+        <Link href={`/empreendimento/${development.id}`} className="block rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4 transition-colors hover:bg-[var(--pill-bg)] md:border-[#E7EAEE] md:bg-[#F6F7F9] md:hover:bg-[#EEF1F4]">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
               {badge.text}
@@ -78,18 +79,15 @@ export default function DevelopmentCard({ development }: { development: Developm
         >
           {cover ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={cover} alt={development.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+            <ImagemCapa mini={development.capaMini} original={cover} alt={`${development.name} — ${development.location}`} prioridade={prioridade} className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <span className="text-[11px] text-[var(--text-faint)]">[FOTO DO EMPREENDIMENTO]</span>
           )}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/60" />
-          <div className="absolute right-2.5 top-2.5 z-20 flex flex-col items-end gap-1.5">
-            <Visualizacoes n={development.visualizacoes} />
+          <div className="absolute left-2.5 right-2.5 top-2.5 z-10 flex flex-wrap items-center gap-1.5">
             <AnunciosBadge n={development.anuncios} />
-          </div>
-
-          <div className="absolute left-2.5 right-24 top-2.5 z-10 flex flex-wrap items-center gap-1.5">
-            <span className="rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
+            <Visualizacoes n={development.visualizacoes} />
+            <span className="whitespace-nowrap rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
               {badge.text}
             </span>
             <span className="rounded-md bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ink">Empreendimento</span>

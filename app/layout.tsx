@@ -25,10 +25,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} — Estruturação de Ativos Imobiliários`,
+    default: `${SITE_NAME} — Imóveis à venda em Goiânia`,
     template: `%s | ${SITE_NAME}`
   },
-  description: 'Estruturação de Ativos Imobiliários — compra, venda, financiamento e Home Equity em Goiânia e para brasileiros no exterior.',
+  description:
+    'Imóveis à venda em Goiânia com fotos e vídeos: apartamentos, casas em condomínio, coberturas e lançamentos. Atendimento especializado em financiamento e crédito imobiliário.',
   openGraph: {
     siteName: SITE_NAME,
     type: 'website',

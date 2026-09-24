@@ -22,9 +22,9 @@ export function useStaffSession() {
     });
   }, []);
 
-  const login = useCallback(async (email: string, password: string): Promise<StaffUser | null> => {
+  const login = useCallback(async (email: string, password: string): Promise<StaffUser | null | 'bloqueado'> => {
     const user = await staffLogin(email, password);
-    setStaff(user);
+    if (user !== 'bloqueado') setStaff(user);
     return user;
   }, []);
 

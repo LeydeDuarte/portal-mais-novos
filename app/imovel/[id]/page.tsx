@@ -5,10 +5,16 @@ import PropertyDetailView from '@/components/PropertyDetailView';
 import OcultoView from '@/components/OcultoView';
 import AtivarLinkPrivado from '@/components/AtivarLinkPrivado';
 import ProtecaoTela from '@/components/ProtecaoTela';
-import { getPropertyById, getResumoOculto, getStaffSession } from '@/lib/actions';
+import { cache } from 'react';
+import { getPropertyById as buscarImovel, getResumoOculto as buscarResumo, getStaffSession } from '@/lib/actions';
+
+// Uma consulta só por página (os metadados e a página usam o mesmo resultado)
+const getPropertyById = cache((id: string) => buscarImovel(id));
+const getResumoOculto = cache((id: string) => buscarResumo(id));
 import { verificarLinkPrivado } from '@/lib/links-privados';
 import { buildPropertyMetadata, buildPropertyJsonLd, SITE_URL } from '@/lib/seo';
 import { tituloOculto, brlCurto } from '@/lib/ocultos';
+import JsonLd from '@/components/JsonLd';
 
 // Sempre busca os dados na hora: assim uma edição feita no painel aparece
 // imediatamente (sem isso, o Next guardava a primeira versão da página).
@@ -74,7 +80,7 @@ export default async function ImovelPage({ params, searchParams }: Props) {
   const jsonLd = buildPropertyJsonLd(property);
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <JsonLd data={jsonLd} />
       <PropertyDetailView property={property} />
     </>
   );

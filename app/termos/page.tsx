@@ -3,7 +3,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Termos de uso e Política de privacidade | Mais Novos Imóveis',
+  title: 'Termos de uso e Política de privacidade',
   description: 'Como a Mais Novos Imóveis usa seus dados ao entrar com o Google, salvar favoritos e falar com nossos corretores.'
 };
 

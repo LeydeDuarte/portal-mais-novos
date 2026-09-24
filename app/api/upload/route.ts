@@ -1,8 +1,7 @@
 import crypto from 'crypto';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { verifySession } from '@/lib/session';
+import { staffAtual } from '@/lib/staff-auth';
 import { r2PublicBase } from '@/lib/r2-url';
 
 // Upload de fotos para o Cloudflare R2 (bucket `portal-mais-novos-imoveis-fotos`).
@@ -43,7 +42,7 @@ function slugArquivo(s: string): string {
 }
 
 export async function POST(request: Request) {
-  const staff = verifySession(cookies().get('mn_staff')?.value);
+  const staff = await staffAtual();
   if (!staff) return NextResponse.json({ error: 'Faça login no painel para enviar fotos.' }, { status: 401 });
 
   const missing = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL'].filter(
@@ -62,6 +61,13 @@ export async function POST(request: Request) {
   if (!ALLOWED.has(file.type)) return NextResponse.json({ error: 'Formato não aceito — use JPG, PNG ou WEBP.' }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: 'Foto muito grande (máx. 4 MB).' }, { status: 400 });
 
+  // Confere o conteúdo de verdade (não só o tipo declarado pelo navegador)
+  const buf = Buffer.from(await file.arrayBuffer());
+  const ehJpeg = buf[0] === 0xff && buf[1] === 0xd8;
+  const ehPng = buf[0] === 0x89 && buf.toString('ascii', 1, 4) === 'PNG';
+  const ehWebp = buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP';
+  if (!(ehJpeg || ehPng || ehWebp)) return NextResponse.json({ error: 'Arquivo não é uma imagem válida.' }, { status: 400 });
+
   const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
   const now = new Date();
   // Nome do arquivo com o nome do empreendimento/imóvel + nome do site (SEO de
@@ -74,7 +80,7 @@ export async function POST(request: Request) {
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME,
         Key: key,
-        Body: Buffer.from(await file.arrayBuffer()),
+        Body: buf,
         ContentType: file.type,
         CacheControl: 'public, max-age=31536000, immutable'
       })

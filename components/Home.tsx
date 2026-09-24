@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Header from './Header';
 import FilterBar from './FilterBar';
-import MasonryFeed from './MasonryFeed';
+import MasonryFeed, { type FeedInicial } from './MasonryFeed';
 import Footer from './Footer';
 import SearchBox from './SearchBox';
 import { DEFAULT_FILTERS, addTermos, localKey, splitTermos, type FilterState, type LocalFiltro } from '@/lib/filters';
@@ -11,13 +11,14 @@ import { DEFAULT_FILTERS, addTermos, localKey, splitTermos, type FilterState, ty
 type Props = {
   initialModo?: FilterState['modo'];
   initialQuery?: string;
+  inicial?: FeedInicial;
 };
 
 const LOCAIS_KEY = 'mn_locais';
 
 // Mesmo feed para o Comprar (/) e para Lançamentos (/lancamentos) — a única
 // diferença é o modo que já vem marcado. Os filtros são os mesmos nos dois.
-export default function Home({ initialModo = 'todos', initialQuery = '' }: Props) {
+export default function Home({ initialModo = 'todos', initialQuery = '', inicial }: Props) {
   const [filters, setFilters] = useState<FilterState>({ ...DEFAULT_FILTERS, modo: initialModo, termos: splitTermos(initialQuery) });
   const carregouLocais = useRef(false);
 
@@ -69,7 +70,7 @@ export default function Home({ initialModo = 'todos', initialQuery = '' }: Props
         }
       />
       <FilterBar filters={filters} onChange={setFilters} />
-      <MasonryFeed filters={filters} />
+      <MasonryFeed filters={filters} inicial={inicial} />
       <Footer />
     </div>
   );

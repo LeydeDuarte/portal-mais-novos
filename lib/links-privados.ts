@@ -11,19 +11,16 @@ import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { query } from './db';
 import { mapPropertyRow, type PropertyRow } from './db-mappers';
-import { verifySession, veTudo } from './session';
+import { veTudo } from './session';
+import { exigirEquipe } from './staff-auth';
 import { SITE_URL } from './seo';
 import type { PropertyDetail } from './property-details';
 
 const DEV_COOKIE = 'mn_dev';
 
-function equipe() {
-  const s = verifySession(cookies().get('mn_staff')?.value);
-  if (!s) throw new Error('Sessão da equipe expirada — faça login novamente no painel.');
-  return s;
-}
+const equipe = exigirEquipe;
 async function podeMexer(propertyId: string) {
-  const s = equipe();
+  const s = await equipe();
   if (veTudo(s.role)) return s;
   const r = await query<{ corretor_email: string | null }>('select corretor_email from properties where id = $1', [propertyId]);
   if (r[0]?.corretor_email !== s.email) throw new Error('Você só pode enviar links dos imóveis que cadastrou.');

@@ -1,3 +1,5 @@
+import { MAIS_VALOR_URL } from '@/lib/marca';
+
 export default function Footer() {
   return (
     <footer className="flex flex-col gap-5 border-t border-[var(--border)] px-5 pb-6 pt-8 md:px-8 md:pt-11 md:pb-7">
@@ -5,8 +7,8 @@ export default function Footer() {
         <div className="flex max-w-[320px] flex-col gap-2">
           <div className="font-serif text-[19px] font-semibold">Mais Novos Imóveis</div>
           <p className="text-[13px] leading-relaxed text-[var(--text-muted)]">
-            Estruturação de Ativos Imobiliários — compra, venda, financiamento e Home Equity em Goiânia e para
-            brasileiros no exterior.
+            Imóveis à venda em Goiânia com vídeo — lançamentos, imóveis novos e casas em condomínio — e estruturação de ativos imobiliários:
+            compra, venda, financiamento e home equity, também para brasileiros no exterior.
           </p>
         </div>
         <div className="flex flex-col gap-2">
@@ -15,7 +17,9 @@ export default function Footer() {
             { label: 'Comprar', href: '/' },
             { label: 'Lançamentos', href: '/lancamentos' },
             { label: 'Financiamento', href: '/financiamento' },
-            { label: 'News', href: '/news' }
+            { label: 'Imóveis por bairro', href: '/imoveis' },
+            { label: 'Quem somos', href: '/quem-somos' },
+            { label: 'Mais Valor Capital (crédito)', href: MAIS_VALOR_URL }
           ].map(({ label, href }) => (
             <a key={label} href={href} className="text-[13px] text-[var(--text-muted)]">
               {label}
@@ -25,7 +29,7 @@ export default function Footer() {
         <div className="flex flex-col gap-2">
           <span className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Contato</span>
           <p className="text-[13px] text-[var(--text-muted)]">Goiânia, Goiás — Brasil</p>
-          <a href="#" className="text-[13px] text-[var(--text-muted)]">
+          <a href="https://www.instagram.com/leydeduarte.br" target="_blank" rel="noopener" className="text-[13px] text-[var(--text-muted)]">
             Instagram @leydeduarte.br
           </a>
         </div>

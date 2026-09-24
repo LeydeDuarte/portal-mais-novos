@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { query } from './db';
-import { verifySession } from './session';
+import { exigirGestor } from './staff-auth';
 import {
   atualizarVisibilidade,
   idsAtivos,
@@ -16,18 +16,15 @@ import {
 } from './jetimob';
 
 // Ações do painel "Integração Jetimob" — só a equipe logada.
-function equipe() {
-  const s = verifySession(cookies().get('mn_staff')?.value);
-  if (!s) throw new Error('Acesso restrito à equipe.');
-  return s;
-}
+// Migração: só admin/analista
+const equipe = exigirGestor;
 
 export async function statusJetimob(): Promise<{
   configurado: boolean;
   ultimas: { tipo: string; iniciado: string; terminado: string | null; resumo: Record<string, unknown>; erro: string | null }[];
   contagem: { imoveis: number; privados: number; condominios: number; fotosPendentes: number };
 }> {
-  equipe();
+  await equipe();
   const [ult, cont] = await Promise.all([
     query<{ tipo: string; iniciado_em: Date; terminado_em: Date | null; resumo: Record<string, unknown>; erro: string | null }>(
       'select tipo, iniciado_em, terminado_em, resumo, erro from jetimob_sync order by iniciado_em desc limit 8'
@@ -54,7 +51,7 @@ export async function statusJetimob(): Promise<{
 }
 
 export async function testarJetimob() {
-  equipe();
+  await equipe();
   try {
     return { ok: true as const, ...(await previaJetimob()) };
   } catch (e) {
@@ -63,30 +60,30 @@ export async function testarJetimob() {
 }
 
 export async function iniciarSync(tipo: 'completa' | 'manual'): Promise<{ id: number; inicio: string }> {
-  equipe();
+  await equipe();
   const r = await query<{ id: number; iniciado_em: Date }>('insert into jetimob_sync (tipo) values ($1) returning id, iniciado_em', [tipo]);
   return { id: r[0].id, inicio: new Date(r[0].iniciado_em).toISOString() };
 }
 
 export async function syncCondominiosPagina(pagina: number, trocarFotos = false): Promise<ResumoPagina> {
-  const s = equipe();
+  const s = await equipe();
   return sincronizarCondominios(pagina, s.email, trocarFotos);
 }
 
 export async function syncImoveisPagina(pagina: number, trocarFotos = false): Promise<ResumoPagina> {
-  const s = equipe();
+  const s = await equipe();
   const ativos = await idsAtivos();
   return sincronizarImoveis(pagina, s.email, { ativos, trocarFotos });
 }
 
 // Migração: nada é apagado do portal quando some da Jetimob (ela vai ser desligada)
 export async function finalizarSync(id: number, resumo: Record<string, unknown>): Promise<void> {
-  equipe();
+  await equipe();
   await query('update jetimob_sync set terminado_em = now(), resumo = $2::jsonb where id = $1', [id, JSON.stringify(resumo)]);
 }
 
 export async function importarContatosJetimob() {
-  equipe();
+  await equipe();
   try {
     return { ok: true as const, ...(await importarLeadsJetimob()) };
   } catch (e) {
@@ -95,11 +92,11 @@ export async function importarContatosJetimob() {
 }
 
 export async function syncFotos(): Promise<{ enviadas: number; restantes: number; erros: string[] }> {
-  equipe();
+  await equipe();
   return processarFotos(20000);
 }
 
 export async function syncVisibilidade(): Promise<number> {
-  equipe();
+  await equipe();
   return atualizarVisibilidade(await idsAtivos());
 }

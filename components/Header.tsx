@@ -39,7 +39,8 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
           { label: 'Comprar', href: '/' },
           { label: 'Lançamentos', href: '/lancamentos' },
           { label: 'Financiamento', href: '/financiamento' },
-          { label: 'News', href: '/news' }
+          { label: 'News', href: '/news' },
+          { label: 'Quem somos', href: '/quem-somos' }
         ].map(({ label, href }) => (
           <a
             key={label}

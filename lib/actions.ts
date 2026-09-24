@@ -3,8 +3,12 @@
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { query } from './db';
-import { mapPropertyRow, mapDevelopmentRow, heightFromId, toStringArray, type PropertyRow, type DevelopmentRow } from './db-mappers';
-import { signSession, verifySession, veTudo, type StaffRole, type StaffSessionPayload } from './session';
+import { mapPropertyRow, mapDevelopmentRow, heightFromId, toStringArray, miniValida, type PropertyRow, type DevelopmentRow } from './db-mappers';
+import { signSession, veTudo, type StaffRole, type StaffSessionPayload } from './session';
+import { staffAtual, exigirEquipe, exigirAdmin, exigirGestor } from './staff-auth';
+import { dentroDoLimite, registrarUso, ipDoVisitante } from './limites';
+import { lerPerfilFeed } from './perfil';
+import { miniaturaDe, processarMiniaturas } from './miniaturas';
 import type { PropertyDetail, Development } from './property-details';
 import type { FilterState } from './filters';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from './tipologias';
@@ -14,7 +18,7 @@ import { enviarEmail, emailConfigurado, emailLayout, escapeHtml } from './email'
 import { SITE_URL } from './seo';
 import { chaveNome, mesmoCondominio } from './planilha-condominios';
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 24;
 const STAFF_COOKIE = 'mn_staff';
 
 // ---------------- Feed (Comprar + Lançamentos) — leitura paginada e filtrada ----------------
@@ -42,6 +46,7 @@ export type DevelopmentCardData = {
   visualizacoes: number;
   tipo: 'vertical' | 'horizontal';
   anuncios: number; // anúncios avulsos públicos ligados ao condomínio (bolinha no card)
+  capaMini?: string;
 };
 
 export type FeedItem = { kind: 'imovel'; property: PropertyDetail } | { kind: 'empreendimento'; development: DevelopmentCardData };
@@ -71,8 +76,28 @@ const TIPOS_CTE = `tl(k, label) as (values ${Object.entries(TIPO_UNIDADE_LABEL)
   .map(([k, v]) => `('${k}', '${v.replace(/'/g, "''")}')`)
   .join(', ')})`;
 
-export async function getFeedPage(page: number, filters: FilterState, opcoes?: { ocultos?: boolean }): Promise<{ items: FeedItem[]; hasMore: boolean }> {
-  const ocultos = !!opcoes?.ocultos;
+// Ação pública: sempre o feed PÚBLICO (os privados nunca saem daqui).
+export async function getFeedPage(page: number, filters: FilterState): Promise<{ items: FeedItem[]; hasMore: boolean }> {
+  return feedInterno(page, filters, false);
+}
+
+// Uso interno (não exportado → não vira endpoint): com ocultos=true devolve os
+// privados, que só saem daqui mascarados (getAnunciosOcultos).
+async function feedInterno(page: number, filters: FilterState, ocultos: boolean): Promise<{ items: FeedItem[]; hasMore: boolean }> {
+  page = Math.max(0, Math.min(500, Math.floor(Number(page) || 0)));
+  // Os filtros vêm do navegador: limita tamanho de listas e textos
+  const lista = <T,>(v: unknown, n: number): T[] => (Array.isArray(v) ? (v.slice(0, n) as T[]) : []);
+  filters = {
+    ...filters,
+    tipos: lista<FilterState['tipos'][number]>(filters?.tipos, 30),
+    termos: lista<string>(filters?.termos, 5).map((t) => String(t).slice(0, 80)),
+    locais: lista<FilterState['locais'][number]>(filters?.locais, 20).map((l) => ({
+      ...l,
+      nome: String(l?.nome ?? '').slice(0, 120),
+      cidade: String(l?.cidade ?? '').slice(0, 80),
+      id: l?.id ? String(l.id).slice(0, 80) : undefined
+    }))
+  };
   if (page === 0) await limparVendidos().catch(() => {});
   const params: unknown[] = [];
   const p = (value: unknown) => {
@@ -122,7 +147,7 @@ export async function getFeedPage(page: number, filters: FilterState, opcoes?: {
   // Google, pela página própria) — assim o feed não enche de condomínio vazio.
   // A equipe logada vê todos.
   const pesquisandoNome = (filters.termos ?? []).length > 0 || (filters.locais ?? []).some((l) => l.tipo === 'condominio');
-  if (!pesquisandoNome && !currentStaff())
+  if (!pesquisandoNome && !await currentStaff())
     devConds.push(
       "(d.delivery_date > now() - interval '3 years' or coalesce(u.avulsos, 0) > 0)"
     );
@@ -207,6 +232,38 @@ export async function getFeedPage(page: number, filters: FilterState, opcoes?: {
   }
 
   const where = (conds: string[]) => (conds.length ? `where ${conds.join(' and ')}` : '');
+
+  // ---- ORDEM DO FEED ----
+  // Aleatória por visita (a "semente" muda a cada sessão do navegador e fica fixa
+  // enquanto a pessoa rola a página — assim nada repete nem some entre páginas),
+  // com pesos que puxam para cima:
+  //   vídeo (autoplay é a marca do portal) · com foto · anúncio novo (10 dias) ·
+  //   lançamento/novo · o PERFIL da pessoa (tipos, bairros e faixa de preço que ela
+  //   buscou ou abriu — cookie mn_perfil).
+  const perfil = lerPerfilFeed();
+  const seed = p(perfil.seed);
+  const rnd = (col: string) => `(('x' || substr(md5(${col} || ${seed}::text), 1, 8))::bit(32)::bigint / 4294967295.0)`;
+  const pTipos = p(perfil.tipos);
+  const pBairros = p(perfil.bairros.map((b) => normalizeText(b)));
+  const pMin = p(perfil.precoMin);
+  const pMax = p(perfil.precoMax);
+  const bairroNorm = (col: string) => norm(`coalesce(${col}, '')`);
+  const scoreImovel = `(${rnd('p.id')}
+      + case when p.video_url is not null and p.video_url <> '' then 0.45 else 0 end
+      + case when jsonb_array_length(coalesce(p.photos, '[]'::jsonb)) = 0 then -0.6 else 0 end
+      + case when p.created_at > now() - interval '10 days' then 0.25 else 0 end
+      + case when p.delivery_date > now() - interval '3 years' then 0.1 else 0 end
+      + case when p.vendido_em is not null then -0.3 else 0 end
+      + case when p.tipo_unidade = any(${pTipos}::text[]) then 0.35 else 0 end
+      + case when ${bairroNorm('p.bairro')} = any(${pBairros}::text[]) then 0.35 else 0 end
+      + case when ${pMin}::numeric is not null and p.price_value between ${pMin}::numeric and ${pMax}::numeric then 0.2 else 0 end)`;
+  const scoreCondo = `(${rnd('d.id')}
+      + case when d.video_url is not null and d.video_url <> '' then 0.45 else 0 end
+      + case when jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) = 0 then -0.35 else 0 end
+      + case when d.delivery_date > now() - interval '3 years' then 0.2 else 0 end
+      + case when coalesce(d.tipos_unidade, '[]'::jsonb) ?| ${pTipos}::text[] or coalesce(u.tipos, '[]'::jsonb) ?| ${pTipos}::text[] then 0.25 else 0 end
+      + case when ${bairroNorm('d.bairro')} = any(${pBairros}::text[]) then 0.35 else 0 end)`;
+
   params.push(PAGE_SIZE + 1, page * PAGE_SIZE);
   const limitIdx = params.length - 1;
   const offsetIdx = params.length;
@@ -214,7 +271,7 @@ export async function getFeedPage(page: number, filters: FilterState, opcoes?: {
   const rows = await query<{ kind: 'imovel' | 'empreendimento'; id: string }>(
     `with ${TIPOS_CTE}
      select kind, id from (
-       select 'imovel' as kind, p.id, p.created_at
+       select 'imovel' as kind, p.id, ${scoreImovel} as score
          from properties p
          left join developments pd on pd.id = p.empreendimento_id
          left join tl ptl on ptl.k = p.tipo_unidade
@@ -223,7 +280,7 @@ export async function getFeedPage(page: number, filters: FilterState, opcoes?: {
          ) pt
          ${where(propConds)}
        union all
-       select 'empreendimento' as kind, d.id, d.created_at
+       select 'empreendimento' as kind, d.id, ${scoreCondo} as score
          from developments d
          left join lateral (
            select min(x.price_value) filter (where x.price_value > 0) as min_price,
@@ -251,7 +308,7 @@ export async function getFeedPage(page: number, filters: FilterState, opcoes?: {
          ) dx
          ${where(devConds)}
      ) feed
-     order by created_at desc, id desc
+     order by score desc, id
      limit $${limitIdx} offset $${offsetIdx}`,
     params
   );
@@ -329,7 +386,8 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       height: heightFromId(base.id) + 40,
       visualizacoes: Number(row.visualizacoes) || 0,
       tipo: base.tipo,
-      anuncios: Number(row.anuncios) || 0
+      anuncios: Number(row.anuncios) || 0,
+      capaMini: miniValida(row)
     };
   });
 }
@@ -351,10 +409,10 @@ export async function getLocationIndex(): Promise<LocalSugestao[]> {
     `with anuncios as (
        select p.bairro, p.cidade, p.uf, coalesce(pd.name, p.condominio) as condominio, pd.id as dev_id
          from properties p left join developments pd on pd.id = p.empreendimento_id
-        where p.is_tipologia = false and p.cidade is not null
+        where p.is_tipologia = false and p.visibilidade = 'publico' and p.cidade is not null
        union all
        select d.bairro, d.cidade, d.uf, d.name, d.id
-         from developments d where d.status = 'publicado' and d.delivery_date is not null and d.cidade is not null
+         from developments d where d.status = 'publicado' and d.cidade is not null
           -- condomínio só entra na lista de locais se tiver foto ou imóvel (os milhares importados
           -- por planilha continuam achados pela busca digitada, sem pesar a lista)
           and (jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) > 0 or exists (select 1 from properties x where x.empreendimento_id = d.id and x.visibilidade = 'publico'))
@@ -403,14 +461,9 @@ export async function findCondominiosByCep(cep: string): Promise<CondominioSuges
 }
 
 // ---------------- Sessão da equipe (servidor) ----------------
-function currentStaff(): StaffSessionPayload | null {
-  return verifySession(cookies().get(STAFF_COOKIE)?.value);
-}
-function requireStaff(): StaffSessionPayload {
-  const staff = currentStaff();
-  if (!staff) throw new Error('Sessão da equipe expirada — faça login novamente no painel.');
-  return staff;
-}
+// Sessão conferida no banco a cada requisição (lib/staff-auth.ts)
+const currentStaff = staffAtual;
+const requireStaff = exigirEquipe;
 // Admin mexe em tudo; corretor só no que ele mesmo cadastrou
 async function assertCanEdit(table: 'properties' | 'developments', id: string, staff: StaffSessionPayload) {
   if (veTudo(staff.role)) return;
@@ -425,7 +478,7 @@ export async function getPropertyById(id: string): Promise<PropertyDetail | null
   const rows = await query<PropertyRow>('select * from properties where id = $1', [id]);
   const r = rows[0];
   if (!r) return null;
-  if (r.visibilidade === 'privado' && !currentStaff()) return null;
+  if (r.visibilidade === 'privado' && !await currentStaff()) return null;
   return mapPropertyRow(r);
 }
 
@@ -434,7 +487,7 @@ export async function getDevelopmentById(id: string): Promise<Development | null
   const devRows = await query<DevelopmentRow>('select * from developments where id = $1', [id]);
   const dev = devRows[0];
   if (!dev) return null;
-  if (dev.status === 'rascunho' && !currentStaff()) return null;
+  if (dev.status === 'rascunho' && !await currentStaff()) return null;
   const unitRows = await query<PropertyRow>(
     "select * from properties where empreendimento_id = $1 and visibilidade = 'publico' order by is_tipologia desc, area asc nulls last",
     [id]
@@ -443,16 +496,17 @@ export async function getDevelopmentById(id: string): Promise<Development | null
 }
 
 export async function getPropertiesByCorretor(email: string, isAdmin: boolean): Promise<PropertyDetail[]> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   const rows =
     veTudo(staff.role) && isAdmin
       ? await query<PropertyRow>('select * from properties where corretor_email is not null and is_tipologia = false order by created_at desc')
       : await query<PropertyRow>('select * from properties where corretor_email = $1 and is_tipologia = false order by created_at desc', [staff.email]);
-  return rows.map(mapPropertyRow);
+  // e-mail do corretor só vai para o painel (nunca nas páginas públicas)
+  return rows.map((r) => ({ ...mapPropertyRow(r), corretorEmail: r.corretor_email ?? undefined }));
 }
 
 export async function getAllPropertyIds(): Promise<string[]> {
-  const rows = await query<{ id: string }>('select id from properties');
+  const rows = await query<{ id: string }>("select id from properties where visibilidade = 'publico' and is_tipologia = false and vendido_em is null");
   return rows.map((r) => r.id);
 }
 
@@ -631,7 +685,7 @@ function propertyValues(input: PropertyFields) {
     input.escaninhos ?? null,
     input.area ?? null,
     input.video,
-    input.videoUrl ?? null,
+    videoSeguro(input.videoUrl),
     input.aceitaTemporada,
     input.description,
     JSON.stringify(input.amenities),
@@ -653,7 +707,7 @@ const PROPERTY_COLS =
 const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', '', '::jsonb', ''];
 
 export async function createProperty(input: CreatePropertyInput): Promise<void> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   const values = propertyValues(input);
   const placeholders = values.map((_, i) => `$${i + 4}${PROPERTY_CASTS[i]}`).join(',');
   await query(
@@ -661,16 +715,18 @@ export async function createProperty(input: CreatePropertyInput): Promise<void> 
     [input.id, staff.email, !!input.isTipologia, ...values]
   );
   if (!input.isTipologia) await avisarInteressados(input.id).catch((err) => console.error('Aviso a interessados falhou', err));
+  if (!input.isTipologia) await miniaturaDe('properties', input.id).catch(() => {});
 }
 
 export async function updateProperty(id: string, input: PropertyFields): Promise<void> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   await assertCanEdit('properties', id, staff);
   const values = propertyValues(input);
   const sets = PROPERTY_COLS.split(', ')
     .map((col, i) => `${col} = $${i + 2}${PROPERTY_CASTS[i]}`)
     .join(', ');
   await query(`update properties set ${sets} where id = $1`, [id, ...values]);
+  await miniaturaDe('properties', id).catch(() => {});
 }
 
 // Nada se perde: antes de sair do ar (excluído ou vendido), o anúncio vai para
@@ -688,7 +744,7 @@ async function arquivarNoHistorico(id: string, motivo: 'excluido' | 'vendido', v
 }
 
 export async function deleteProperty(id: string): Promise<void> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   await assertCanEdit('properties', id, staff);
   const v = await query<{ vendido_em: string | null }>('select vendido_em from properties where id = $1', [id]);
   if (!v[0]?.vendido_em) await arquivarNoHistorico(id, 'excluido'); // vendido já está no histórico
@@ -699,8 +755,14 @@ export async function deleteProperty(id: string): Promise<void> {
 // Só anúncio avulso pode ser marcado como vendido. Vai para o histórico na hora
 // (conta no Mercado) e, se for público, fica 15 dias no feed com a tag VENDIDO.
 const DIAS_VENDIDO_NO_FEED = 15;
+
+// Link de vídeo: só https de YouTube, Instagram, TikTok ou Vimeo (nada de "javascript:")
+function videoSeguro(url?: string | null): string | null {
+  const u = String(url ?? '').trim();
+  return /^https:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be|instagram\.com|tiktok\.com|vimeo\.com)\//i.test(u) ? u.slice(0, 400) : null;
+}
 export async function marcarComoVendido(id: string, valorVenda?: number): Promise<void> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   await assertCanEdit('properties', id, staff);
   const r = await query<{ is_tipologia: boolean; visibilidade: string; vendido_em: string | null }>('select is_tipologia, visibilidade, vendido_em from properties where id = $1', [id]);
   if (!r[0] || r[0].is_tipologia) throw new Error('Só anúncio avulso pode ser marcado como vendido.');
@@ -760,7 +822,7 @@ function mascarar(r: PropertyRow, comCondominio = false): AnuncioOculto {
 
 /** Resumos dos anúncios privados que atendem a mesma busca do feed */
 export async function getAnunciosOcultos(filters: FilterState): Promise<AnuncioOculto[]> {
-  const { items } = await getFeedPage(0, filters, { ocultos: true });
+  const { items } = await feedInterno(0, filters, true);
   const ids = items.filter((i) => i.kind === 'imovel').map((i) => (i as { property: { id: string } }).property.id);
   if (!ids.length) return [];
   const rows = await query<PropertyRow>('select * from properties where id = any($1::text[])', [ids]);
@@ -790,7 +852,7 @@ export async function getResumoOculto(id: string): Promise<AnuncioOculto | null>
 export type PropertyEditData = PropertyFields & { id: string; corretorEmail: string | null };
 
 export async function getPropertyForEdit(id: string): Promise<PropertyEditData | null> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   await assertCanEdit('properties', id, staff);
   const rows = await query<PropertyRow & { price_value: string; delivery_date: string | Date | null }>('select * from properties where id = $1', [id]);
   const r = rows[0];
@@ -879,7 +941,7 @@ function developmentValues(input: DevelopmentFields) {
     JSON.stringify(input.amenities),
     input.aceitaTemporada,
     input.heroHeight ?? 300,
-    input.videoUrl ?? null,
+    videoSeguro(input.videoUrl),
     JSON.stringify(sanitizePhotos(input.photos)),
     JSON.stringify(Array.from(new Set((input.tiposUnidade ?? []).filter((t) => t in TIPO_UNIDADE_LABEL)))),
     JSON.stringify(Array.from(new Set((input.quartosOpcoes ?? []).filter((n) => Number.isInteger(n) && n > 0 && n < 20))).sort((a, b) => a - b)),
@@ -900,7 +962,7 @@ export type CondoDuplicado = { id: string; name: string; bairro: string | null }
 export async function createDevelopment(
   input: CreateDevelopmentInput
 ): Promise<{ ok: true } | { ok: false; faltando: string[]; duplicado?: CondoDuplicado }> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   // Não deixa cadastrar de novo um condomínio que já existe (mesmo nome + mesmo CEP ou bairro)
   const existentes = await query<{ id: string; name: string; cep: string | null; bairro: string | null; cidade: string | null }>(
     'select id, name, cep, bairro, cidade from developments'
@@ -916,11 +978,12 @@ export async function createDevelopment(
   const values = developmentValues(input);
   const placeholders = values.map((_, i) => `$${i + 3}${DEV_CASTS[i]}`).join(',');
   await query(`insert into developments (id, corretor_email, ${DEV_COLS}) values ($1, $2, ${placeholders})`, [input.id, staff.email, ...values]);
+  await miniaturaDe('developments', input.id).catch(() => {});
   return { ok: true };
 }
 
 export async function updateDevelopment(id: string, input: DevelopmentFields): Promise<{ ok: true } | { ok: false; faltando: string[] }> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   await assertCanEdit('developments', id, staff);
   if (input.status !== 'rascunho') {
     const faltando = await pendenciasParaPublicar(input);
@@ -939,6 +1002,7 @@ export async function updateDevelopment(id: string, input: DevelopmentFields): P
       [id, input.location, clean(input.bairro), clean(input.cidade), clean(input.uf), clean(input.cep?.replace(/\D/g, '')), input.name, `${input.deliveryDate}-01`, JSON.stringify(sanitizePhotos(input.photos))]
     );
   }
+  await miniaturaDe('developments', id).catch(() => {});
   return { ok: true };
 }
 
@@ -946,7 +1010,7 @@ export async function updateDevelopment(id: string, input: DevelopmentFields): P
 export type TipologiaInput = { id?: string; tipoUnidade: TipoUnidade; quartos?: number; vagas?: number; area?: number; priceValue: number; plantas?: string[] };
 
 export async function saveTipologias(developmentId: string, tipologias: TipologiaInput[]): Promise<void> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   await assertCanEdit('developments', developmentId, staff);
   const devRows = await query<DevelopmentRow>('select * from developments where id = $1', [developmentId]);
   const dev = devRows[0];
@@ -995,7 +1059,7 @@ export async function saveTipologias(developmentId: string, tipologias: Tipologi
 export type DevelopmentEditData = DevelopmentFields & { id: string; tipologias: (TipologiaInput & { id: string })[] };
 
 export async function getDevelopmentForEdit(id: string): Promise<DevelopmentEditData | null> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   await assertCanEdit('developments', id, staff);
   const rows = await query<DevelopmentRow>('select * from developments where id = $1', [id]);
   const d = rows[0];
@@ -1060,7 +1124,7 @@ export type CondominioResumo = {
 };
 
 export async function listCondominios(): Promise<CondominioResumo[]> {
-  requireStaff();
+  await requireStaff();
   const rows = await query<DevelopmentRow & { anuncios: string; tipologias: string }>(
     `select d.*,
             (select count(*) from properties p where p.empreendimento_id = d.id and p.is_tipologia = false) as anuncios,
@@ -1112,6 +1176,11 @@ export async function registrarInteresse(input: InteresseInput): Promise<{ ok: b
   if (!input.aceitaContato) return { ok: false, erro: 'Para avisarmos você, é preciso autorizar o contato.' };
   const condominio = formatTitulo((input.condominio ?? '').slice(0, 160));
   const devId = input.developmentId && /^[\w-]{1,80}$/.test(input.developmentId) ? input.developmentId : null;
+
+  // Contra robôs: no máximo 10 formulários por hora do mesmo endereço
+  const ip = ipDoVisitante();
+  if (!(await dentroDoLimite(`lead:${ip}`, 10, 60))) return { ok: false, erro: 'Muitas mensagens em pouco tempo. Tente de novo mais tarde.' };
+  await registrarUso(`lead:${ip}`);
 
   // Evita cadastro repetido em sequência (mesma pessoa, mesmo condomínio, últimos 10 min)
   const dup = await query<{ id: string }>(
@@ -1167,7 +1236,7 @@ export type InteresseLead = {
 };
 
 export async function listInteresses(): Promise<InteresseLead[]> {
-  requireStaff();
+  await requireStaff();
   const rows = await query<Record<string, unknown>>('select * from interest_leads order by created_at desc limit 500');
   const n = (v: unknown) => (v == null ? null : Number(v));
   const d = (v: unknown) => (v == null ? null : new Date(v as string).toISOString());
@@ -1192,7 +1261,7 @@ export async function listInteresses(): Promise<InteresseLead[]> {
 }
 
 export async function updateInteresseStatus(id: string, status: InteresseLead['status']): Promise<void> {
-  requireStaff();
+  await requireStaff();
   if (!['novo', 'contatado', 'descartado'].includes(status)) throw new Error('Status inválido.');
   await query('update interest_leads set status = $1 where id = $2::uuid', [status, id]);
 }
@@ -1235,15 +1304,24 @@ async function avisarInteressados(propertyId: string): Promise<void> {
 }
 
 // ---------------- Login da equipe ----------------
-export async function staffLogin(email: string, password: string): Promise<StaffSessionPayload | null> {
+// Contra força bruta: 5 erros por e-mail ou 15 por IP em 15 minutos = bloqueio temporário.
+export async function staffLogin(email: string, password: string): Promise<StaffSessionPayload | null | 'bloqueado'> {
+  email = String(email ?? '').trim().toLowerCase().slice(0, 200);
+  password = String(password ?? '').slice(0, 200);
+  const ip = ipDoVisitante();
+  const [okEmail, okIp] = await Promise.all([dentroDoLimite(`login-erro:email:${email}`, 5, 15), dentroDoLimite(`login-erro:ip:${ip}`, 15, 15)]);
+  if (!okEmail || !okIp) return 'bloqueado';
   const rows = await query<{ email: string; name: string; role: StaffRole; password_hash: string }>(
-    'select email, name, role, password_hash from staff_users where email = $1',
+    'select email, name, role, password_hash from staff_users where lower(email) = $1',
     [email]
   );
   const user = rows[0];
-  if (!user) return null;
-  const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) return null;
+  // compara mesmo sem usuário (tempo de resposta igual — não revela quais e-mails existem)
+  const valid = await bcrypt.compare(password, user?.password_hash ?? '$2a$10$0000000000000000000000000000000000000000000000000000a');
+  if (!user || !valid) {
+    await Promise.all([registrarUso(`login-erro:email:${email}`), registrarUso(`login-erro:ip:${ip}`)]);
+    return null;
+  }
 
   const payload: StaffSessionPayload = { email: user.email, name: user.name, role: user.role };
   cookies().set(STAFF_COOKIE, signSession(payload), {
@@ -1261,7 +1339,7 @@ export async function staffLogout(): Promise<void> {
 }
 
 export async function getStaffSession(): Promise<StaffSessionPayload | null> {
-  return verifySession(cookies().get(STAFF_COOKIE)?.value);
+  return staffAtual();
 }
 
 // ---------------- Mercado (histórico) ----------------
@@ -1288,7 +1366,7 @@ const BASE_MERCADO = `
     from imoveis_historico h where h.finalidade = 'venda'`;
 
 export async function getMercado(tipos?: string[]): Promise<MercadoBairro[]> {
-  requireStaff();
+  await requireStaff();
   const filtroTipo = tipos?.length ? 'and tipo_unidade = any($1::text[])' : '';
   const rows = await query<{ bairro: string; cidade: string; ativos: string; privados: string; vendidos: string; excluidos: string; m2a: string | null; m2v: string | null }>(
     `with base as (${BASE_MERCADO})
@@ -1319,7 +1397,7 @@ export async function getMercado(tipos?: string[]): Promise<MercadoBairro[]> {
 }
 
 export async function getMercadoMensal(bairro: string, cidade: string, tipos?: string[]): Promise<MercadoMes[]> {
-  requireStaff();
+  await requireStaff();
   const params: unknown[] = [bairro, cidade];
   const filtroTipo = tipos?.length ? `and tipo_unidade = any($3::text[])` : '';
   if (tipos?.length) params.push(tipos);
@@ -1351,7 +1429,7 @@ export async function getMercadoMensal(bairro: string, cidade: string, tipos?: s
 export type HistoricoLinha = { propertyId: string; motivo: string; titulo: string | null; tipoUnidade: string; preco: number | null; valorVenda: number | null; area: number | null; bairro: string | null; cidade: string | null; condominio: string | null; encerradoEm: string };
 
 export async function listHistorico(): Promise<HistoricoLinha[]> {
-  requireStaff();
+  await requireStaff();
   const rows = await query<{ property_id: string; motivo: string; titulo: string | null; tipo_unidade: string; price_value: string | null; valor_venda: string | null; area: string | null; bairro: string | null; cidade: string | null; condominio: string | null; encerrado_em: Date }>(
     'select * from imoveis_historico order by encerrado_em desc limit 300'
   );
@@ -1407,7 +1485,7 @@ function acharExistente(idx: Map<string, Existente[]>, c: { nome: string; cep: s
 
 /** Quais linhas já existem no banco (índice das linhas) — para a tela mostrar antes de gravar */
 export async function conferirExistentes(lista: { nome: string; cep: string; bairro: string; cidade: string }[]): Promise<number[]> {
-  requireStaff();
+  await exigirGestor();
   const idx = await carregarExistentes();
   return lista.map((c, i) => (acharExistente(idx, c) ? i : -1)).filter((i) => i >= 0);
 }
@@ -1418,7 +1496,7 @@ export async function conferirExistentes(lista: { nome: string; cep: string; bai
  *  - 'completar': só preenche o que estiver vazio (entrega, descrição, endereço, pavimentos, lazer, localização)
  */
 export async function importarCondominios(lote: CondoImport[], opcoes: { status: 'publicado' | 'rascunho'; existentes: 'pular' | 'completar' }): Promise<ResultadoImport> {
-  const staff = requireStaff();
+  const staff = await exigirGestor();
   const res: ResultadoImport = { criados: 0, atualizados: 0, pulados: 0, erros: [] };
   const linhas = (lote ?? []).slice(0, 300).filter((c) => c && typeof c.nome === 'string' && c.nome.trim());
   if (!linhas.length) return res;
@@ -1518,14 +1596,10 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
 // ---------------- Equipe (só o administrador gerencia) ----------------
 export type MembroEquipe = { email: string; name: string; role: StaffRole; criadoEm: string; imoveis: number };
 
-function requireAdmin(): StaffSessionPayload {
-  const s = requireStaff();
-  if (s.role !== 'admin') throw new Error('Só o administrador gerencia a equipe.');
-  return s;
-}
+const requireAdmin = exigirAdmin;
 
 export async function listarEquipe(): Promise<MembroEquipe[]> {
-  requireAdmin();
+  await requireAdmin();
   const rows = await query<{ email: string; name: string; role: StaffRole; created_at: string; imoveis: string }>(
     `select u.email, u.name, u.role, u.created_at,
         (select count(*) from properties p where p.corretor_email = u.email and p.is_tipologia = false) as imoveis
@@ -1536,20 +1610,24 @@ export async function listarEquipe(): Promise<MembroEquipe[]> {
 
 /** Cria ou altera um membro. Senha em branco numa alteração = mantém a atual. */
 export async function salvarMembro(m: { email: string; name: string; role: StaffRole; senha?: string }): Promise<{ ok: boolean; erro?: string }> {
-  const eu = requireAdmin();
+  const eu = await requireAdmin();
   const email = m.email.trim().toLowerCase();
   const name = m.name.trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, erro: 'E-mail inválido.' };
   if (!name) return { ok: false, erro: 'Informe o nome.' };
   if (!['admin', 'analista', 'corretor'].includes(m.role)) return { ok: false, erro: 'Papel inválido.' };
   if (email === eu.email && m.role !== 'admin') return { ok: false, erro: 'Você não pode tirar o seu próprio acesso de administrador.' };
-  const existe = (await query<{ email: string }>('select email from staff_users where email = $1', [email])).length > 0;
+  const existe = (await query<{ email: string }>('select email from staff_users where lower(email) = $1', [email])).length > 0;
   const senha = (m.senha ?? '').trim();
   if (!existe && senha.length < 8) return { ok: false, erro: 'Defina uma senha com pelo menos 8 caracteres.' };
   if (senha && senha.length < 8) return { ok: false, erro: 'A senha precisa ter pelo menos 8 caracteres.' };
   const hash = senha ? await bcrypt.hash(senha, 10) : null;
   if (existe) {
-    await query('update staff_users set name = $2, role = $3, password_hash = coalesce($4::text, password_hash) where email = $1', [email, name, m.role, hash]);
+    // trocou a senha: derruba as sessões abertas dessa pessoa
+    await query(
+      'update staff_users set name = $2, role = $3, password_hash = coalesce($4::text, password_hash), sessoes_desde = case when $4::text is not null then now() else sessoes_desde end where lower(email) = $1',
+      [email, name, m.role, hash]
+    );
   } else {
     await query('insert into staff_users (email, name, role, password_hash) values ($1, $2, $3, $4)', [email, name, m.role, hash]);
   }
@@ -1558,7 +1636,7 @@ export async function salvarMembro(m: { email: string; name: string; role: Staff
 
 /** Remove o acesso. Os imóveis que a pessoa cadastrou continuam no site (passam para quem removeu, se pedido). */
 export async function removerMembro(email: string, transferirPara?: string): Promise<{ ok: boolean; erro?: string }> {
-  const eu = requireAdmin();
+  const eu = await requireAdmin();
   if (email === eu.email) return { ok: false, erro: 'Você não pode remover a si mesmo.' };
   if (transferirPara) {
     await query('update properties set corretor_email = $2 where corretor_email = $1', [email, transferirPara]);
@@ -1581,7 +1659,7 @@ export async function contarImoveisAVenda(): Promise<number> {
 
 /** O feed está mostrando a visão da equipe (todos os condomínios)? */
 export async function feedModoEquipe(): Promise<boolean> {
-  return !!currentStaff();
+  return !!await currentStaff();
 }
 
 // "Condomínios neste bairro" (fim do feed quando a pessoa filtra por bairro):
@@ -1607,4 +1685,10 @@ export async function condominiosDosBairros(bairros: { nome: string; cidade: str
     params
   );
   return rows.map((r) => ({ id: r.id, nome: formatTitulo(r.name), bairro: r.bairro, anuncios: Number(r.anuncios) || 0 }));
+}
+
+/** Painel: gera as miniaturas das capas que faltam (feed leve). Rode até "restantes" = 0. */
+export async function otimizarFotosDoFeed(): Promise<{ feitas: number; restantes: number; erros: string[] }> {
+  await exigirGestor();
+  return processarMiniaturas(20000);
 }

@@ -17,6 +17,8 @@ import { getBadgeCondominio } from '@/lib/classification';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import ContarVisita from '@/components/ContarVisita';
+import Trilha from '@/components/Trilha';
+import { trilhaDoImovel } from '@/lib/seo';
 
 function formatBRL(v: number): string {
   if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mi`;
@@ -62,12 +64,10 @@ export default async function DevelopmentDetailView({ development }: { developme
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <ContarVisita tipo="empreendimento" id={development.id} />
+      <ContarVisita tipo="empreendimento" id={development.id} perfil={{ tipos: development.tiposUnidade ?? [], bairros: development.bairro ? [development.bairro] : [] }} />
 
       <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
-        <Link href="/" className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text)]">
-          ← Voltar para a Home
-        </Link>
+        <Trilha itens={trilhaDoImovel({ cidade: development.cidade, bairro: development.bairro })} />
 
         {development.status === 'rascunho' && (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
@@ -85,7 +85,7 @@ export default async function DevelopmentDetailView({ development }: { developme
             <PhotoGallery
               photos={photos}
               video={galleryVideo}
-              alt={development.name}
+              alt={`${development.name} — ${development.tipo === 'horizontal' ? 'condomínio de casas' : 'edifício'} em ${[development.bairro, development.cidade].filter(Boolean).join(', ') || development.location} | Mais Novos Imóveis`}
               badges={
                 <span className="rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
                   {badge.text}

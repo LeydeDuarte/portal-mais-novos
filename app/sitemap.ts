@@ -1,32 +1,35 @@
 import type { MetadataRoute } from 'next';
-import { getAllPropertyIds, getAllDevelopmentIds } from '@/lib/actions';
-import { SITE_URL } from '@/lib/seo';
+import { SITE_URL, slugify } from '@/lib/seo';
+import { listarRegioes, urlsParaSitemap } from '@/lib/landing';
 
-// Mesmo motivo do /lancamentos — o sitemap precisa refletir os cadastros
-// mais recentes, não ficar congelado no que existia no momento do build.
-export const dynamic = 'force-dynamic';
+// Mapa do site para o Google: páginas fixas, regiões (cidade/bairro/categoria),
+// anúncios públicos e condomínios publicados. Privados, vendidos e rascunhos ficam fora.
+export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticPages: MetadataRoute.Sitemap = [
-    { url: SITE_URL, changeFrequency: 'daily', priority: 1 },
-    { url: `${SITE_URL}/lancamentos`, changeFrequency: 'daily', priority: 0.8 },
-    { url: `${SITE_URL}/financiamento`, changeFrequency: 'monthly', priority: 0.3 },
-    { url: `${SITE_URL}/news`, changeFrequency: 'weekly', priority: 0.3 }
+  const agora = new Date();
+  const fixas: MetadataRoute.Sitemap = [
+    { url: SITE_URL, lastModified: agora, changeFrequency: 'hourly', priority: 1 },
+    { url: `${SITE_URL}/lancamentos`, lastModified: agora, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${SITE_URL}/imoveis`, lastModified: agora, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${SITE_URL}/quem-somos`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE_URL}/financiamento`, changeFrequency: 'monthly', priority: 0.5 }
   ];
 
-  const [propertyIds, developmentIds] = await Promise.all([getAllPropertyIds(), getAllDevelopmentIds()]);
+  const [regioes, { imoveis, condominios }] = await Promise.all([listarRegioes().catch(() => []), urlsParaSitemap().catch(() => ({ imoveis: [], condominios: [] }))]);
 
-  const propertyPages: MetadataRoute.Sitemap = propertyIds.map((id) => ({
-    url: `${SITE_URL}/imovel/${id}`,
-    changeFrequency: 'weekly',
-    priority: 0.7
-  }));
+  const paginasRegiao: MetadataRoute.Sitemap = regioes.flatMap((r) => {
+    const base = `${SITE_URL}/imoveis/${slugify(r.cidade)}${r.bairro ? `/${slugify(r.bairro)}` : ''}`;
+    return [
+      { url: base, lastModified: agora, changeFrequency: 'daily' as const, priority: r.bairro ? 0.8 : 0.9 },
+      ...Object.keys(r.categorias).map((c) => ({ url: `${base}/${c}`, lastModified: agora, changeFrequency: 'daily' as const, priority: 0.7 }))
+    ];
+  });
 
-  const developmentPages: MetadataRoute.Sitemap = developmentIds.map((id) => ({
-    url: `${SITE_URL}/empreendimento/${id}`,
-    changeFrequency: 'weekly',
-    priority: 0.7
-  }));
-
-  return [...staticPages, ...propertyPages, ...developmentPages];
+  return [
+    ...fixas,
+    ...paginasRegiao,
+    ...imoveis.map((i) => ({ url: `${SITE_URL}/imovel/${i.id}`, lastModified: new Date(i.em), changeFrequency: 'weekly' as const, priority: 0.8 })),
+    ...condominios.map((c) => ({ url: `${SITE_URL}/empreendimento/${c.id}`, lastModified: new Date(c.em), changeFrequency: 'weekly' as const, priority: 0.6 }))
+  ];
 }

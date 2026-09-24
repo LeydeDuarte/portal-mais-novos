@@ -15,6 +15,10 @@ export default function PainelLoginPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const user = await login(email, password);
+    if (user === 'bloqueado') {
+      setError('Muitas tentativas erradas. Por segurança, o acesso foi bloqueado por 15 minutos.');
+      return;
+    }
     if (!user) {
       setError('E-mail ou senha incorretos.');
       return;

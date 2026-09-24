@@ -18,6 +18,7 @@ import { TIPOS, formatarDescricao } from './anuncio-parser';
 import { chaveNome, mesmoCondominio, padronizarBairro } from './planilha-condominios';
 import { enviarParaR2, r2Configurado } from './r2';
 import { ehCasa, type TipoUnidade } from './tipologias';
+import { miniaturaDe } from './miniaturas';
 
 const BASE = 'https://api.jetimob.com';
 const sa = (s: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -515,6 +516,7 @@ export async function processarFotos(orcamentoMs = 20000): Promise<{ enviadas: n
             : `update developments set photos = case when jsonb_array_length($2::jsonb) > 0 then $2::jsonb else photos end, fotos_pendentes = '[]'::jsonb, jetimob_fotos_novas = '{}'::jsonb where id = $1`,
           tabela === 'properties' ? [l.id, JSON.stringify(compact(novas.fotos)), JSON.stringify(compact(novas.plantas))] : [l.id, JSON.stringify(compact(novas.fotos))]
         );
+        await miniaturaDe(tabela, l.id).catch(() => {}); // capa leve para o feed
       } else {
         await query(`update ${tabela} set fotos_pendentes = $2::jsonb, jetimob_fotos_novas = $3::jsonb where id = $1`, [l.id, JSON.stringify(fila), JSON.stringify(novas)]);
       }

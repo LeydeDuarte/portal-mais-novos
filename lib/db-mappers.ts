@@ -36,6 +36,8 @@ export type PropertyRow = {
   jetimob_codigo?: string | null;
   vendido_em?: string | Date | null;
   visualizacoes?: number | null;
+  capa_mini?: string | null;
+  capa_mini_de?: string | null;
   cep?: string | null;
   logradouro?: string | null;
   bairro?: string | null;
@@ -70,6 +72,8 @@ export type DevelopmentRow = {
   quartos_opcoes?: unknown;
   status?: string;
   visualizacoes?: number | null;
+  capa_mini?: string | null;
+  capa_mini_de?: string | null;
   video_vertical?: boolean;
 };
 
@@ -117,6 +121,12 @@ export function heightFromId(id: string): number {
   return 190 + (hash % 170);
 }
 
+// Miniatura só vale se foi feita da capa ATUAL
+export function miniValida(row: { photos?: unknown; capa_mini?: string | null; capa_mini_de?: string | null }): string | undefined {
+  const capa = toStringArray(row.photos)[0];
+  return row.capa_mini && capa && row.capa_mini_de === capa ? row.capa_mini : undefined;
+}
+
 export function mapPropertyRow(row: PropertyRow): PropertyDetail {
   return {
     id: row.id,
@@ -141,12 +151,12 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
     description: row.description,
     amenities: row.amenities ?? [],
     empreendimentoId: row.empreendimento_id ?? undefined,
-    corretorEmail: row.corretor_email ?? undefined,
     photos: toStringArray(row.photos),
     plantas: toStringArray(row.plantas),
     visibilidade: row.visibilidade === 'privado' ? 'privado' : 'publico',
     codigo: row.jetimob_codigo ?? undefined,
     visualizacoes: Number(row.visualizacoes) || 0,
+    capaMini: miniValida(row),
     vendidoEm: row.vendido_em ? new Date(row.vendido_em).toISOString() : undefined,
     condominio: row.condominio ? formatTitulo(row.condominio) : undefined,
     bairro: row.bairro ?? undefined,
@@ -178,7 +188,6 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     aceitaTemporada: row.aceita_temporada,
     heroHeight: row.hero_height,
     videoUrl: row.video_url ?? undefined,
-    corretorEmail: row.corretor_email ?? undefined,
     photos: toStringArray(row.photos),
     tiposUnidade: toStringArray(row.tipos_unidade) as TipoUnidade[],
     quartosOpcoes: toNumberArray(row.quartos_opcoes),

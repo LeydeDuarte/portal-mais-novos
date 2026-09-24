@@ -7,15 +7,11 @@
 // "SÃO DIFERENTES" (não pergunta mais).
 import { cookies } from 'next/headers';
 import { query } from './db';
-import { verifySession, veTudo } from './session';
+import { veTudo } from './session';
+import { exigirGestor, exigirEquipe, staffAtual } from './staff-auth';
 import { chaveNome, chaveBairro } from './planilha-condominios';
 
-function gestor() {
-  const s = verifySession(cookies().get('mn_staff')?.value);
-  if (!s) throw new Error('Sessão da equipe expirada — faça login novamente no painel.');
-  if (!veTudo(s.role)) throw new Error('Só o administrador ou analista pode juntar condomínios.');
-  return s;
-}
+const gestor = exigirGestor;
 
 const sa = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
@@ -107,21 +103,21 @@ async function carregar(): Promise<{ grupos: GrupoDup[] }> {
 }
 
 export async function listarDuplicados(): Promise<{ grupos: GrupoDup[]; total: number; provaveis: number }> {
-  gestor();
+  await gestor();
   const { grupos } = await carregar();
   return { grupos: grupos.slice(0, 60), total: grupos.length, provaveis: grupos.filter((g) => g.provavel).length };
 }
 
 /** Quantos grupos de possíveis duplicados existem (aviso na lista de condomínios) */
 export async function contarDuplicados(): Promise<number> {
-  const s = verifySession(cookies().get('mn_staff')?.value);
+  const s = await staffAtual();
   if (!s || !veTudo(s.role)) return 0;
   const { grupos } = await carregar();
   return grupos.length;
 }
 
 export async function marcarDiferentes(ids: string[]): Promise<void> {
-  const s = gestor();
+  const s = await gestor();
   for (let i = 0; i < ids.length; i++)
     for (let j = i + 1; j < ids.length; j++) {
       const [a, b] = ids[i] < ids[j] ? [ids[i], ids[j]] : [ids[j], ids[i]];
@@ -132,7 +128,7 @@ export async function marcarDiferentes(ids: string[]): Promise<void> {
 /** Junta os condomínios `outros` no `principal`: anúncios, tipologias, interessados e
  *  links passam para ele; o que estiver vazio nele é completado com os dados dos outros. */
 export async function juntarCondominios(principal: string, outros: string[]): Promise<{ ok: boolean; erro?: string }> {
-  const s = gestor();
+  const s = await gestor();
   const lista = outros.filter((o) => o && o !== principal);
   if (!lista.length) return { ok: false, erro: 'Escolha pelo menos um condomínio para juntar.' };
   for (const o of lista) {
@@ -175,6 +171,7 @@ export async function destinoDoMesclado(id: string): Promise<string | null> {
 
 /** Cadastro manual: já existe um condomínio com esse nome na mesma cidade? */
 export async function condominioExistente(nome: string, cidade?: string | null, ignorarId?: string): Promise<{ id: string; name: string; bairro: string | null } | null> {
+  await exigirEquipe();
   const k = chaveNome(nome);
   if (!k) return null;
   const rows = await query<{ id: string; name: string; bairro: string | null; cidade: string | null }>('select id, name, bairro, cidade from developments');

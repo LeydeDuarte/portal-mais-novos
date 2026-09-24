@@ -4,6 +4,8 @@ import TemporadaBadge from '@/components/TemporadaBadge';
 import SeloVendido from '@/components/SeloVendido';
 import Visualizacoes from '@/components/Visualizacoes';
 import CondominioTag from '@/components/CondominioTag';
+import ImagemCapa from '@/components/ImagemCapa';
+import { altFoto } from '@/lib/seo';
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type { Property } from '@/lib/mock-properties';
@@ -18,6 +20,7 @@ type Props = {
   loggedIn: boolean;
   onFavoriteClick: (id: string) => void;
   onDwell: (id: string, ms: number) => void;
+  prioridade?: boolean;
 };
 
 const BED_PATH = 'M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6 M3 18h18 M5 10V7a2 2 0 0 1 2-2h3v5';
@@ -50,7 +53,7 @@ function Spec({ children, icon }: { children: React.ReactNode; icon: React.React
   );
 }
 
-export default function PropertyCard({ property, isFavorite, loggedIn, onFavoriteClick, onDwell }: Props) {
+export default function PropertyCard({ property, isFavorite, loggedIn, onFavoriteClick, onDwell, prioridade = false }: Props) {
   const embed = property.videoUrl ? getEmbedInfo(property.videoUrl) : null;
   // Instagram não faz autoplay em embed (exige clique, às vezes até redireciona
   // pra fora do site) — só entra na roleta de autoplay do feed quem é YouTube
@@ -108,11 +111,11 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
               title="Vídeo do imóvel"
             />
           ) : property.photos && property.photos[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={property.photos[0]}
-              alt={property.titulo || `${TIPO_UNIDADE_LABEL[property.tipoUnidade]} em ${property.location}`}
-              loading="lazy"
+            <ImagemCapa
+              mini={property.capaMini}
+              original={property.photos[0]}
+              alt={altFoto(property)}
+              prioridade={prioridade}
               className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             />
           ) : (

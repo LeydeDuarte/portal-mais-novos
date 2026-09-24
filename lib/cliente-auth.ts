@@ -2,7 +2,8 @@
 
 import { cookies } from 'next/headers';
 import { query } from './db';
-import { assinar, verificarAssinado, verifySession } from './session';
+import { assinar, verificarAssinado } from './session';
+import { exigirGestor } from './staff-auth';
 
 // Login de CLIENTE com Google (Google Identity Services).
 // O navegador recebe um "credential" (JWT) do Google; aqui ele é conferido no
@@ -81,14 +82,9 @@ export type ClienteLinha = {
   favoritos: number;
 };
 
-function exigirEquipe() {
-  const s = verifySession(cookies().get('mn_staff')?.value);
-  if (!s) throw new Error('Acesso restrito à equipe.');
-  return s;
-}
 
 export async function listClientes(): Promise<ClienteLinha[]> {
-  exigirEquipe();
+  await exigirGestor(); // lista de clientes (marketing): só admin/analista
   const rows = await query<{
     email: string;
     nome: string | null;

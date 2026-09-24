@@ -2,8 +2,12 @@ import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { destinoDoMesclado } from '@/lib/duplicados';
 import DevelopmentDetailView from '@/components/DevelopmentDetailView';
-import { getDevelopmentById } from '@/lib/actions';
+import { cache } from 'react';
+import { getDevelopmentById as buscarCondominio } from '@/lib/actions';
+
+const getDevelopmentById = cache((id: string) => buscarCondominio(id));
 import { buildDevelopmentMetadata, buildDevelopmentJsonLd } from '@/lib/seo';
+import JsonLd from '@/components/JsonLd';
 
 // Sempre busca os dados na hora: assim uma edição feita no painel aparece
 // imediatamente (sem isso, o Next guardava a primeira versão da página).
@@ -27,7 +31,7 @@ export default async function EmpreendimentoPage({ params }: { params: { id: str
   const jsonLd = buildDevelopmentJsonLd(development);
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <JsonLd data={jsonLd} />
       <DevelopmentDetailView development={development} />
     </>
   );

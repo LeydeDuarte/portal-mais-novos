@@ -118,6 +118,9 @@ export default function PhotoGallery({ photos, alt, video, badges, vendido, marc
         src={item.url}
         alt={`${alt} — foto ${video ? index : index + 1}`}
         loading={index < 2 ? 'eager' : 'lazy'}
+        decoding="async"
+        fetchPriority={index === 0 ? 'high' : 'auto'}
+        draggable={false}
         className={`h-full w-full object-cover ${extraClass}`}
       />
     );

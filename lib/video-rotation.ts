@@ -7,7 +7,14 @@ import { useEffect, useRef, useState } from 'react';
 // prioriza o maior matchScore (afinidade de perfil) e, depois de ~30 s, troca
 // o que está tocando há mais tempo pelo próximo melhor candidato visível.
 
-const MAX_PLAYING = 3;
+// Quantos tocam juntos: 2 no computador, 1 no celular (cada vídeo do YouTube pesa
+// ~1 MB e disputa processador) e nenhum com "economia de dados" ligada.
+function maxPlaying(): number {
+  if (typeof window === 'undefined') return 0;
+  const conn = (navigator as unknown as { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  if (conn?.saveData || conn?.effectiveType === '2g' || conn?.effectiveType === 'slow-2g') return 0;
+  return window.innerWidth < 768 ? 1 : 2;
+}
 // Cada vídeo toca pelo menos 30 segundos antes de dar a vez ao próximo
 // (a verificação roda a cada 2 s, só troca quem já completou o tempo).
 const MIN_PLAY_MS = 30_000;
@@ -62,7 +69,7 @@ class VideoRotationManager {
 
   private reevaluate() {
     const playing = [...this.pool.values()].filter((e) => e.playing);
-    const slotsOpen = MAX_PLAYING - playing.length;
+    const slotsOpen = maxPlaying() - playing.length;
     if (slotsOpen > 0) {
       const candidates = [...this.pool.values()]
         .filter((e) => e.visible && !e.playing)

@@ -3,7 +3,8 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { query } from './db';
-import { verifySession, verificarAssinado, veTudo } from './session';
+import { verificarAssinado, veTudo } from './session';
+import { exigirEquipe } from './staff-auth';
 import type { MarketReference } from './market-mock';
 import type { TipoUnidade } from './tipologias';
 
@@ -67,7 +68,7 @@ export async function setFavorite(propertyId: string, favorite: boolean): Promis
 // Migração única: favoritos que a pessoa já tinha salvos no navegador sobem
 // para o banco na primeira visita depois desta atualização.
 export async function importFavorites(propertyIds: string[]): Promise<void> {
-  const ids = propertyIds.filter((id) => typeof id === 'string').slice(0, 200);
+  const ids = (Array.isArray(propertyIds) ? propertyIds : []).filter((id) => typeof id === 'string' && id.length <= 80).slice(0, 200);
   if (!ids.length) return;
   const key = getVisitorKey(true)!;
   await query(
@@ -122,17 +123,13 @@ function mapLead(row: MarketLeadRow): MarketLead {
   };
 }
 
-function requireStaff() {
-  const staff = verifySession(cookies().get(STAFF_COOKIE)?.value);
-  if (!staff) throw new Error('Sessão da equipe expirada — faça login novamente.');
-  return staff;
-}
+const requireStaff = exigirEquipe;
 
 const STATUSES: MarketLeadStatus[] = ['novo', 'contatado', 'descartado'];
 
 // Admin vê os leads de toda a equipe; corretor vê só os seus.
 export async function getMarketLeads(): Promise<MarketLead[]> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   const rows =
     veTudo(staff.role)
       ? await query<MarketLeadRow>('select * from market_leads order by created_at desc')
@@ -143,13 +140,13 @@ export async function getMarketLeads(): Promise<MarketLead[]> {
 // Lista de referências que já viraram lead para QUALQUER corretor — evita que
 // dois corretores da equipe tentem captar o mesmo imóvel.
 export async function getTakenReferenceIds(): Promise<string[]> {
-  requireStaff();
+  await requireStaff();
   const rows = await query<{ ref_id: string }>('select ref_id from market_leads where ref_id is not null');
   return rows.map((r) => r.ref_id);
 }
 
 export async function addMarketLead(ref: MarketReference): Promise<MarketLead | null> {
-  const staff = requireStaff(); // e-mail do corretor vem da sessão, nunca do navegador
+  const staff = await requireStaff(); // e-mail do corretor vem da sessão, nunca do navegador
   const rows = await query<MarketLeadRow>(
     `insert into market_leads
       (ref_id, cidade, bairro, tipo_unidade, preco_aproximado, area_aproximada, quartos, fonte, observacao, corretor_email)
@@ -173,7 +170,7 @@ export async function addMarketLead(ref: MarketReference): Promise<MarketLead | 
 }
 
 export async function updateMarketLeadStatus(leadId: string, status: MarketLeadStatus): Promise<void> {
-  const staff = requireStaff();
+  const staff = await requireStaff();
   if (!STATUSES.includes(status)) throw new Error('Status inválido.');
   if (veTudo(staff.role)) {
     await query('update market_leads set status = $1 where id = $2::uuid', [status, leadId]);

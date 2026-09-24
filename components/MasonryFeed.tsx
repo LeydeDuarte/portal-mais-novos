@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { aprenderPerfil } from '@/lib/perfil-cliente';
 import { getFeedPage, getAnunciosOcultos, contarImoveisAVenda, feedModoEquipe, condominiosDosBairros, type FeedItem, type AnuncioOculto, type CondoDoBairro } from '@/lib/actions';
 import Link from 'next/link';
 import { countActiveFilters, type FilterState } from '@/lib/filters';
@@ -12,19 +13,33 @@ import DevelopmentCard from './DevelopmentCard';
 import LoginModal from './LoginModal';
 import type { Cliente } from '@/lib/cliente-auth';
 
-export default function MasonryFeed({ filters }: { filters: FilterState }) {
-  const [items, setItems] = useState<FeedItem[]>([]);
+export type FeedInicial = { items: FeedItem[]; hasMore: boolean; totalAVenda: number; modoEquipe: boolean; filtrosChave: string };
+
+const chaveItem = (i: FeedItem) => (i.kind === 'empreendimento' ? `d-${i.development.id}` : `p-${i.property.id}`);
+
+export default function MasonryFeed({ filters, inicial }: { filters: FilterState; inicial?: FeedInicial }) {
+  // 1ª página já vem pronta do servidor (aparece na hora e o Google enxerga os links)
+  const usarInicial = useRef(!!inicial);
+  const [items, setItems] = useState<FeedItem[]>(inicial?.items ?? []);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [ocultos, setOcultos] = useState<AnuncioOculto[]>([]);
-  const [totalAVenda, setTotalAVenda] = useState<number | null>(null);
-  const [modoEquipe, setModoEquipe] = useState(false);
+  const [totalAVenda, setTotalAVenda] = useState<number | null>(inicial?.totalAVenda ?? null);
+  const [modoEquipe, setModoEquipe] = useState(inicial?.modoEquipe ?? false);
   useEffect(() => {
+    if (inicial) return;
     contarImoveisAVenda().then(setTotalAVenda).catch(() => {});
     feedModoEquipe().then(setModoEquipe).catch(() => {});
-  }, []);
+  }, [inicial]);
+
+  // Aprende o perfil com o que a pessoa filtra (ordena o feed nas próximas vezes)
+  useEffect(() => {
+    const bairros = filters.locais.filter((l) => l.tipo === 'bairro').map((l) => l.nome);
+    const preco = filters.precoMin && filters.precoMax ? (filters.precoMin + filters.precoMax) / 2 : filters.precoMax ?? null;
+    if (filters.tipos.length || bairros.length || preco) aprenderPerfil({ tipos: filters.tipos, bairros, preco, peso: 2 });
+  }, [filters]);
   const filtrando = countActiveFilters(filters) > 0;
   const pendingFavoriteId = useRef<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -41,7 +56,11 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
       try {
         const { items: newItems, hasMore } = await getFeedPage(pageToLoad, filters);
         if (myId !== requestId.current) return;
-        setItems((prev) => (reset ? newItems : [...prev, ...newItems]));
+        setItems((prev) => {
+          if (reset) return newItems;
+          const vistos = new Set(prev.map(chaveItem));
+          return [...prev, ...newItems.filter((i) => !vistos.has(chaveItem(i)))];
+        });
         setDone(!hasMore);
       } catch {
         if (myId === requestId.current) setDone(true);
@@ -88,6 +107,12 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
 
   useEffect(() => {
     setPage(0);
+    if (usarInicial.current && inicial && JSON.stringify(filters) === inicial.filtrosChave) {
+      usarInicial.current = false;
+      setDone(!inicial.hasMore);
+      return;
+    }
+    usarInicial.current = false;
     loadPage(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
@@ -167,17 +192,18 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
       )}
 
       <div className="columns-2 gap-2.5 px-2.5 pb-16 pt-2.5 sm:columns-3 sm:gap-3 sm:px-5 md:columns-4 md:gap-4 md:px-7 xl:columns-5 xl:gap-4.5 2xl:columns-6">
-        {items.map((item) =>
+        {items.map((item, idx) =>
           item.kind === 'empreendimento' ? (
-            <DevelopmentCard key={`d-${item.development.id}`} development={item.development} />
+            <DevelopmentCard key={chaveItem(item)} development={item.development} prioridade={idx < 4} />
           ) : (
             <PropertyCard
-              key={`p-${item.property.id}`}
+              key={chaveItem(item)}
               property={item.property}
               isFavorite={!!favorites[item.property.id]}
               loggedIn={session.loggedIn}
               onFavoriteClick={handleFavoriteClick}
               onDwell={handleDwell}
+              prioridade={idx < 4}
             />
           )
         )}

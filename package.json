@@ -15,7 +15,8 @@
     "next": "14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "read-excel-file": "^5.8.8"
+    "read-excel-file": "^5.8.8",
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

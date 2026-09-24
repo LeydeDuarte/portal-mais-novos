@@ -11,6 +11,8 @@ import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
 import ContarVisita from '@/components/ContarVisita';
 import CondominioTag from '@/components/CondominioTag';
+import Trilha from '@/components/Trilha';
+import { altFoto, trilhaDoImovel } from '@/lib/seo';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getAveragePricePerM2, formatPricePerM2, type PropertyDetail } from '@/lib/property-details';
 import { getDevelopmentById, getRelatedListings } from '@/lib/actions';
@@ -78,12 +80,10 @@ export default async function PropertyDetailView({
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <ContarVisita tipo="imovel" id={property.id} />
+      <ContarVisita tipo="imovel" id={property.id} perfil={{ tipos: [property.tipoUnidade], bairros: property.bairro ? [property.bairro] : [], preco: property.finalidade === 'venda' ? property.priceValue : null }} />
 
       <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
-        <Link href="/" className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text)]">
-          ← Voltar para a Home
-        </Link>
+        <Trilha itens={trilhaDoImovel({ cidade: property.cidade, bairro: property.bairro })} />
 
         {avisoPrivado && (
           <div className="mb-5 flex items-start gap-2 rounded-xl border border-[var(--border)] bg-[var(--pill-bg)] p-4 text-sm">
@@ -124,7 +124,7 @@ export default async function PropertyDetailView({
         )}
         {hasGallery && (
           <section aria-label="Fotos e vídeo do imóvel" className="mb-8">
-            <PhotoGallery photos={photos} video={galleryVideo} alt={titulo} badges={badges} vendido={!!property.vendidoEm} marcaDagua={marcaDagua} />
+            <PhotoGallery photos={photos} video={galleryVideo} alt={altFoto(property)} badges={badges} vendido={!!property.vendidoEm} marcaDagua={marcaDagua} />
           </section>
         )}
 
