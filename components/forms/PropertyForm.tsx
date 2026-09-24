@@ -39,6 +39,7 @@ type Values = {
   condominio: string;
   endereco: Endereco;
   photos: string[];
+  plantas: string[];
 };
 
 const EMPTY: Values = {
@@ -62,7 +63,8 @@ const EMPTY: Values = {
   empreendimentoId: '',
   condominio: '',
   endereco: ENDERECO_VAZIO,
-  photos: []
+  photos: [],
+  plantas: []
 };
 
 const chip = (n?: number) => (n == null ? '' : n >= 5 ? '5+' : String(n));
@@ -89,7 +91,8 @@ function fromEditData(d: PropertyEditData): Values {
     empreendimentoId: d.empreendimentoId ?? '',
     condominio: d.condominio ?? '',
     endereco: { cep: d.cep ?? '', logradouro: d.logradouro ?? '', bairro: d.bairro ?? '', cidade: d.cidade ?? '', uf: d.uf ?? '' },
-    photos: d.photos ?? []
+    photos: d.photos ?? [],
+    plantas: d.plantas ?? []
   };
 }
 
@@ -170,6 +173,7 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         amenities: v.amenities,
         empreendimentoId: v.empreendimentoId || undefined,
         photos: v.photos,
+        plantas: v.plantas,
         condominio: v.condominio || undefined,
         ...v.endereco
       });
@@ -274,6 +278,15 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
       </div>
 
       <PhotoUploadField photos={v.photos} onChange={(x) => set('photos', x)} onUploadingChange={setUploading} />
+
+      <PhotoUploadField
+        label="Planta do imóvel (opcional)"
+        folder="plantas"
+        modo="plantas"
+        photos={v.plantas}
+        onChange={(x) => set('plantas', x)}
+        onUploadingChange={setUploading}
+      />
 
       <div className="flex flex-col gap-2 pt-1">
         <label className="flex items-center gap-2 text-sm">

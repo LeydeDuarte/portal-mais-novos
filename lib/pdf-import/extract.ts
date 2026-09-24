@@ -46,23 +46,92 @@ export async function lerPdf(
   nome = 'arquivo.pdf',
   onProgresso?: (pagina: number, total: number) => void
 ): Promise<PdfDoc> {
-  const { getDocumentProxy } = await import('unpdf');
+  const pdfjs = await carregarPdfJs();
   const bytes =
     arquivo instanceof Uint8Array ? new Uint8Array(arquivo) : arquivo instanceof ArrayBuffer ? new Uint8Array(arquivo) : new Uint8Array(await (arquivo as File).arrayBuffer());
-  const pdf = await getDocumentProxy(bytes);
+  const pdf = await pdfjs.getDocument({ data: bytes, isEvalSupported: false }).promise;
   const paginas: string[][] = [];
-  for (let p = 1; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const tc = await page.getTextContent();
-    const items: Item[] = (tc.items as { str?: string; transform?: number[]; width?: number; height?: number }[])
-      .filter((i) => typeof i.str === 'string' && i.transform)
-      .map((i) => ({ str: i.str as string, x: i.transform![4], y: i.transform![5], w: i.width ?? 0, h: i.height ?? Math.abs(i.transform![3]) }));
-    paginas.push(montarLinhas(items));
-    page.cleanup();
-    onProgresso?.(p, pdf.numPages);
-    // devolve o controle ao navegador a cada 10 páginas (tela não trava)
-    if (p % 10 === 0) await new Promise((r) => setTimeout(r, 0));
+  try {
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      const items: Item[] = (tc.items as { str?: string; transform?: number[]; width?: number; height?: number }[])
+        .filter((i) => typeof i.str === 'string' && i.transform)
+        .map((i) => ({ str: i.str as string, x: i.transform![4], y: i.transform![5], w: i.width ?? 0, h: i.height ?? Math.abs(i.transform![3]) }));
+      paginas.push(montarLinhas(items));
+      page.cleanup();
+      onProgresso?.(p, pdf.numPages);
+      // devolve o controle ao navegador a cada 10 páginas (tela não trava)
+      if (p % 10 === 0) await new Promise((r) => setTimeout(r, 0));
+    }
+  } finally {
+    await pdf.destroy();
   }
-  await (pdf as unknown as { cleanup?: () => Promise<void> }).cleanup?.();
   return { nome: arquivo instanceof File ? arquivo.name : nome, paginas };
+}
+
+// PDF.js completo servido em /pdfjs (public/pdfjs, versão 4.10.38 "legacy"):
+// fica fora do bundle do Next e decodifica imagens JPEG 2000, muito usadas em
+// cadernos de plantas (numa versão enxuta a planta saía em branco).
+type PdfJs = {
+  GlobalWorkerOptions: { workerSrc: string };
+  getDocument: (src: { data: Uint8Array; isEvalSupported?: boolean }) => { promise: Promise<PdfJsDoc> };
+};
+type PdfJsDoc = {
+  getPage: (n: number) => Promise<{
+    getViewport: (o: { scale: number }) => { width: number; height: number };
+    render: (o: unknown) => { promise: Promise<void> };
+    getTextContent: () => Promise<{ items: unknown[] }>;
+    cleanup: () => void;
+  }>;
+  numPages: number;
+  destroy: () => Promise<void>;
+};
+let pdfjsPromise: Promise<PdfJs> | null = null;
+function carregarPdfJs(): Promise<PdfJs> {
+  if (!pdfjsPromise) {
+    pdfjsPromise = (import(/* webpackIgnore: true */ '/pdfjs/pdf.min.mjs' as string) as Promise<PdfJs>).then((m) => {
+      m.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.mjs';
+      return m;
+    });
+  }
+  return pdfjsPromise;
+}
+
+/** Transforma páginas do PDF em imagens JPEG (planta), maior lado ~2400 px. */
+export async function renderizarPaginas(
+  arquivo: File,
+  paginas: number[],
+  onPronta?: (indice: number, blob: Blob) => void,
+  maiorLado = 2400
+): Promise<Blob[]> {
+  const pdfjs = await carregarPdfJs();
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await arquivo.arrayBuffer()), isEvalSupported: false }).promise;
+  const out: Blob[] = [];
+  try {
+    for (const [i, n] of paginas.entries()) {
+      // eslint-disable-next-line no-await-in-loop
+      const page = await pdf.getPage(n).catch(() => null);
+      if (!page) continue;
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.min(4, maiorLado / Math.max(base.width, base.height));
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(viewport.width);
+      canvas.height = Math.round(viewport.height);
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', 0.88));
+      if (blob) {
+        out.push(blob);
+        onPronta?.(i, blob);
+      }
+      page.cleanup();
+    }
+  } finally {
+    await pdf.destroy();
+  }
+  return out;
 }

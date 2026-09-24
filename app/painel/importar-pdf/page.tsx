@@ -8,8 +8,9 @@ import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
 import DescriptionEditor from '@/components/forms/DescriptionEditor';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { createDevelopment, saveTipologias, listCondominios, getDevelopmentForEdit, type CondominioResumo } from '@/lib/actions';
-import { lerPdf, type PdfDoc } from '@/lib/pdf-import/extract';
-import { analisarDocs, classificarDoc, gerarDescricao, semAcento, type ImportResult, type TipoDoc } from '@/lib/pdf-import/parse';
+import { lerPdf, renderizarPaginas, type PdfDoc } from '@/lib/pdf-import/extract';
+import { uploadOne } from '@/components/PhotoUploadField';
+import { analisarDocs, classificarDoc, gerarDescricao, paginasDePlanta, semAcento, type ImportResult, type TipoDoc } from '@/lib/pdf-import/parse';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { maskCurrencyInput } from '@/lib/currency';
 import { formatLocation } from '@/components/CepField';
@@ -18,7 +19,8 @@ const inputClass = 'w-full rounded-lg border border-[var(--border)] bg-[var(--bg
 const TIPO_DOC_LABEL: Record<TipoDoc, string> = { tabela: 'Tabela de vendas', ficha: 'Ficha técnica', plantas: 'Caderno de plantas', book: 'Book', outro: 'Outro' };
 
 type Arquivo = { file: File; doc?: PdfDoc; tipo?: TipoDoc; erro?: string };
-type LinhaTip = { incluir: boolean; tipoUnidade: TipoUnidade; area: string; quartos: string; vagas: string; precoDigits: string; info: string };
+type PlantaImport = { src: string; blob: Blob; legenda: string };
+type LinhaTip = { incluir: boolean; tipoUnidade: TipoUnidade; area: string; quartos: string; vagas: string; precoDigits: string; info: string; plantas: PlantaImport[] };
 
 const norm = (s: string) => semAcento(s.toLowerCase()).replace(/[^a-z0-9]/g, '');
 
@@ -33,6 +35,7 @@ export default function ImportarPdfPage() {
   const [arquivos, setArquivos] = useState<Arquivo[]>([]);
   const [lendo, setLendo] = useState<string | null>(null);
   const [progresso, setProgresso] = useState<string>('');
+  const [gerandoPlantas, setGerandoPlantas] = useState<string | null>(null);
   const [res, setRes] = useState<ImportResult | null>(null);
   const [f, setF] = useState({ nome: '', cep: '', logradouro: '', bairro: '', cidade: '', uf: '', entrega: '', pavimentos: '', tipo: 'vertical' as 'vertical' | 'horizontal' });
   const [amenities, setAmenities] = useState<string[]>([]);
@@ -101,9 +104,37 @@ export default function ImportarPdfPage() {
         precoDigits: t.precoMin ? String(Math.round(t.precoMin)) : '',
         info: t.total
           ? `${t.disponiveis} de ${t.total} unidade(s) disponível(is) na tabela${t.unidades.length ? ` · ${t.unidades.slice(0, 6).join(', ')}${t.unidades.length > 6 ? '…' : ''}` : ''}${t.rotulo ? ` · ${t.rotulo}` : ''}`
-          : t.rotulo ?? 'da ficha/plantas (sem preço)'
+          : t.rotulo ?? 'da ficha/plantas (sem preço)',
+        plantas: []
       }))
     );
+    // Plantas: páginas do caderno com uma só metragem viram imagem e já ficam
+    // ligadas à tipologia de mesma metragem (dá para tirar as que não servirem)
+    const comDoc = lidos.filter((a) => a.doc);
+    const achadas = paginasDePlanta(docs, r.tipologias);
+    if (achadas.length) {
+      setGerandoPlantas(`0 de ${achadas.length}`);
+      let feitas = 0;
+      for (const di of Array.from(new Set(achadas.map((a) => a.doc)))) {
+        const doDoc = achadas.filter((a) => a.doc === di);
+        try {
+          await renderizarPaginas(
+            comDoc[di].file,
+            doDoc.map((a) => a.pagina),
+            (k, blob) => {
+              const a = doDoc[k];
+              const planta = { src: URL.createObjectURL(blob), blob, legenda: a.legenda || `pág. ${a.pagina}` };
+              setTips((ts) => ts.map((t, j) => (j === a.tipologia ? { ...t, plantas: [...t.plantas, planta] } : t)));
+              setGerandoPlantas(`${++feitas} de ${achadas.length}`);
+            }
+          );
+        } catch (err) {
+          console.error('plantas', err);
+          /* se o PDF não renderizar, as plantas ficam para adicionar à mão */
+        }
+      }
+      setGerandoPlantas(null);
+    }
     const igual = condos.find((c) => norm(c.name) === norm(r.nome));
     setDestino(igual ? igual.id : 'novo');
     // CEP pelo endereço (ViaCEP), se o material não trouxe
@@ -122,6 +153,15 @@ export default function ImportarPdfPage() {
   };
 
   const setTip = (i: number, patch: Partial<LinhaTip>) => setTips((ts) => ts.map((t, j) => (j === i ? { ...t, ...patch } : t)));
+  // Sobe as imagens das plantas para o R2 só na hora de salvar
+  const subirPlantas = async (linhas: LinhaTip[]) =>
+    Promise.all(
+      linhas.map((t) =>
+        Promise.all(t.plantas.map((p, k) => uploadOne(new File([p.blob], `planta-${k + 1}.jpg`, { type: 'image/jpeg' }), 'plantas').catch(() => null))).then(
+          (urls) => urls.filter((u): u is string => !!u)
+        )
+      )
+    );
   const tipsFinais = () =>
     tips
       .filter((t) => t.incluir)
@@ -168,9 +208,11 @@ export default function ImportarPdfPage() {
         // Atualiza só a tabela (tipologias e preços) do condomínio que já existe,
         // mantendo os ids das tipologias de mesma metragem.
         const atual = await getDevelopmentForEdit(destino);
-        const novas = tipsFinais().map((t) => {
+        const urls = await subirPlantas(tips.filter((t) => t.incluir));
+        const novas = tipsFinais().map((t, k) => {
           const mesma = atual?.tipologias.find((x) => x.area && t.area && Math.abs(x.area - t.area) / t.area < 0.01 && x.tipoUnidade === t.tipoUnidade);
-          return mesma ? { ...t, id: mesma.id } : t;
+          const plantas = urls[k].length ? urls[k] : mesma?.plantas ?? [];
+          return mesma ? { ...t, id: mesma.id, plantas } : { ...t, plantas };
         });
         await saveTipologias(destino, novas);
         router.push(`/painel/condominios/${destino}/editar`);
@@ -201,7 +243,10 @@ export default function ImportarPdfPage() {
         status: 'rascunho'
       });
       if (!r.ok) throw new Error('Faltando: ' + r.faltando.join(', '));
-      if (f.entrega) await saveTipologias(id, tipsFinais());
+      if (f.entrega) {
+        const urls = await subirPlantas(tips.filter((t) => t.incluir));
+        await saveTipologias(id, tipsFinais().map((t, k) => ({ ...t, plantas: urls[k] })));
+      }
       router.push(`/painel/condominios/${id}/editar`);
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível salvar.');
@@ -361,6 +406,7 @@ export default function ImportarPdfPage() {
 
             <section className="rounded-2xl border border-[var(--border)] p-4">
               <h2 className="text-sm font-bold uppercase tracking-wide text-[var(--text-muted)]">Tipologias ({tips.filter((t) => t.incluir).length})</h2>
+              {gerandoPlantas && <p className="mt-1 text-xs font-semibold text-accent">Gerando imagens das plantas… {gerandoPlantas}</p>}
               <p className="mt-1 text-xs text-[var(--text-muted)]">Agrupadas pela metragem da tabela. O preço é o menor valor entre as unidades disponíveis (&quot;a partir de&quot;).</p>
               <div className="mt-3 space-y-3">
                 {tips.map((t, i) => (
@@ -400,6 +446,31 @@ export default function ImportarPdfPage() {
                         <input className={inputClass} inputMode="numeric" value={maskCurrencyInput(t.precoDigits)} onChange={(e) => setTip(i, { precoDigits: e.target.value.replace(/\D/g, '') })} />
                       </label>
                     </div>
+                    <div className="mt-3">
+                      <div className="mb-1.5 text-[11px] font-semibold text-[var(--text-muted)]">
+                        Planta{t.plantas.length !== 1 ? 's' : ''} ({t.plantas.length}){' '}
+                        {t.plantas.length === 0 && <span className="font-normal">— nenhuma página de planta com esta metragem; adicione depois na tela do condomínio (dá para colar print com Ctrl+V).</span>}
+                      </div>
+                      {t.plantas.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {t.plantas.map((p, k) => (
+                            <div key={p.src} className="relative h-24 w-32 overflow-hidden rounded-lg border border-[var(--border)] bg-white">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <a href={p.src} target="_blank" rel="noreferrer"><img src={p.src} alt="" className="h-full w-full object-contain" /></a>
+                              <span className="absolute bottom-0 left-0 right-0 truncate bg-black/55 px-1.5 py-0.5 text-[10px] text-white">{p.legenda}</span>
+                              <button
+                                type="button"
+                                aria-label="Tirar esta planta"
+                                onClick={() => setTip(i, { plantas: t.plantas.filter((_, x) => x !== k) })}
+                                className="absolute right-1 top-1 rounded-full bg-black/60 px-1.5 text-xs text-white hover:bg-red-600"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
                 {!tips.length && <p className="text-sm text-[var(--text-muted)]">Nenhuma tipologia encontrada — dá para cadastrar depois na tela do condomínio.</p>}
@@ -430,7 +501,7 @@ export default function ImportarPdfPage() {
               <p className="text-xs text-amber-800">Sem data de entrega as tipologias ficam para depois (a entrega é usada nelas). O condomínio é salvo como rascunho do mesmo jeito.</p>
             )}
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" disabled={salvando} onClick={salvar} className="rounded-full bg-ink px-6 py-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">
+              <button type="button" disabled={salvando || !!gerandoPlantas} onClick={salvar} className="rounded-full bg-ink px-6 py-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">
                 {salvando ? 'Salvando…' : destino === 'novo' ? 'Criar rascunho e revisar' : 'Atualizar tabela'}
               </button>
               <span className="text-xs text-[var(--text-muted)]">

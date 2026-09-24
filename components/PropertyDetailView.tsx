@@ -6,6 +6,7 @@ import PhotoGallery, { type GalleryVideo } from '@/components/PhotoGallery';
 import LocationCard from '@/components/LocationCard';
 import RichText from '@/components/RichText';
 import CollapsibleText from '@/components/CollapsibleText';
+import PlantaViewer from '@/components/PlantaViewer';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import type { PropertyDetail } from '@/lib/property-details';
 import { getDevelopmentById, getRelatedListings } from '@/lib/actions';
@@ -111,7 +112,14 @@ export default async function PropertyDetailView({ property }: { property: Prope
             </div>
             )}
 
-            <div className={showMediaBlock ? 'mt-6' : ''}>
+            {property.plantas && property.plantas.length > 0 && (
+              <section className={showMediaBlock ? 'mt-6' : ''} aria-label="Planta do imóvel">
+                <h2 className="mb-3 text-lg font-bold">{property.plantas.length > 1 ? 'Plantas' : 'Planta'}</h2>
+                <PlantaViewer plantas={property.plantas} titulo={titulo} />
+              </section>
+            )}
+
+            <div className={showMediaBlock || property.plantas?.length ? 'mt-6' : ''}>
               <h2 className="mb-2 text-lg font-bold">Sobre o imóvel</h2>
               <CollapsibleText>
                 <RichText texto={property.description} />

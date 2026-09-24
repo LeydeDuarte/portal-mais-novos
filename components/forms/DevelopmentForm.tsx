@@ -17,7 +17,7 @@ const QUARTO_OPCOES = ['1', '2', '3', '4', '5+'];
 const TODOS_OS_TIPOS = TIPO_UNIDADE_GRUPOS.flatMap((g) => g.tipos).map((t) => ({ value: t, label: TIPO_UNIDADE_LABEL[t] }));
 const QUARTOS_MULTI = ['1', '2', '3', '4', '5'].map((q) => ({ value: q, label: q === '5' ? '5+' : q }));
 
-type Tip = { key: string; id?: string; tipoUnidade: TipoUnidade; quartos: string; vagas: string; area: string; priceDigits: string };
+type Tip = { key: string; id?: string; tipoUnidade: TipoUnidade; quartos: string; vagas: string; area: string; priceDigits: string; plantas: string[] };
 
 export type DevelopmentSaveResult = { ok: true } | { ok: false; faltando: string[] };
 
@@ -56,7 +56,8 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
       quartos: t.quartos == null ? '' : t.quartos >= 5 ? '5+' : String(t.quartos),
       vagas: t.vagas == null ? '' : t.vagas >= 5 ? '5+' : String(t.vagas),
       area: t.area != null ? String(t.area) : '',
-      priceDigits: t.priceValue ? String(Math.round(t.priceValue)) : ''
+      priceDigits: t.priceValue ? String(Math.round(t.priceValue)) : '',
+      plantas: t.plantas ?? []
     }))
   );
   const [detalhar, setDetalhar] = useState((initial?.tipologias?.length ?? 0) > 0);
@@ -67,7 +68,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
 
   const set = <K extends keyof typeof f>(key: K, value: (typeof f)[K]) => setF((prev) => ({ ...prev, [key]: value }));
   const updTip = <K extends keyof Tip>(key: string, k: K, value: Tip[K]) => setTips((prev) => prev.map((t) => (t.key === key ? { ...t, [k]: value } : t)));
-  const addTip = () => setTips((prev) => [...prev, { key: `n${Date.now()}`, tipoUnidade: f.tiposUnidade[0] ?? 'apartamento', quartos: '', vagas: '', area: '', priceDigits: '' }]);
+  const addTip = () => setTips((prev) => [...prev, { key: `n${Date.now()}`, tipoUnidade: f.tiposUnidade[0] ?? 'apartamento', quartos: '', vagas: '', area: '', priceDigits: '', plantas: [] }]);
 
   // Checklist visível do que falta para publicar
   const pendencias = [
@@ -83,7 +84,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
     setFaltando([]);
     if (!f.name.trim()) return setErro('Digite o nome do condomínio.');
     if (f.video && f.videoUrl.trim() && f.videoVertical === null) return setErro('Escolha o formato do vídeo (Deitado ou Em pé) antes de salvar.');
-    const tipologiasValidas = detalhar ? tips.filter((t) => t.quartos || t.area || t.priceDigits) : [];
+    const tipologiasValidas = detalhar ? tips.filter((t) => t.quartos || t.area || t.priceDigits || t.plantas.length) : [];
     const tiposUnidade = Array.from(new Set([...f.tiposUnidade, ...tipologiasValidas.map((t) => t.tipoUnidade)]));
     const location = formatLocation(f.endereco);
     setSaving(status);
@@ -113,7 +114,8 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
           quartos: numOrUndef(t.quartos),
           vagas: numOrUndef(t.vagas),
           area: t.area ? Number(t.area) : undefined,
-          priceValue: Number(t.priceDigits.replace(/\D/g, '')) || 0
+          priceValue: Number(t.priceDigits.replace(/\D/g, '')) || 0,
+          plantas: t.plantas
         }))
       );
       if (!res.ok) setFaltando(res.faltando);
@@ -240,6 +242,15 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
                 <input type="number" className={inputClass} placeholder="Área (m²)" value={t.area} onChange={(e) => updTip(t.key, 'area', e.target.value)} />
                 <input className={inputClass} placeholder="Preço" value={maskCurrencyInput(t.priceDigits)} onChange={(e) => updTip(t.key, 'priceDigits', e.target.value)} />
               </div>
+              <PhotoUploadField
+                label="Planta desta tipologia (opcional — duplex pode ter 2)"
+                folder="plantas"
+                modo="plantas"
+                compacto
+                photos={t.plantas}
+                onChange={(x) => updTip(t.key, 'plantas', x)}
+                onUploadingChange={setUploading}
+              />
             </div>
           ))}
           <button type="button" onClick={addTip} className="self-start rounded-full bg-[var(--pill-bg)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--pill-bg-hover)]">

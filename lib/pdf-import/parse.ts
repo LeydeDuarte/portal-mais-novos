@@ -85,7 +85,7 @@ export function parseArea(s: string): number | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
-function todasAreas(linha: string): number[] {
+export function todasAreas(linha: string): number[] {
   const out: number[] = [];
   const re = /(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*m(?:²|2)(?![a-z0-9])/gi;
   let m;
@@ -328,7 +328,7 @@ function pistasDeArea(docs: { doc: PdfDoc; tipo: TipoDoc }[]): Pista[] {
   return pistas;
 }
 
-const perto = (a: number, b: number, tol = 0.012) => Math.abs(a - b) / Math.max(a, b) <= tol || Math.floor(a) === Math.floor(b);
+export const perto = (a: number, b: number, tol = 0.012) => Math.abs(a - b) / Math.max(a, b) <= tol || Math.floor(a) === Math.floor(b);
 
 // ---------- lazer ----------
 
@@ -621,4 +621,32 @@ export function gerarDescricao(r: ImportResult): string {
   }
   if (onde) l.push('', `Procurando ${tiposNomes[0]?.toLowerCase() ?? 'apartamento'} na planta no ${bairro || cidade}? Registre seu interesse e receba a tabela atualizada do ${nome}.`);
   return l.join('\n');
+}
+
+// ---------- páginas de planta (para virar imagem) ----------
+
+/** Páginas do caderno de plantas (ou do book, se não houver caderno) que
+ *  mostram UMA planta — uma só metragem na página — ligadas à tipologia de
+ *  metragem igual. Resultado: índice da tipologia → páginas (1-based) do doc. */
+export function paginasDePlanta(
+  docs: PdfDoc[],
+  tipologias: { area: number }[]
+): { doc: number; pagina: number; tipologia: number; legenda: string }[] {
+  const tipos = docs.map(classificarDoc);
+  let alvo = tipos.map((t, i) => (t === 'plantas' ? i : -1)).filter((i) => i >= 0);
+  if (!alvo.length) alvo = tipos.map((t, i) => (t === 'book' ? i : -1)).filter((i) => i >= 0);
+  const out: { doc: number; pagina: number; tipologia: number; legenda: string }[] = [];
+  for (const di of alvo) {
+    docs[di].paginas.forEach((pag, pi) => {
+      const areas = pag.flatMap(todasAreas).filter((a) => a >= 20 && a < 2000);
+      if (!areas.length || new Set(areas.map((a) => Math.floor(a))).size !== 1) return;
+      const ti = tipologias.findIndex((t) => perto(t.area, areas[0]));
+      if (ti < 0) return;
+      if (out.filter((o) => o.tipologia === ti).length >= 4) return;
+      const texto = pag.join(' ');
+      const leg = texto.match(/\b(inferior|superior|varanda [a-zà-ú/.]+(?: c\/ [a-zà-ú]+)?|decorado)\b/i)?.[0] ?? '';
+      out.push({ doc: di, pagina: pi + 1, tipologia: ti, legenda: leg });
+    });
+  }
+  return out;
 }

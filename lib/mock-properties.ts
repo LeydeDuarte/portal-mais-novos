@@ -22,6 +22,7 @@ export type Property = {
   area: string;
   // Fotos reais (URLs no R2) — a primeira é a capa. Vazio = mostra o espaço reservado.
   photos?: string[];
+  plantas?: string[]; // imagens da planta da unidade
   condominio?: string; // nome do condomínio/edifício, quando o imóvel fica em um
   bairro?: string;
   cidade?: string;

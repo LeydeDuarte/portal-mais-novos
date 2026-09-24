@@ -557,6 +557,7 @@ export type CreatePropertyInput = {
   empreendimentoId?: string;
   corretorEmail?: string; // ignorado — o corretor vem sempre do login
   photos?: string[];
+  plantas?: string[]; // imagens da planta da unidade (duplex pode ter 2: inferior e superior)
   cep?: string;
   logradouro?: string;
   bairro?: string;
@@ -606,12 +607,13 @@ function propertyValues(input: PropertyFields) {
     clean(input.cidade),
     clean(input.uf?.toUpperCase()),
     clean(input.condominio ? formatTitulo(input.condominio) : undefined),
-    !!input.videoVertical
+    !!input.videoVertical,
+    JSON.stringify(sanitizePhotos(input.plantas))
   ];
 }
 const PROPERTY_COLS =
-  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical';
-const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', ''];
+  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical, plantas';
+const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', '', '::jsonb'];
 
 export async function createProperty(input: CreatePropertyInput): Promise<void> {
   const staff = requireStaff();
@@ -673,6 +675,7 @@ export async function getPropertyForEdit(id: string): Promise<PropertyEditData |
     amenities: toStringArray(r.amenities),
     empreendimentoId: r.empreendimento_id ?? undefined,
     photos: toStringArray(r.photos),
+    plantas: toStringArray(r.plantas),
     cep: r.cep ?? undefined,
     logradouro: r.logradouro ?? undefined,
     bairro: r.bairro ?? undefined,
@@ -785,7 +788,7 @@ export async function updateDevelopment(id: string, input: DevelopmentFields): P
 }
 
 // Tipologias da tabela de vendas: cria as novas, atualiza as existentes e remove as que saíram da lista
-export type TipologiaInput = { id?: string; tipoUnidade: TipoUnidade; quartos?: number; vagas?: number; area?: number; priceValue: number };
+export type TipologiaInput = { id?: string; tipoUnidade: TipoUnidade; quartos?: number; vagas?: number; area?: number; priceValue: number; plantas?: string[] };
 
 export async function saveTipologias(developmentId: string, tipologias: TipologiaInput[]): Promise<void> {
   const staff = requireStaff();
@@ -815,6 +818,7 @@ export async function saveTipologias(developmentId: string, tipologias: Tipologi
       amenities: toStringArray(dev.amenities),
       empreendimentoId: developmentId,
       photos: toStringArray(dev.photos),
+      plantas: t.plantas ?? [],
       cep: dev.cep ?? undefined,
       bairro: dev.bairro ?? undefined,
       cidade: dev.cidade ?? undefined,
@@ -841,8 +845,8 @@ export async function getDevelopmentForEdit(id: string): Promise<DevelopmentEdit
   const rows = await query<DevelopmentRow>('select * from developments where id = $1', [id]);
   const d = rows[0];
   if (!d) return null;
-  const tips = await query<{ id: string; tipo_unidade: string; quartos: number | null; vagas: number | null; area: string | null; price_value: string }>(
-    'select id, tipo_unidade, quartos, vagas, area, price_value from properties where empreendimento_id = $1 and is_tipologia = true order by area asc nulls last',
+  const tips = await query<{ id: string; tipo_unidade: string; quartos: number | null; vagas: number | null; area: string | null; price_value: string; plantas: unknown }>(
+    'select id, tipo_unidade, quartos, vagas, area, price_value, plantas from properties where empreendimento_id = $1 and is_tipologia = true order by area asc nulls last',
     [id]
   );
   const dd = d.delivery_date ? (d.delivery_date instanceof Date ? d.delivery_date.toISOString() : String(d.delivery_date)).slice(0, 7) : undefined;
@@ -875,7 +879,8 @@ export async function getDevelopmentForEdit(id: string): Promise<DevelopmentEdit
       quartos: t.quartos ?? undefined,
       vagas: t.vagas ?? undefined,
       area: t.area != null ? Number(t.area) : undefined,
-      priceValue: Number(t.price_value) || 0
+      priceValue: Number(t.price_value) || 0,
+      plantas: toStringArray(t.plantas)
     }))
   };
 }

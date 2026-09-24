@@ -6,6 +6,7 @@ import LocationCard from '@/components/LocationCard';
 import RichText from '@/components/RichText';
 import InterestForm from '@/components/InterestForm';
 import CollapsibleText from '@/components/CollapsibleText';
+import PlantaViewer from '@/components/PlantaViewer';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getRelatedListings } from '@/lib/actions';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
@@ -191,10 +192,19 @@ export default async function DevelopmentDetailView({ development }: { developme
               {[...tipologias]
                 .sort((a, b) => parseFloat(a.area) - parseFloat(b.area))
                 .map((unit) => (
+                <div key={unit.id} className="flex flex-col overflow-hidden rounded-xl border border-[var(--border)]">
+                {unit.plantas && unit.plantas.length > 0 && (
+                  <div className="border-b border-[var(--border)] p-2">
+                    <PlantaViewer
+                      compacta
+                      plantas={unit.plantas}
+                      titulo={`${TIPO_UNIDADE_LABEL[unit.tipoUnidade]} de ${unit.area} no ${development.name}`}
+                    />
+                  </div>
+                )}
                 <Link
-                  key={unit.id}
                   href={`/imovel/${unit.id}`}
-                  className="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-4 hover:bg-[var(--pill-bg)]"
+                  className="flex flex-1 flex-col gap-2 p-4 hover:bg-[var(--pill-bg)]"
                 >
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[unit.tipoUnidade]}</div>
                   <div className="font-serif text-lg font-semibold">{unit.price}</div>
@@ -202,6 +212,7 @@ export default async function DevelopmentDetailView({ development }: { developme
                   <div className="text-xs text-[var(--text-faint)]">{formatPricePerM2(getAveragePricePerM2([unit]))}</div>
                   <span className="mt-1 text-xs font-semibold text-accent">Ver unidade →</span>
                 </Link>
+                </div>
               ))}
             </div>
           )}
