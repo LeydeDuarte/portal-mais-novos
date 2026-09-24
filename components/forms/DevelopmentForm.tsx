@@ -6,6 +6,7 @@ import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
 import PhotoUploadField from '@/components/PhotoUploadField';
 import MultiChipSelect from '@/components/MultiChipSelect';
 import VideoFormato, { pareceVertical } from '@/components/forms/VideoFormato';
+import DescriptionEditor from '@/components/forms/DescriptionEditor';
 import CepField, { ENDERECO_VAZIO, formatLocation, type Endereco } from '@/components/CepField';
 import type { DevelopmentEditData, DevelopmentFields, DevelopmentStatus, TipologiaInput } from '@/lib/actions';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
@@ -73,8 +74,6 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
     !f.name.trim() && 'Nome',
     (!f.endereco.bairro || !f.endereco.cidade) && 'Endereço (CEP, ou bairro e cidade)',
     !f.deliveryDate && 'Data de entrega',
-    f.description.trim().length < 60 && 'Narrativa do condomínio (pelo menos 60 caracteres)',
-    f.tiposUnidade.length === 0 && 'Tipos de imóvel que existem no condomínio',
     f.video && f.videoUrl.trim() && f.videoVertical === null && 'Formato do vídeo (Deitado ou Em pé)'
   ].filter(Boolean) as string[];
 
@@ -183,11 +182,11 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-semibold text-[var(--text-muted)]">Narrativa do condomínio (aparece na página — conte a história, o estilo de vida, a localização)</label>
-        <textarea rows={6} className={inputClass} value={f.description} onChange={(e) => set('description', e.target.value)} />
-        <span className="text-xs text-[var(--text-faint)]">{f.description.trim().length} caracteres (mínimo 60 para publicar)</span>
-      </div>
+      <DescriptionEditor
+        label="Narrativa do condomínio (opcional — pode completar depois de publicar)"
+        value={f.description}
+        onChange={(x) => set('description', x)}
+      />
 
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold text-[var(--text-muted)]">Lazer e diferenciais</label>
@@ -286,7 +285,9 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
                 <li key={p}>{p}</li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-[var(--text-faint)]">Você pode salvar como rascunho e terminar depois. Fotos são opcionais.</p>
+            <p className="mt-2 text-xs text-[var(--text-faint)]">
+              Você pode salvar como rascunho e terminar depois. Narrativa, fotos, tipos e lazer são opcionais — dá para publicar e completar depois.
+            </p>
           </>
         )}
       </div>

@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import ScrollRow from './ScrollRow';
+import { formatTitulo } from '@/lib/text';
 import type { PropertyDetail } from '@/lib/property-details';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
@@ -21,7 +23,8 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-[var(--text-muted)]">{emptyText}</p>
       ) : (
-        <div className="-mx-5 mt-4 flex snap-x gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:thin] md:mx-0 md:px-0">
+        <div className="-mx-5 mt-4 md:mx-0">
+        <ScrollRow className="snap-x gap-4 px-5 pb-2 md:px-0">
           {items.map((p) => {
             const badge = getStatusBadge(p.deliveryDate);
             const cover = p.photos?.[0];
@@ -40,12 +43,19 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
                   >
                     {badge.text}
                   </span>
+                  <span
+                    className={`absolute bottom-2.5 left-2.5 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                      p.finalidade === 'aluguel' ? 'bg-sky-700 text-white' : 'bg-white/95 text-ink'
+                    }`}
+                  >
+                    {p.finalidade === 'aluguel' ? 'Aluguel' : 'À venda'}
+                  </span>
                 </div>
                 <div className="pt-2">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[p.tipoUnidade]}</div>
                   <div className="font-serif text-base font-semibold">{p.price}</div>
                   <div className="truncate text-xs text-[var(--text-muted)]">
-                    {p.condominio ? `${p.condominio} · ` : ''}
+                    {p.condominio ? `${formatTitulo(p.condominio)} · ` : ''}
                     {p.bairro || p.location}
                   </div>
                   <div className="text-xs text-[var(--text-muted)]">
@@ -55,6 +65,7 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
               </Link>
             );
           })}
+        </ScrollRow>
         </div>
       )}
     </section>

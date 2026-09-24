@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { PropertyDetail, Development } from './property-details';
 import { getStatusBadge } from './classification';
 import { TIPO_UNIDADE_LABEL, TIPO_UNIDADE_SCHEMA_ORG } from './tipologias';
+import { descricaoTextoPuro } from './text';
 
 // Trocar pelo domínio definitivo assim que ele existir — hoje aponta pro
 // domínio da Vercel pra sitemap/canonical/OG funcionarem desde já.
@@ -18,7 +19,7 @@ export function buildPropertyMetadata(property: PropertyDetail): Metadata {
   const tipo = TIPO_UNIDADE_LABEL[property.tipoUnidade];
   const baseTitle = property.titulo || `${tipo} em ${property.location}`;
   const title = `${baseTitle} — ${badge.label} | ${SITE_NAME}`;
-  const description = property.description.slice(0, 155);
+  const description = descricaoTextoPuro(property.description).slice(0, 155);
   const url = `${SITE_URL}/imovel/${property.id}`;
 
   return {
@@ -50,7 +51,7 @@ export function buildPropertyJsonLd(property: PropertyDetail) {
     // descreve o imóvel em si — o JSON-LD aceita @type como lista.
     '@type': ['RealEstateListing', TIPO_UNIDADE_SCHEMA_ORG[property.tipoUnidade]],
     name: property.titulo || `${TIPO_UNIDADE_LABEL[property.tipoUnidade]} em ${property.location}`,
-    description: property.description,
+    description: descricaoTextoPuro(property.description),
     url,
     address: {
       '@type': 'PostalAddress',
@@ -86,7 +87,7 @@ export function buildAgentJsonLd() {
 export function buildDevelopmentMetadata(development: Development): Metadata {
   const badge = getStatusBadge(development.deliveryDate);
   const title = `${development.name} — ${development.location} | ${badge.label} | ${SITE_NAME}`;
-  const description = development.description.slice(0, 155);
+  const description = (descricaoTextoPuro(development.description) || `${development.name} em ${development.location}.`).slice(0, 155);
   const url = `${SITE_URL}/empreendimento/${development.id}`;
 
   return {
@@ -118,7 +119,7 @@ export function buildDevelopmentJsonLd(development: Development) {
     // específicos do schema.org pra isso, mais precisos que um "Residence" genérico.
     '@type': development.tipo === 'vertical' ? 'ApartmentComplex' : 'GatedResidenceCommunity',
     name: development.name,
-    description: development.description,
+    description: descricaoTextoPuro(development.description) || undefined,
     url,
     address: {
       '@type': 'PostalAddress',

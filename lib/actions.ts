@@ -9,6 +9,7 @@ import type { PropertyDetail, Development } from './property-details';
 import type { FilterState } from './filters';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from './tipologias';
 import { r2PublicBase, cleanPhotoUrl } from './r2-url';
+import { formatTitulo } from './text';
 
 const PAGE_SIZE = 12;
 const STAFF_COOKIE = 'mn_staff';
@@ -342,7 +343,7 @@ export async function getLocationIndex(): Promise<LocalSugestao[]> {
      select * from cidades union all select * from bairros union all select * from condos
      order by total desc`
   );
-  return rows.map((r) => ({ tipo: r.tipo, nome: r.nome, cidade: r.cidade, uf: r.uf ?? '', id: r.id ?? undefined, total: Number(r.total) || 0 }));
+  return rows.map((r) => ({ tipo: r.tipo, nome: formatTitulo(r.nome), cidade: r.cidade, uf: r.uf ?? '', id: r.id ?? undefined, total: Number(r.total) || 0 }));
 }
 
 // ---------------- Reconhecimento de condomínio pelo CEP ----------------
@@ -573,7 +574,7 @@ const clean = (v?: string | null) => (v && v.trim() ? v.trim() : null);
 
 function propertyValues(input: PropertyFields) {
   return [
-    input.titulo ?? null,
+    input.titulo ? formatTitulo(input.titulo) : null,
     input.tipoUnidade,
     input.finalidade,
     `${input.deliveryDate}-01`,
@@ -597,7 +598,7 @@ function propertyValues(input: PropertyFields) {
     clean(input.bairro),
     clean(input.cidade),
     clean(input.uf?.toUpperCase()),
-    clean(input.condominio),
+    clean(input.condominio ? formatTitulo(input.condominio) : undefined),
     !!input.videoVertical
   ];
 }
@@ -707,14 +708,13 @@ export async function pendenciasParaPublicar(f: DevelopmentFields): Promise<stri
   if (!f.name?.trim()) faltando.push('nome');
   if (!f.bairro?.trim() || !f.cidade?.trim()) faltando.push('endereço (bairro e cidade)');
   if (!f.deliveryDate) faltando.push('data de entrega');
-  if (!f.description?.trim() || f.description.trim().length < 60) faltando.push('narrativa (descrição com pelo menos 60 caracteres)');
-  if (!f.tiposUnidade?.length) faltando.push('tipos de imóvel que existem no condomínio');
+  // Narrativa, tipos, fotos e lazer são opcionais — dá para publicar e completar depois
   return faltando;
 }
 
 function developmentValues(input: DevelopmentFields) {
   return [
-    input.name,
+    formatTitulo(input.name),
     input.location,
     input.deliveryDate ? `${input.deliveryDate}-01` : null,
     input.description,
@@ -900,7 +900,7 @@ export async function listCondominios(): Promise<CondominioResumo[]> {
   );
   return rows.map((d) => ({
     id: d.id,
-    name: d.name,
+    name: formatTitulo(d.name),
     bairro: d.bairro ?? null,
     cidade: d.cidade ?? null,
     uf: d.uf ?? null,

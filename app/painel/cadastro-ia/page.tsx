@@ -7,6 +7,7 @@ import PainelNav from '@/components/PainelNav';
 import ChipSelect from '@/components/ChipSelect';
 import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
 import PhotoUploadField from '@/components/PhotoUploadField';
+import DescriptionEditor from '@/components/forms/DescriptionEditor';
 import CepField, { ENDERECO_VAZIO, formatLocation, type Endereco } from '@/components/CepField';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { createProperty } from '@/lib/actions';
@@ -271,10 +272,7 @@ export default function CadastroIAPage() {
               <input required type="number" className={inputClass} value={form.area} onChange={(e) => update('area', e.target.value)} />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">Descrição</label>
-              <textarea rows={3} className={inputClass} value={form.description} onChange={(e) => update('description', e.target.value)} />
-            </div>
+            <DescriptionEditor label="Descrição" value={form.description} onChange={(x) => update('description', x)} />
 
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-[var(--text-muted)]">Comodidades</label>

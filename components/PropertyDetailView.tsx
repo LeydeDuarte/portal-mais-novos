@@ -4,6 +4,8 @@ import Footer from '@/components/Footer';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import PhotoGallery, { type GalleryVideo } from '@/components/PhotoGallery';
 import LocationCard from '@/components/LocationCard';
+import RichText from '@/components/RichText';
+import CollapsibleText from '@/components/CollapsibleText';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import type { PropertyDetail } from '@/lib/property-details';
 import { getDevelopmentById, getRelatedListings } from '@/lib/actions';
@@ -111,7 +113,9 @@ export default async function PropertyDetailView({ property }: { property: Prope
 
             <div className={showMediaBlock ? 'mt-6' : ''}>
               <h2 className="mb-2 text-lg font-bold">Sobre o imóvel</h2>
-              <p className="text-sm leading-relaxed text-[var(--text-muted)]">{property.description}</p>
+              <CollapsibleText>
+                <RichText texto={property.description} />
+              </CollapsibleText>
             </div>
 
             <div className="mt-6">
@@ -202,8 +206,12 @@ export default async function PropertyDetailView({ property }: { property: Prope
           </aside>
         </div>
         <RelatedListings
-          title={nomeCondominio ? `Outros imóveis disponíveis no ${nomeCondominio}` : 'Outros imóveis neste condomínio'}
-          items={related.mesmoCondominio}
+          title={nomeCondominio ? `Outros à venda no ${nomeCondominio}` : 'Outros à venda neste condomínio'}
+          items={related.mesmoCondominio.filter((p) => p.finalidade === 'venda')}
+        />
+        <RelatedListings
+          title={nomeCondominio ? `Para alugar no ${nomeCondominio}` : 'Para alugar neste condomínio'}
+          items={related.mesmoCondominio.filter((p) => p.finalidade === 'aluguel')}
         />
 
         <RelatedListings

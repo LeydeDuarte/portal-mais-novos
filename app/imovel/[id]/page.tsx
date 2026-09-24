@@ -4,6 +4,10 @@ import PropertyDetailView from '@/components/PropertyDetailView';
 import { getPropertyById } from '@/lib/actions';
 import { buildPropertyMetadata, buildPropertyJsonLd } from '@/lib/seo';
 
+// Sempre busca os dados na hora: assim uma edição feita no painel aparece
+// imediatamente (sem isso, o Next guardava a primeira versão da página).
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const property = await getPropertyById(params.id);
   if (!property) return { title: 'Imóvel — Mais Novos Imóveis' };

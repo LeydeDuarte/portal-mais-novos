@@ -4,6 +4,10 @@ import DevelopmentDetailView from '@/components/DevelopmentDetailView';
 import { getDevelopmentById } from '@/lib/actions';
 import { buildDevelopmentMetadata, buildDevelopmentJsonLd } from '@/lib/seo';
 
+// Sempre busca os dados na hora: assim uma edição feita no painel aparece
+// imediatamente (sem isso, o Next guardava a primeira versão da página).
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const development = await getDevelopmentById(params.id);
   if (!development) return { title: 'Empreendimento — Mais Novos Imóveis' };

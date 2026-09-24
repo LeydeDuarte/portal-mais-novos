@@ -7,6 +7,7 @@ import PhotoUploadField from '@/components/PhotoUploadField';
 import CepField, { ENDERECO_VAZIO, formatLocation, type Endereco } from '@/components/CepField';
 import CondominioPicker from '@/components/forms/CondominioPicker';
 import VideoFormato, { pareceVertical } from '@/components/forms/VideoFormato';
+import DescriptionEditor from '@/components/forms/DescriptionEditor';
 import { listCondominios, type CondominioResumo, type PropertyFields, type PropertyEditData } from '@/lib/actions';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { maskCurrencyInput } from '@/lib/currency';
@@ -261,10 +262,11 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         <input required type="number" className={inputClass} value={v.area} onChange={(e) => set('area', e.target.value)} placeholder="98" />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-semibold text-[var(--text-muted)]">Descrição (opcional — se deixar em branco, gera uma básica)</label>
-        <textarea rows={4} className={inputClass} value={v.description} onChange={(e) => set('description', e.target.value)} />
-      </div>
+      <DescriptionEditor
+        label="Descrição (opcional — se deixar em branco, gera uma básica)"
+        value={v.description}
+        onChange={(x) => set('description', x)}
+      />
 
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold text-[var(--text-muted)]">Comodidades (o lazer do condomínio entra sozinho ao escolher o condomínio)</label>

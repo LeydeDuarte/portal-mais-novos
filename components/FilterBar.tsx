@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { DEFAULT_FILTERS, countActiveFilters, type FilterState } from '@/lib/filters';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { maskCurrencyInput } from '@/lib/currency';
+import ScrollRow from './ScrollRow';
 
 type Props = {
   filters: FilterState;
@@ -141,7 +142,7 @@ export default function FilterBar({ filters, onChange }: Props) {
 
   return (
     <div ref={wrapRef} className="relative border-b border-[var(--border)]">
-      <div className="flex items-center gap-2 overflow-x-auto px-4 py-3.5 [scrollbar-width:none] md:gap-2.5 md:px-8 md:py-4 [&::-webkit-scrollbar]:hidden">
+      <ScrollRow className="items-center gap-2 px-4 py-3.5 md:gap-2.5 md:px-8 md:py-4">
         <div className="flex shrink-0 rounded-full bg-[var(--pill-bg)] p-1">
           {(['todos', 'lancamentos'] as const).map((m) => (
             <button
@@ -256,7 +257,7 @@ export default function FilterBar({ filters, onChange }: Props) {
           <option value="todas">Aceita temporada</option>
           <option value="sim">Só com temporada</option>
         </select>
-      </div>
+      </ScrollRow>
 
       {painel && (
         <form

@@ -1,4 +1,5 @@
 import { cleanPhotoUrl } from './r2-url';
+import { formatTitulo } from './text';
 import type { PropertyDetail, Development } from './property-details';
 import type { TipoUnidade } from './tipologias';
 
@@ -111,7 +112,7 @@ export function heightFromId(id: string): number {
 export function mapPropertyRow(row: PropertyRow): PropertyDetail {
   return {
     id: row.id,
-    titulo: row.titulo ?? undefined,
+    titulo: row.titulo ? formatTitulo(row.titulo) : undefined,
     tipoUnidade: row.tipo_unidade as TipoUnidade,
     finalidade: row.finalidade,
     deliveryDate: formatDeliveryDate(row.delivery_date),
@@ -132,7 +133,7 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
     empreendimentoId: row.empreendimento_id ?? undefined,
     corretorEmail: row.corretor_email ?? undefined,
     photos: toStringArray(row.photos),
-    condominio: row.condominio ?? undefined,
+    condominio: row.condominio ? formatTitulo(row.condominio) : undefined,
     bairro: row.bairro ?? undefined,
     cidade: row.cidade ?? undefined,
     isTipologia: !!row.is_tipologia,
@@ -146,7 +147,7 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
   const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
   return {
     id: row.id,
-    name: row.name,
+    name: formatTitulo(row.name),
     location: row.location,
     deliveryDate: deliveryDateFormatted,
     deliveryNote: deliveryDateFormatted ? `Previsão de entrega: ${MESES[Number(month) - 1] ?? month} de ${year}` : 'Data de entrega a confirmar',

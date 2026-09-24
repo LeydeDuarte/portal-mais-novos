@@ -3,6 +3,8 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import PhotoGallery, { type GalleryVideo } from '@/components/PhotoGallery';
 import LocationCard from '@/components/LocationCard';
+import RichText from '@/components/RichText';
+import CollapsibleText from '@/components/CollapsibleText';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getRelatedListings } from '@/lib/actions';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
@@ -18,7 +20,8 @@ export default async function DevelopmentDetailView({ development }: { developme
   const related = await getRelatedListings({ developmentId: development.id }).catch(() => ({ mesmoCondominio: [], regiao: [], precoReferencia: null }));
   const futuro = !!development.deliveryDate && badge.bucket === 'lancamento';
   const embed = development.videoUrl ? getEmbedInfo(development.videoUrl) : null;
-  const avgPricePerM2 = getAveragePricePerM2(development.units);
+  // Preço médio do m² vem só da tabela de vendas (tipologias), não dos imóveis de revenda
+  const avgPricePerM2 = getAveragePricePerM2(development.units.filter((u) => u.isTipologia));
 
   const youtubeAspect = embed?.platform === 'youtube' ? await getYouTubeAspectRatio(embed.videoId) : null;
   const galleryVideo: GalleryVideo | null = embed
@@ -29,9 +32,12 @@ export default async function DevelopmentDetailView({ development }: { developme
   // Com vídeo, ele ocupa o lugar da foto principal da galeria; sem vídeo, a foto de capa.
   const hasGallery = photos.length > 0 || !!galleryVideo;
   const showMediaBlock = !hasGallery;
-  const tipos = Array.from(new Set([...(development.tiposUnidade ?? []), ...development.units.map((u) => u.tipoUnidade)]));
+  // Tipos e quartos do CONDOMÍNIO: o que foi marcado no cadastro dele + a tabela de vendas.
+  // Os imóveis anunciados (revenda/aluguel) aparecem na seção deles, sem mudar isso.
+  const tabela = development.units.filter((u) => u.isTipologia);
+  const tipos = Array.from(new Set([...(development.tiposUnidade ?? []), ...tabela.map((u) => u.tipoUnidade)]));
   const quartosConhecidos = Array.from(
-    new Set([...(development.quartosOpcoes ?? []), ...development.units.map((u) => parseInt(u.beds, 10)).filter((n) => Number.isFinite(n))])
+    new Set([...(development.quartosOpcoes ?? []), ...tabela.map((u) => parseInt(u.beds, 10)).filter((n) => Number.isFinite(n))])
   ).sort((a, b) => a - b);
 
   return (
@@ -141,7 +147,14 @@ export default async function DevelopmentDetailView({ development }: { developme
           </div>
         )}
 
-        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[var(--text-muted)]">{development.description}</p>
+        {development.description?.trim() && (
+          <div className="mt-5 max-w-2xl">
+            <h2 className="mb-2 text-lg font-bold">Sobre o empreendimento</h2>
+            <CollapsibleText>
+              <RichText texto={development.description} />
+            </CollapsibleText>
+          </div>
+        )}
 
         <div className="mt-6">
           <h2 className="mb-3 text-lg font-bold">Lazer e diferenciais</h2>
@@ -189,10 +202,11 @@ export default async function DevelopmentDetailView({ development }: { developme
         )}
 
         <RelatedListings
-          title="Imóveis disponíveis neste condomínio"
-          items={related.mesmoCondominio}
-          emptyText="Nenhum imóvel à venda neste condomínio no momento. Fale com um corretor — avisamos quando surgir uma oportunidade."
+          title={`À venda no ${development.name}`}
+          items={related.mesmoCondominio.filter((p) => p.finalidade === 'venda')}
+          emptyText={`Nenhum imóvel à venda no ${development.name} no momento. Fale com um corretor — avisamos quando surgir uma oportunidade.`}
         />
+        <RelatedListings title={`Para alugar no ${development.name}`} items={related.mesmoCondominio.filter((p) => p.finalidade === 'aluguel')} />
 
         <RelatedListings title="Imóveis à venda nesta região" subtitle={faixaDePreco(related.precoReferencia)} items={related.regiao} />
 
