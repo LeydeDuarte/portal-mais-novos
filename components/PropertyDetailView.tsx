@@ -2,6 +2,8 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
+import PhotoGallery, { type GalleryVideo } from '@/components/PhotoGallery';
+import LocationCard from '@/components/LocationCard';
 import type { PropertyDetail } from '@/lib/property-details';
 import { getDevelopmentById } from '@/lib/actions';
 import { getStatusBadge } from '@/lib/classification';
@@ -22,56 +24,22 @@ export default async function PropertyDetailView({ property }: { property: Prope
   // vídeo, em vez de forçar um formato fixo. Só existe pra YouTube (o
   // Instagram não expõe essa informação do mesmo jeito).
   const youtubeAspect = embed?.platform === 'youtube' ? await getYouTubeAspectRatio(embed.videoId) : null;
-  const mediaStyle = youtubeAspect
-    ? { aspectRatio: `${youtubeAspect.width} / ${youtubeAspect.height}`, maxHeight: '70vh' }
-    : embed
-      ? { aspectRatio: '16 / 9' }
-      : { height: 360 };
+  const galleryVideo: GalleryVideo | null = embed
+    ? { embedUrl: embed.embedUrl, platform: embed.platform, ratio: youtubeAspect ? youtubeAspect.width / youtubeAspect.height : undefined }
+    : null;
 
-  return (
-    <div className="flex min-h-screen flex-col">
-      <Header />
+  const photos = property.photos ?? [];
+  // Galeria no topo: com vídeo, ele ocupa o lugar da foto principal (tocando
+  // sozinho, sem som); sem vídeo, a foto de capa ocupa esse lugar. Sem fotos
+  // nem vídeo, fica só o espaço reservado.
+  const hasGallery = photos.length > 0 || !!galleryVideo;
+  const showMediaBlock = !hasGallery;
+  const nomeCondominio = property.condominio || development?.name;
+  const regiao = property.location.replace(' — ', ', ');
+  const titulo = property.titulo || `${TIPO_UNIDADE_LABEL[property.tipoUnidade]} em ${property.location}`;
 
-      <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
-        <Link href="/" className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text)]">
-          ← Voltar para a Home
-        </Link>
-
-        <h1 className="mb-5 font-serif text-2xl font-semibold">
-          {property.titulo || `${TIPO_UNIDADE_LABEL[property.tipoUnidade]} em ${property.location}`}
-        </h1>
-
-        <div className="grid gap-8 md:grid-cols-[1.3fr_1fr]">
-          <div>
-            <div
-              className={`relative mx-auto flex w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)] ${
-                property.video && !embed ? 'video-playing' : ''
-              }`}
-              style={mediaStyle}
-            >
-              {embed ? (
-                <iframe
-                  src={embed.embedUrl}
-                  className="h-full w-full"
-                  style={{ border: 0 }}
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  allowFullScreen
-                  title="Vídeo do imóvel"
-                />
-              ) : (
-                <span className="text-sm text-[var(--text-faint)]">{property.video ? '[CAPA EM VÍDEO]' : '[FOTO]'}</span>
-              )}
-              {property.videoUrl && !embed && (
-                <a
-                  href={property.videoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="absolute bottom-3 right-3 rounded-md bg-ink/70 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink"
-                >
-                  Assistir vídeo ↗
-                </a>
-              )}
-              <div className="absolute left-3 top-3 flex items-center gap-2">
+  const badges = (
+              <div className="flex flex-wrap items-center gap-2">
                 <span
                   className="rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wide"
                   style={{ background: badge.bg, color: badge.color }}
@@ -93,9 +61,54 @@ export default async function PropertyDetailView({ property }: { property: Prope
                   </span>
                 )}
               </div>
-            </div>
+  );
 
-            <div className="mt-6">
+  return (
+    <div className="flex min-h-screen flex-col">
+      <Header />
+
+      <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
+        <Link href="/" className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text)]">
+          ← Voltar para a Home
+        </Link>
+
+        <h1 className="font-serif text-2xl font-semibold">{titulo}</h1>
+        <p className="mb-5 mt-1 text-sm text-[var(--text-muted)]">
+          {property.condominio ? <strong className="font-semibold text-[var(--text)]">{property.condominio} · </strong> : null}
+          {property.location}
+        </p>
+
+        {hasGallery && (
+          <section aria-label="Fotos e vídeo do imóvel" className="mb-8">
+            <PhotoGallery photos={photos} video={galleryVideo} alt={titulo} badges={badges} />
+          </section>
+        )}
+
+        <div className="grid gap-8 md:grid-cols-[1.3fr_1fr]">
+          <div>
+            {showMediaBlock && (
+            <div
+              className={`relative mx-auto flex w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)] ${
+                property.video && !embed ? 'video-playing' : ''
+              }`}
+              style={{ height: 360 }}
+            >
+              <span className="text-sm text-[var(--text-faint)]">{property.video ? '[CAPA EM VÍDEO]' : '[FOTO]'}</span>
+              {property.videoUrl && !embed && (
+                <a
+                  href={property.videoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="absolute bottom-3 right-3 rounded-md bg-ink/70 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink"
+                >
+                  Assistir vídeo ↗
+                </a>
+              )}
+              <div className="absolute left-3 top-3">{badges}</div>
+            </div>
+            )}
+
+            <div className={showMediaBlock ? 'mt-6' : ''}>
               <h2 className="mb-2 text-lg font-bold">Sobre o imóvel</h2>
               <p className="text-sm leading-relaxed text-[var(--text-muted)]">{property.description}</p>
             </div>
@@ -202,6 +215,12 @@ export default async function PropertyDetailView({ property }: { property: Prope
             </div>
           </aside>
         </div>
+        <LocationCard
+          title={nomeCondominio || property.bairro || property.location.split(',')[0]}
+          subtitle={property.location}
+          mapsQuery={nomeCondominio ? `${nomeCondominio}, ${regiao}` : regiao}
+          approximate={!nomeCondominio}
+        />
       </main>
 
       <Footer />

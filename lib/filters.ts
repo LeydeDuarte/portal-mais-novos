@@ -10,6 +10,14 @@ export type FilterState = {
   vagasMin: 'todas' | 1 | 2 | 3;
   situacao: 'todas' | StatusBucket;
   aceitaTemporada: 'todas' | 'sim';
+  // "todos" = feed geral do Comprar; "lancamentos" = só empreendimentos
+  // (condomínios cadastrados) e imóveis avulsos com entrega no futuro.
+  modo: 'todos' | 'lancamentos';
+  // Busca livre: bairro, cidade, nome do condomínio/empreendimento, tipo...
+  q: string;
+  // Ano de entrega — um ano só (mínimo = máximo) ou uma faixa (ex: 2020 a 2025)
+  anoMin: number | null;
+  anoMax: number | null;
 };
 
 export const DEFAULT_FILTERS: FilterState = {
@@ -19,8 +27,16 @@ export const DEFAULT_FILTERS: FilterState = {
   quartosMin: 'todas',
   vagasMin: 'todas',
   situacao: 'todas',
-  aceitaTemporada: 'todas'
+  aceitaTemporada: 'todas',
+  modo: 'todos',
+  q: '',
+  anoMin: null,
+  anoMax: null
 };
+
+export function countActiveFilters(f: FilterState): number {
+  return (Object.keys(DEFAULT_FILTERS) as (keyof FilterState)[]).filter((k) => k !== 'modo' && f[k] !== DEFAULT_FILTERS[k]).length;
+}
 
 function parsePriceBRL(price: string): number {
   const cleaned = price.replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');

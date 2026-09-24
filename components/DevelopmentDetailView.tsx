@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import PhotoGallery, { type GalleryVideo } from '@/components/PhotoGallery';
+import LocationCard from '@/components/LocationCard';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
 import { getStatusBadge } from '@/lib/classification';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
@@ -12,11 +14,18 @@ export default async function DevelopmentDetailView({ development }: { developme
   const avgPricePerM2 = getAveragePricePerM2(development.units);
 
   const youtubeAspect = embed?.platform === 'youtube' ? await getYouTubeAspectRatio(embed.videoId) : null;
-  const mediaStyle = youtubeAspect
-    ? { aspectRatio: `${youtubeAspect.width} / ${youtubeAspect.height}`, maxHeight: '70vh' }
-    : embed
-      ? { aspectRatio: '16 / 9' }
-      : { height: development.heroHeight };
+  const galleryVideo: GalleryVideo | null = embed
+    ? { embedUrl: embed.embedUrl, platform: embed.platform, ratio: youtubeAspect ? youtubeAspect.width / youtubeAspect.height : undefined }
+    : null;
+
+  const photos = development.photos ?? [];
+  // Com vídeo, ele ocupa o lugar da foto principal da galeria; sem vídeo, a foto de capa.
+  const hasGallery = photos.length > 0 || !!galleryVideo;
+  const showMediaBlock = !hasGallery;
+  const tipos = Array.from(new Set([...(development.tiposUnidade ?? []), ...development.units.map((u) => u.tipoUnidade)]));
+  const quartosConhecidos = Array.from(
+    new Set([...(development.quartosOpcoes ?? []), ...development.units.map((u) => parseInt(u.beds, 10)).filter((n) => Number.isFinite(n))])
+  ).sort((a, b) => a - b);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -27,22 +36,27 @@ export default async function DevelopmentDetailView({ development }: { developme
           ← Voltar para a Home
         </Link>
 
+        {hasGallery && (
+          <section aria-label="Fotos do empreendimento" className={showMediaBlock ? 'mb-6' : ''}>
+            <PhotoGallery
+              photos={photos}
+              video={galleryVideo}
+              alt={development.name}
+              badges={
+                <span className="rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
+                  {badge.text}
+                </span>
+              }
+            />
+          </section>
+        )}
+
+        {showMediaBlock && (
         <div
           className="relative mx-auto flex w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)]"
-          style={mediaStyle}
+          style={{ height: development.heroHeight }}
         >
-          {embed ? (
-            <iframe
-              src={embed.embedUrl}
-              className="h-full w-full"
-              style={{ border: 0 }}
-              allow="autoplay; encrypted-media; picture-in-picture"
-              allowFullScreen
-              title="Vídeo do empreendimento"
-            />
-          ) : (
-            <span className="text-sm text-[var(--text-faint)]">[FOTO DO EMPREENDIMENTO]</span>
-          )}
+          <span className="text-sm text-[var(--text-faint)]">[FOTO DO EMPREENDIMENTO]</span>
           <div className="absolute left-3 top-3 flex flex-wrap items-center gap-1.5">
             <span
               className="rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wide"
@@ -61,6 +75,7 @@ export default async function DevelopmentDetailView({ development }: { developme
             )}
           </div>
         </div>
+        )}
 
         <div className="mt-6 flex flex-col gap-1">
           <h1 className="font-serif text-2xl font-semibold">{development.name}</h1>
@@ -83,6 +98,31 @@ export default async function DevelopmentDetailView({ development }: { developme
           )}
         </div>
 
+        {(tipos.length > 0 || quartosConhecidos.length > 0) && (
+          <div className="mt-4 flex flex-col gap-2">
+            {tipos.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-xs font-bold uppercase tracking-wide text-[var(--text-faint)]">Tipos de imóvel</span>
+                {tipos.map((t) => (
+                  <span key={t} className="rounded-full bg-[var(--pill-bg)] px-3 py-1 text-xs font-semibold">
+                    {TIPO_UNIDADE_LABEL[t]}
+                  </span>
+                ))}
+              </div>
+            )}
+            {quartosConhecidos.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-xs font-bold uppercase tracking-wide text-[var(--text-faint)]">Opções de quartos</span>
+                {quartosConhecidos.map((q) => (
+                  <span key={q} className="rounded-full bg-[var(--pill-bg)] px-3 py-1 text-xs font-semibold">
+                    {q} {q === 1 ? 'quarto' : 'quartos'}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[var(--text-muted)]">{development.description}</p>
 
         <div className="mt-6">
@@ -101,11 +141,11 @@ export default async function DevelopmentDetailView({ development }: { developme
 
         <div className="mt-8">
           <h2 className="mb-4 text-lg font-bold">
-            {development.units.length > 0 ? 'Anúncios neste condomínio' : 'Ainda sem anúncios vinculados'}
+            {development.units.length > 0 ? 'Tipologias e unidades' : 'Tipologias em breve'}
           </h2>
           {development.units.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)]">
-              Cadastre um imóvel avulso e vincule a este condomínio para ele aparecer aqui.
+              As metragens e valores de cada tipologia ainda não foram divulgados. Fale com um corretor para receber a tabela de vendas.
             </p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
@@ -127,6 +167,11 @@ export default async function DevelopmentDetailView({ development }: { developme
             </div>
           )}
         </div>
+        <LocationCard
+          title={development.name}
+          subtitle={development.location}
+          mapsQuery={`${development.name}, ${development.location.replace(' — ', ', ')}`}
+        />
       </main>
 
       <Footer />

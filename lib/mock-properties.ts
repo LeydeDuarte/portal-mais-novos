@@ -19,6 +19,11 @@ export type Property = {
   titulo?: string; // título do anúncio — se não tiver, gera um genérico na exibição
   videoUrl?: string; // link do YouTube/Instagram, quando "Tem vídeo de capa" está marcado
   area: string;
+  // Fotos reais (URLs no R2) — a primeira é a capa. Vazio = mostra o espaço reservado.
+  photos?: string[];
+  condominio?: string; // nome do condomínio/edifício, quando o imóvel fica em um
+  bairro?: string;
+  cidade?: string;
   height: number;
   video: boolean;
   // Selo "Aceita temporada" — sim/não, definido no cadastro (regra do

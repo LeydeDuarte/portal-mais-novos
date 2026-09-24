@@ -1,4 +1,23 @@
-export default function Header() {
+'use client';
+
+import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+
+// Campo de busca do topo: em qualquer página, leva para o feed com ?q=.
+// Se a pessoa estiver em Lançamentos, a busca continua em Lançamentos.
+export default function Header({ initialQuery = '' }: { initialQuery?: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [q, setQ] = useState(initialQuery);
+  useEffect(() => setQ(initialQuery), [initialQuery]);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const base = pathname === '/lancamentos' ? '/lancamentos' : '/';
+    const term = q.trim();
+    router.push(term ? `${base}?q=${encodeURIComponent(term)}` : base);
+  };
+
   return (
     <header className="sticky top-0 z-30 flex items-center gap-4 border-b border-[var(--border)] bg-[var(--bg)] px-5 py-2.5 md:gap-6 md:px-8 md:py-3">
       <a href="/" className="shrink-0 font-serif text-[19px] font-semibold whitespace-nowrap">
@@ -22,17 +41,21 @@ export default function Header() {
         ))}
       </nav>
 
-      <div className="flex max-w-[560px] flex-grow items-center gap-2 rounded-full bg-[var(--pill-bg)] px-4 py-2.5">
+      <form onSubmit={submit} role="search" className="flex max-w-[560px] flex-grow items-center gap-2 rounded-full bg-[var(--pill-bg)] px-4 py-2.5">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-[var(--text-muted)]">
           <circle cx="11" cy="11" r="7" />
           <path d="m21 21-4.3-4.3" />
         </svg>
         <input
-          type="text"
-          placeholder="Buscar por cidade, bairro ou condomínio"
+          type="search"
+          name="q"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar por cidade, bairro, condomínio ou tipo"
+          aria-label="Buscar imóveis"
           className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--text-faint)]"
         />
-      </div>
+      </form>
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
         <button type="button" aria-label="Favoritos" className="flex h-[38px] w-[38px] items-center justify-center rounded-full hover:bg-[var(--pill-bg)]">

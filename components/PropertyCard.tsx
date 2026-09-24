@@ -103,6 +103,14 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
               tabIndex={-1}
               title="Vídeo do imóvel"
             />
+          ) : property.photos && property.photos[0] ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={property.photos[0]}
+              alt={property.titulo || `${TIPO_UNIDADE_LABEL[property.tipoUnidade]} em ${property.location}`}
+              loading="lazy"
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            />
           ) : (
             <span className="text-[11px] text-[var(--text-faint)]">{property.video ? '[CAPA EM VÍDEO]' : '[FOTO]'}</span>
           )}
@@ -159,7 +167,10 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
         <div className="flex flex-col gap-0.5 pt-2">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[property.tipoUnidade]}</div>
           <div className="font-serif text-sm font-semibold md:text-base">{property.price}</div>
-          <div className="text-xs text-[var(--text-muted)] md:text-[13px]">{property.location}</div>
+          <div className="text-xs text-[var(--text-muted)] md:text-[13px]">
+            {property.condominio ? `${property.condominio} · ` : ''}
+            {property.location}
+          </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-2.5">
             <Spec icon={<path d={BED_PATH} />}>{property.beds}</Spec>
             <Spec icon={CAR_ICON}>{property.parking}</Spec>

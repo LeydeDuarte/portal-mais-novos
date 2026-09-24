@@ -1,7 +1,7 @@
 'use client';
 
-import type { CSSProperties } from 'react';
-import type { FilterState } from '@/lib/filters';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { DEFAULT_FILTERS, countActiveFilters, type FilterState } from '@/lib/filters';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 
 type Props = {
@@ -20,13 +20,80 @@ const selectStyle: CSSProperties = {
   backgroundPosition: 'right 12px center'
 };
 
+const pillClass = 'shrink-0 rounded-full px-4 py-2.5 text-[13px] font-semibold whitespace-nowrap';
+
+function anoLabel(min: number | null, max: number | null): string {
+  if (min && max) return min === max ? `Entrega em ${min}` : `Entrega ${min}–${max}`;
+  if (min) return `Entrega a partir de ${min}`;
+  if (max) return `Entrega até ${max}`;
+  return 'Ano de entrega';
+}
+
 export default function FilterBar({ filters, onChange }: Props) {
   const set = <K extends keyof FilterState>(key: K, value: FilterState[K]) => {
     onChange({ ...filters, [key]: value });
   };
 
+  // Painel do ano de entrega — digita um ano só ou uma faixa (ex: 2020 a 2025)
+  const [anoOpen, setAnoOpen] = useState(false);
+  const [anoMinText, setAnoMinText] = useState('');
+  const [anoMaxText, setAnoMaxText] = useState('');
+  useEffect(() => {
+    setAnoMinText(filters.anoMin ? String(filters.anoMin) : '');
+    setAnoMaxText(filters.anoMax ? String(filters.anoMax) : '');
+  }, [filters.anoMin, filters.anoMax]);
+
+  const aplicarAno = () => {
+    let min = /^\d{4}$/.test(anoMinText) ? Number(anoMinText) : null;
+    let max = /^\d{4}$/.test(anoMaxText) ? Number(anoMaxText) : null;
+    if (min && max && min > max) [min, max] = [max, min];
+    onChange({ ...filters, anoMin: min, anoMax: max });
+    setAnoOpen(false);
+  };
+
+  const anoAtivo = !!(filters.anoMin || filters.anoMax);
+  const ativos = countActiveFilters(filters);
+  const anoAtual = new Date().getFullYear();
+
   return (
-    <div className="flex gap-2 overflow-x-auto border-b border-[var(--border)] px-4 py-3.5 [scrollbar-width:none] md:gap-2.5 md:px-8 md:py-4 [&::-webkit-scrollbar]:hidden">
+    <div className="relative border-b border-[var(--border)]">
+    <div className="flex gap-2 overflow-x-auto px-4 py-3.5 [scrollbar-width:none] md:gap-2.5 md:px-8 md:py-4 [&::-webkit-scrollbar]:hidden">
+      <div className="flex shrink-0 rounded-full bg-[var(--pill-bg)] p-1">
+        <button
+          type="button"
+          onClick={() => set('modo', 'todos')}
+          className={`rounded-full px-3.5 py-1.5 text-[13px] font-bold whitespace-nowrap ${filters.modo === 'todos' ? 'bg-ink text-white' : 'text-[var(--text-muted)]'}`}
+        >
+          Todos
+        </button>
+        <button
+          type="button"
+          onClick={() => set('modo', 'lancamentos')}
+          className={`rounded-full px-3.5 py-1.5 text-[13px] font-bold whitespace-nowrap ${filters.modo === 'lancamentos' ? 'bg-ink text-white' : 'text-[var(--text-muted)]'}`}
+        >
+          Lançamentos e empreendimentos
+        </button>
+      </div>
+
+      {filters.q && (
+        <button
+          type="button"
+          onClick={() => set('q', '')}
+          className={`${pillClass} flex items-center gap-1.5 bg-accent text-ink`}
+          title="Limpar busca"
+        >
+          “{filters.q}” <span aria-hidden>✕</span>
+        </button>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setAnoOpen((o) => !o)}
+        className={`${pillClass} ${anoAtivo ? 'bg-ink text-white' : 'bg-[var(--pill-bg)] hover:bg-[var(--pill-bg-hover)]'}`}
+        aria-expanded={anoOpen}
+      >
+        {anoLabel(filters.anoMin, filters.anoMax)} ▾
+      </button>
       <select
         className={selectClass}
         style={selectStyle}
@@ -114,6 +181,91 @@ export default function FilterBar({ filters, onChange }: Props) {
         <option value="todas">Aceita temporada</option>
         <option value="sim">Só com temporada</option>
       </select>
+
+      {ativos > 0 && (
+        <button
+          type="button"
+          onClick={() => onChange({ ...DEFAULT_FILTERS, modo: filters.modo })}
+          className={`${pillClass} text-[var(--text-muted)] underline-offset-2 hover:underline`}
+        >
+          Limpar filtros ({ativos})
+        </button>
+      )}
+    </div>
+
+    {anoOpen && (
+      <div className="absolute left-4 top-full z-40 mt-1 w-[300px] rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4 shadow-xl md:left-8">
+        <div className="mb-1 text-sm font-bold">Ano de entrega</div>
+        <p className="mb-3 text-xs text-[var(--text-muted)]">Digite um ano só (ex: 2027) ou uma faixa (ex: de 2020 até 2025).</p>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            aplicarAno();
+          }}
+          className="flex flex-col gap-3"
+        >
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
+              De
+              <input
+                inputMode="numeric"
+                maxLength={4}
+                autoFocus
+                value={anoMinText}
+                onChange={(e) => setAnoMinText(e.target.value.replace(/\D/g, ''))}
+                placeholder={String(anoAtual - 5)}
+                className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-[var(--text)] outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
+              Até
+              <input
+                inputMode="numeric"
+                maxLength={4}
+                value={anoMaxText}
+                onChange={(e) => setAnoMaxText(e.target.value.replace(/\D/g, ''))}
+                placeholder={String(anoAtual + 3)}
+                className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-[var(--text)] outline-none"
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { label: `Só ${anoAtual + 1}`, min: anoAtual + 1, max: anoAtual + 1 },
+              { label: `De ${anoAtual} em diante`, min: anoAtual, max: null },
+              { label: 'Últimos 5 anos', min: anoAtual - 5, max: anoAtual }
+            ].map((atalho) => (
+              <button
+                key={atalho.label}
+                type="button"
+                onClick={() => {
+                  onChange({ ...filters, anoMin: atalho.min, anoMax: atalho.max });
+                  setAnoOpen(false);
+                }}
+                className="rounded-full bg-[var(--pill-bg)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--pill-bg-hover)]"
+              >
+                {atalho.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onChange({ ...filters, anoMin: null, anoMax: null });
+                setAnoOpen(false);
+              }}
+              className="text-xs font-semibold text-[var(--text-muted)] hover:underline"
+            >
+              Limpar
+            </button>
+            <button type="submit" className="rounded-full bg-ink px-4 py-2 text-xs font-bold text-white hover:opacity-90">
+              Aplicar
+            </button>
+          </div>
+        </form>
+      </div>
+    )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import type { TipoUnidade } from './tipologias';
 import { BASE_PROPERTIES, type Property } from './mock-properties';
 
 export type PropertyDetail = Property & {
@@ -25,6 +26,14 @@ export type Development = {
   aceitaTemporada: boolean;
   heroHeight: number;
   videoUrl?: string;
+  photos?: string[]; // fachada, área comum — a primeira é a capa
+  // Tipos de imóvel que existem no empreendimento (casa, sobrado, apartamento...),
+  // marcados no cadastro mesmo sem detalhar cada tipologia — é o que alimenta o filtro.
+  tiposUnidade?: TipoUnidade[];
+  quartosOpcoes?: number[]; // opções de quartos conhecidas (ex: [2, 3, 4]), sem precisar de metragem/preço
+  bairro?: string;
+  cidade?: string;
+  cep?: string;
   corretorEmail?: string; // preenchido só nos condomínios cadastrados pelo painel
   units: PropertyDetail[]; // cada unit = uma tipologia (metragem/quartos/valor próprios) — inclui as vinculadas depois via imóvel avulso
 };

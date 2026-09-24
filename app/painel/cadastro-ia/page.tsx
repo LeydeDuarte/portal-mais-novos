@@ -7,6 +7,7 @@ import PainelNav from '@/components/PainelNav';
 import ChipSelect from '@/components/ChipSelect';
 import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
 import PhotoUploadField from '@/components/PhotoUploadField';
+import CepField, { ENDERECO_VAZIO, formatLocation, type Endereco } from '@/components/CepField';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { createProperty } from '@/lib/actions';
 import { extractFieldsFromText } from '@/lib/ai-extraction';
@@ -45,8 +46,13 @@ export default function CadastroIAPage() {
     aceitaTemporada: false,
     description: '',
     amenities: [] as string[],
-    photoNames: [] as string[]
+    condominio: '',
+    endereco: ENDERECO_VAZIO as Endereco,
+    photos: [] as string[]
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   if (!loaded || !staff) return null;
 
@@ -74,6 +80,14 @@ export default function CadastroIAPage() {
         finalidade: extracted.finalidade ?? prev.finalidade,
         priceDigits: extracted.price ?? prev.priceDigits,
         location: extracted.location ?? prev.location,
+        endereco:
+          extracted.location && !prev.endereco.bairro
+            ? (() => {
+                const [bairro, ...resto] = extracted.location.split(',');
+                const cidade = resto.join(',').replace(/\s*[—-]\s*[A-Za-z]{2}\s*$/, '').trim();
+                return { ...prev.endereco, bairro: bairro.trim(), cidade: cidade || prev.endereco.cidade || 'Goiânia', uf: prev.endereco.uf || 'GO' };
+              })()
+            : prev.endereco,
         quartos: extracted.quartos ?? prev.quartos,
         vagas: extracted.vagas ?? prev.vagas,
         banheiros: extracted.banheiros ?? prev.banheiros,
@@ -87,13 +101,19 @@ export default function CadastroIAPage() {
     }, 1200);
   };
 
-  const [submitting, setSubmitting] = useState(false);
-
   const handlePublish = async (e: FormEvent) => {
     e.preventDefault();
+    if (uploading) return;
+    setFormError(null);
+    const location = formatLocation(form.endereco) || form.location;
+    if (!form.endereco.bairro || !form.endereco.cidade) {
+      setFormError('Preencha o CEP (ou bairro e cidade) para o imóvel aparecer nas buscas por localização.');
+      return;
+    }
     setSubmitting(true);
     const id = `ia-${Date.now()}`;
 
+    try {
     await createProperty({
       id,
       titulo: form.titulo || undefined,
@@ -102,17 +122,25 @@ export default function CadastroIAPage() {
       deliveryDate: form.deliveryDate || new Date().toISOString().slice(0, 7),
       priceValue: Number(form.priceDigits.replace(/\D/g, '')) || 0,
       pricePeriod: form.finalidade === 'aluguel' && form.priceSuffix === '/mês' ? 'mensal' : 'unico',
-      location: form.location || 'Goiânia — GO',
+      location,
       quartos: form.quartos ? Number(form.quartos.replace('+', '')) : undefined,
       vagas: form.vagas ? Number(form.vagas.replace('+', '')) : undefined,
       banheiros: form.banheiros ? Number(form.banheiros.replace('+', '')) : undefined,
       area: form.area ? Number(form.area) : undefined,
       video: false,
       aceitaTemporada: form.aceitaTemporada,
-      description: form.description || `Imóvel ${form.finalidade === 'aluguel' ? 'disponível para locação' : 'à venda'} em ${form.location}.`,
+      description: form.description || `Imóvel ${form.finalidade === 'aluguel' ? 'disponível para locação' : 'à venda'} em ${location}.`,
       amenities: form.amenities,
-      corretorEmail: staff!.email
+      corretorEmail: staff!.email,
+      photos: form.photos,
+      condominio: form.condominio || undefined,
+      ...form.endereco
     });
+    } catch {
+      setFormError('Não foi possível publicar agora. Confira sua conexão e tente de novo.');
+      setSubmitting(false);
+      return;
+    }
 
     setSubmitting(false);
     setSuccess(id);
@@ -223,9 +251,15 @@ export default function CadastroIAPage() {
               <input required className={inputClass} value={form.priceDigits} onChange={(e) => update('priceDigits', e.target.value)} />
             </div>
 
+            <CepField
+              value={form.endereco}
+              onChange={(v) => update('endereco', v)}
+              onPickCondominio={(sug) => update('condominio', sug.nome)}
+            />
+
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">Localização</label>
-              <input required className={inputClass} value={form.location} onChange={(e) => update('location', e.target.value)} placeholder="Bairro, Goiânia — GO" />
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Nome do condomínio / edifício (opcional)</label>
+              <input className={inputClass} value={form.condominio} onChange={(e) => update('condominio', e.target.value)} placeholder="Ex: Residencial Bueno" />
             </div>
 
             <ChipSelect label="Quartos" options={NUM_OPCOES} value={form.quartos} onChange={(v) => update('quartos', v)} />
@@ -247,20 +281,17 @@ export default function CadastroIAPage() {
               <AmenitiesCheckboxes selected={form.amenities} onChange={(v) => update('amenities', v)} />
             </div>
 
-            <PhotoUploadField
-              label="Fotos (a IA vai poder extrair do PDF nesta etapa, quando conectada)"
-              fileNames={form.photoNames}
-              onChange={(v) => update('photoNames', v)}
-            />
+            <PhotoUploadField label="Fotos do imóvel" photos={form.photos} onChange={(v) => update('photos', v)} onUploadingChange={setUploading} />
 
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.aceitaTemporada} onChange={(e) => update('aceitaTemporada', e.target.checked)} />
               Aceita temporada
             </label>
 
+            {formError && <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{formError}</p>}
             <div className="mt-2 flex gap-3">
-              <button type="submit" disabled={submitting} className="rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">
-                {submitting ? 'Publicando…' : 'Publicar imóvel'}
+              <button type="submit" disabled={submitting || uploading} className="rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">
+                {submitting ? 'Publicando…' : uploading ? 'Aguarde as fotos…' : 'Publicar imóvel'}
               </button>
               <button
                 type="button"

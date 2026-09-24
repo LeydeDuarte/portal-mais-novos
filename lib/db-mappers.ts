@@ -28,6 +28,13 @@ export type PropertyRow = {
   amenities: string[];
   empreendimento_id: string | null;
   corretor_email: string | null;
+  photos?: unknown;
+  cep?: string | null;
+  logradouro?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  condominio?: string | null;
 };
 
 export type DevelopmentRow = {
@@ -44,7 +51,33 @@ export type DevelopmentRow = {
   hero_height: number;
   video_url: string | null;
   corretor_email: string | null;
+  photos?: unknown;
+  cep?: string | null;
+  logradouro?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  tipos_unidade?: unknown;
+  quartos_opcoes?: unknown;
 };
+
+// jsonb pode chegar como array ou (em casos raros) como texto — normaliza
+export function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string' && v.length > 0);
+  if (typeof value === 'string') {
+    try {
+      return toStringArray(JSON.parse(value));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function toNumberArray(value: unknown): number[] {
+  const arr = Array.isArray(value) ? value : toStringArray(value);
+  return arr.map(Number).filter((n) => Number.isFinite(n) && n > 0).sort((a, b) => a - b);
+}
 
 function formatPrice(value: string, period: 'unico' | 'mensal'): string {
   const formatted = Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
@@ -64,7 +97,7 @@ function formatDeliveryDate(value: string | Date): string {
 
 // Altura do card no feed — puramente visual (masonry), não precisa vir do
 // banco; deriva de forma estável do id pra não "pular" a cada nova busca.
-function heightFromId(id: string): number {
+export function heightFromId(id: string): number {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   return 190 + (hash % 170);
@@ -92,7 +125,11 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
     description: row.description,
     amenities: row.amenities ?? [],
     empreendimentoId: row.empreendimento_id ?? undefined,
-    corretorEmail: row.corretor_email ?? undefined
+    corretorEmail: row.corretor_email ?? undefined,
+    photos: toStringArray(row.photos),
+    condominio: row.condominio ?? undefined,
+    bairro: row.bairro ?? undefined,
+    cidade: row.cidade ?? undefined
   };
 }
 
@@ -115,6 +152,12 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     heroHeight: row.hero_height,
     videoUrl: row.video_url ?? undefined,
     corretorEmail: row.corretor_email ?? undefined,
+    photos: toStringArray(row.photos),
+    tiposUnidade: toStringArray(row.tipos_unidade) as TipoUnidade[],
+    quartosOpcoes: toNumberArray(row.quartos_opcoes),
+    bairro: row.bairro ?? undefined,
+    cidade: row.cidade ?? undefined,
+    cep: row.cep ?? undefined,
     units
   };
 }
