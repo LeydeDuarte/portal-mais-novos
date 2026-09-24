@@ -60,7 +60,9 @@ const inputClass = 'w-full min-w-0 rounded-lg border border-[var(--border)] px-3
 export default function CepField({ value, onChange, onPickCondominio, modo = 'imovel' }: Props) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ok' | 'notfound'>('idle');
   const [sugestoes, setSugestoes] = useState<CondominioSugestao[]>([]);
-  const lastLookup = useRef('');
+  // Ao abrir um cadastro que já tem endereço, NÃO busca o CEP de novo — senão as
+  // correções feitas à mão (bairro, rua) seriam apagadas pelo ViaCEP.
+  const lastLookup = useRef(value.cep && (value.bairro || value.logradouro) ? value.cep : '');
   const valueRef = useRef(value);
   valueRef.current = value;
 
@@ -73,7 +75,16 @@ export default function CepField({ value, onChange, onPickCondominio, modo = 'im
     (async () => {
       const [endereco, condos] = await Promise.all([buscarCep(cep), findCondominiosByCep(cep).catch(() => [])]);
       if (endereco) {
-        onChange({ ...valueRef.current, ...endereco, cep });
+        // CEP geral da cidade (ex.: 74000-000) vem sem rua/bairro: não apaga o que já foi digitado
+        const atual = valueRef.current;
+        onChange({
+          ...atual,
+          cep,
+          logradouro: endereco.logradouro || atual.logradouro,
+          bairro: endereco.bairro || atual.bairro,
+          cidade: endereco.cidade || atual.cidade,
+          uf: endereco.uf || atual.uf
+        });
         setStatus('ok');
       } else {
         setStatus('notfound');
@@ -100,9 +111,9 @@ export default function CepField({ value, onChange, onPickCondominio, modo = 'im
         </div>
         <span className="pb-2.5 text-xs text-[var(--text-faint)]">
           {status === 'loading' && 'Buscando endereço…'}
-          {status === 'ok' && 'Endereço encontrado — confira abaixo.'}
+          {status === 'ok' && 'Endereço preenchido — confira e corrija à vontade abaixo.'}
           {status === 'notfound' && 'CEP não encontrado — preencha o endereço à mão.'}
-          {status === 'idle' && 'Digite o CEP e o endereço é preenchido sozinho.'}
+          {status === 'idle' && 'Digite o CEP e o endereço é preenchido sozinho (dá para editar depois).'}
         </span>
       </div>
 
@@ -134,8 +145,8 @@ export default function CepField({ value, onChange, onPickCondominio, modo = 'im
       )}
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-semibold text-[var(--text-muted)]">Rua / logradouro (fica só para a equipe, não aparece no anúncio)</label>
-        <input className={inputClass} value={value.logradouro} onChange={(e) => set('logradouro', e.target.value)} placeholder="Rua T-55" />
+        <label className="text-xs font-semibold text-[var(--text-muted)]">Rua, número, quadra e lote (fica só para a equipe, não aparece no anúncio)</label>
+        <input className={inputClass} value={value.logradouro} onChange={(e) => set('logradouro', e.target.value)} placeholder="Rua T-55, nº 120, Qd. 10, Lt. 5" />
       </div>
       <div className="grid grid-cols-[1fr_1fr_70px] gap-3">
         <div className="flex flex-col gap-1">

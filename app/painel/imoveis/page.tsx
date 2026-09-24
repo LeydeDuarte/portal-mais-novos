@@ -59,7 +59,7 @@ export default function MeusImoveisPage() {
               <div key={p.id} className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] p-4">
                 <div className="flex flex-col gap-0.5">
                   <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[p.tipoUnidade]}</span>
-                  <span className="font-serif text-base font-semibold">{p.price}</span>
+                  <span className="font-sans tabular-nums text-base font-bold tracking-tight">{p.price}</span>
                   <span className="text-sm text-[var(--text-muted)]">
                     {p.condominio ? `${p.condominio} · ` : ''}
                     {p.location}

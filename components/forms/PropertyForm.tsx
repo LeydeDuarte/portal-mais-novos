@@ -184,6 +184,8 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
     }
   };
 
+  // Nome dos arquivos de imagem: condomínio (ou título) + tipo + bairro — ex.: "marista-262-apartamento-setor-marista"
+  const nomeArquivo = [v.condominio || v.titulo, TIPO_UNIDADE_LABEL[v.tipoUnidade], v.endereco.bairro].filter(Boolean).join(' ');
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
@@ -277,11 +279,12 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         <AmenitiesCheckboxes selected={v.amenities} onChange={(x) => set('amenities', x)} />
       </div>
 
-      <PhotoUploadField photos={v.photos} onChange={(x) => set('photos', x)} onUploadingChange={setUploading} />
+      <PhotoUploadField photos={v.photos} onChange={(x) => set('photos', x)} onUploadingChange={setUploading} nomeArquivo={nomeArquivo} />
 
       <PhotoUploadField
         label="Planta do imóvel (opcional)"
         folder="plantas"
+        nomeArquivo={`${nomeArquivo} planta`}
         modo="plantas"
         photos={v.plantas}
         onChange={(x) => set('plantas', x)}

@@ -35,9 +35,9 @@ export function escapeHtml(s: string): string {
 
 // Moldura simples, nas cores do site
 export function emailLayout(titulo: string, corpo: string): string {
-  return `<!doctype html><html><body style="margin:0;background:#f2f1ee;font-family:Arial,Helvetica,sans-serif;color:#14161a">
+  return `<!doctype html><html><body style="margin:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#14161a">
   <div style="max-width:560px;margin:0 auto;padding:24px">
-    <div style="font-family:Georgia,serif;font-size:20px;font-weight:bold;margin-bottom:16px">Mais Novos <span style="color:#c9a227">Imóveis</span></div>
+    <div style="font-family:Georgia,serif;font-size:20px;font-weight:bold;margin-bottom:16px">Mais Novos <span style="color:#257cff">Imóveis</span></div>
     <div style="background:#fff;border-radius:16px;padding:24px">
       <h1 style="font-family:Georgia,serif;font-size:22px;margin:0 0 12px">${titulo}</h1>
       ${corpo}

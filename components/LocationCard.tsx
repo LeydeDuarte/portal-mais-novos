@@ -17,11 +17,11 @@ export default function LocationCard({ title, subtitle, mapsQuery, approximate }
         href={href}
         target="_blank"
         rel="noreferrer"
-        className="group relative flex h-[170px] items-center justify-center overflow-hidden rounded-2xl bg-[#f3f1ec] px-5"
+        className="group relative flex h-[170px] items-center justify-center overflow-hidden rounded-2xl bg-[#f1f3f5] px-5"
       >
         <svg className="absolute inset-0 h-full w-full opacity-70" viewBox="0 0 600 170" preserveAspectRatio="xMidYMid slice" aria-hidden>
-          <rect width="600" height="170" fill="#f3f1ec" />
-          <path d="M430 10 C500 0 560 40 560 90 C560 140 500 160 450 150 C400 140 380 90 395 50 C402 30 412 15 430 10Z" fill="#e2e9da" />
+          <rect width="600" height="170" fill="#f1f3f5" />
+          <path d="M430 10 C500 0 560 40 560 90 C560 140 500 160 450 150 C400 140 380 90 395 50 C402 30 412 15 430 10Z" fill="#e3ebe0" />
           <g stroke="#fff" strokeLinecap="round" fill="none">
             <path d="M-10 60 C150 50 320 80 610 40" strokeWidth="11" />
             <path d="M-10 128 C200 115 400 140 610 118" strokeWidth="8" />

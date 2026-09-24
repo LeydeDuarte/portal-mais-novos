@@ -31,7 +31,7 @@ export default function DetailFavoriteButton({ propertyId }: { propertyId: strin
         type="button"
         onClick={handleClick}
         className={`flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold transition-colors ${
-          isFavorite ? 'border-accent bg-accent text-ink' : 'border-[var(--border)] hover:bg-[var(--pill-bg)]'
+          isFavorite ? 'border-accent bg-accent text-white' : 'border-[var(--border)] hover:bg-[var(--pill-bg)]'
         }`}
       >
         <svg width="17" height="17" viewBox="0 0 24 24" fill={isFavorite ? '#14161A' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

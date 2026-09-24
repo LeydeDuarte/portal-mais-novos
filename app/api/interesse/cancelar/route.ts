@@ -16,9 +16,9 @@ export async function GET(request: Request) {
   const msg = ok ? 'Pronto! Você não vai mais receber avisos deste condomínio.' : 'Este link já foi usado ou não é válido.';
   return new Response(
     `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Avisos cancelados</title>
-     <body style="font-family:Arial,sans-serif;background:#f2f1ee;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0">
+     <body style="font-family:Arial,sans-serif;background:#f3f4f6;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0">
      <div style="background:#fff;padding:32px;border-radius:16px;max-width:420px;text-align:center"><p style="font-size:16px">${msg}</p>
-     <a href="/" style="color:#c9a227;font-weight:bold">Voltar para o site</a></div></body></html>`,
+     <a href="/" style="color:#257cff;font-weight:bold">Voltar para o site</a></div></body></html>`,
     { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
   );
 }

@@ -20,6 +20,9 @@ export type Property = {
   videoVertical?: boolean; // vídeo gravado em pé (celular)
   videoUrl?: string; // link do YouTube/Instagram, quando "Tem vídeo de capa" está marcado
   area: string;
+  // Valores numéricos (quando vêm do banco) — usados em cálculos como o preço médio do m²
+  priceValue?: number;
+  areaValue?: number;
   // Fotos reais (URLs no R2) — a primeira é a capa. Vazio = mostra o espaço reservado.
   photos?: string[];
   plantas?: string[]; // imagens da planta da unidade

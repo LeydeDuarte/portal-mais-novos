@@ -13,7 +13,7 @@ import { uploadOne } from '@/components/PhotoUploadField';
 import { analisarDocs, classificarDoc, gerarDescricao, paginasDePlanta, semAcento, type ImportResult, type TipoDoc } from '@/lib/pdf-import/parse';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { maskCurrencyInput } from '@/lib/currency';
-import { formatLocation } from '@/components/CepField';
+import CepField, { formatLocation } from '@/components/CepField';
 
 const inputClass = 'w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm outline-none';
 const TIPO_DOC_LABEL: Record<TipoDoc, string> = { tabela: 'Tabela de vendas', ficha: 'Ficha técnica', plantas: 'Caderno de plantas', book: 'Book', outro: 'Outro' };
@@ -157,7 +157,7 @@ export default function ImportarPdfPage() {
   const subirPlantas = async (linhas: LinhaTip[]) =>
     Promise.all(
       linhas.map((t) =>
-        Promise.all(t.plantas.map((p, k) => uploadOne(new File([p.blob], `planta-${k + 1}.jpg`, { type: 'image/jpeg' }), 'plantas').catch(() => null))).then(
+        Promise.all(t.plantas.map((p, k) => uploadOne(new File([p.blob], `planta-${k + 1}.jpg`, { type: 'image/jpeg' }), 'plantas', `${f.nome} planta ${TIPO_UNIDADE_LABEL[t.tipoUnidade]} ${t.area} m2`).catch(() => null))).then(
           (urls) => urls.filter((u): u is string => !!u)
         )
       )
@@ -281,7 +281,7 @@ export default function ImportarPdfPage() {
             adicionar(e.dataTransfer.files);
           }}
           onClick={() => inputRef.current?.click()}
-          className={`mt-5 cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center text-sm transition-colors ${arrastando ? 'border-accent bg-[#fbf8ee]' : 'border-[var(--border)] hover:bg-[var(--pill-bg)]'}`}
+          className={`mt-5 cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center text-sm transition-colors ${arrastando ? 'border-accent bg-[#eef4ff]' : 'border-[var(--border)] hover:bg-[var(--pill-bg)]'}`}
         >
           <strong>Clique ou arraste os PDFs aqui</strong>
           <div className="mt-1 text-xs text-[var(--text-muted)]">Pode mandar vários de uma vez, inclusive books de 100 MB ou mais — a leitura é feita aqui no seu computador, nada sobe para o servidor.</div>
@@ -362,28 +362,13 @@ export default function ImportarPdfPage() {
                   Nome
                   <input className={inputClass} value={f.nome} onChange={(e) => set('nome', e.target.value)} />
                 </label>
-                <label className="text-xs font-semibold text-[var(--text-muted)] md:col-span-2">
-                  Endereço (rua, quadra, lote)
-                  <input className={inputClass} value={f.logradouro} onChange={(e) => set('logradouro', e.target.value)} />
-                </label>
-                <label className="text-xs font-semibold text-[var(--text-muted)]">
-                  Bairro
-                  <input className={inputClass} value={f.bairro} onChange={(e) => set('bairro', e.target.value)} />
-                </label>
-                <div className="grid grid-cols-[1fr_70px] gap-2">
-                  <label className="text-xs font-semibold text-[var(--text-muted)]">
-                    Cidade
-                    <input className={inputClass} value={f.cidade} onChange={(e) => set('cidade', e.target.value)} />
-                  </label>
-                  <label className="text-xs font-semibold text-[var(--text-muted)]">
-                    UF
-                    <input className={inputClass} maxLength={2} value={f.uf} onChange={(e) => set('uf', e.target.value.toUpperCase())} />
-                  </label>
+                <div className="md:col-span-2">
+                  <CepField
+                    modo="empreendimento"
+                    value={{ cep: f.cep.replace(/\D/g, ''), logradouro: f.logradouro, bairro: f.bairro, cidade: f.cidade, uf: f.uf }}
+                    onChange={(e) => setF((p) => ({ ...p, ...e }))}
+                  />
                 </div>
-                <label className="text-xs font-semibold text-[var(--text-muted)]">
-                  CEP
-                  <input className={inputClass} value={f.cep} onChange={(e) => set('cep', e.target.value)} placeholder="opcional" />
-                </label>
                 <label className="text-xs font-semibold text-[var(--text-muted)]">
                   Previsão de entrega *
                   <input type="month" className={inputClass} value={f.entrega} onChange={(e) => set('entrega', e.target.value)} />

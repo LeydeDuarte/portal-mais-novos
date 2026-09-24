@@ -28,7 +28,7 @@ export default function DevelopmentUnitsSection({ development }: { development: 
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
           {[...allUnits]
-            .sort((a, b) => parseFloat(a.area) - parseFloat(b.area))
+            .sort((a, b) => (a.areaValue ?? parseFloat(a.area)) - (b.areaValue ?? parseFloat(b.area)))
             .map((unit) => (
               <Link
                 key={unit.id}
@@ -36,7 +36,7 @@ export default function DevelopmentUnitsSection({ development }: { development: 
                 className="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-4 hover:bg-[var(--pill-bg)]"
               >
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[unit.tipoUnidade]}</div>
-                <div className="font-serif text-lg font-semibold">{unit.price}</div>
+                <div className="font-sans tabular-nums text-lg font-bold tracking-tight">{unit.price}</div>
                 <div className="text-xs text-[var(--text-muted)]">{unit.beds} · {unit.parking} · {unit.area}</div>
                 <div className="text-xs text-[var(--text-faint)]">{formatPricePerM2(getAveragePricePerM2([unit]))}</div>
                 <span className="mt-1 text-xs font-semibold text-accent">Ver unidade →</span>

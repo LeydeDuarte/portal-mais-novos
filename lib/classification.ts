@@ -42,10 +42,10 @@ const BUCKET_LABEL: Record<StatusBucket, string> = {
   usado: 'Usado'
 };
 
-// Cores por período — do mais recente/novo (dourado, cor de destaque da marca)
+// Cores por período — do mais recente/novo (azul, cor de destaque da marca)
 // ao mais antigo (tom neutro), pra dar a leitura visual de "quão novo é" de relance.
 const BUCKET_COLOR: Record<StatusBucket, { bg: string; text: string }> = {
-  lancamento: { bg: '#C9A227', text: '#14161A' },
+  lancamento: { bg: '#257CFF', text: '#FFFFFF' },
   seminovo: { bg: '#5B6B7A', text: '#FFFFFF' },
   usado: { bg: 'rgba(20,22,26,0.72)', text: '#FFFFFF' }
 };

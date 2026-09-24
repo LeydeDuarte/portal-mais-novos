@@ -99,7 +99,7 @@ export default function DevelopmentCard({ development }: { development: Developm
           {tipos.length > 0 && (
             <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{tipos.slice(0, 4).join(' · ')}{tipos.length > 4 ? ' +' : ''}</div>
           )}
-          <div className="font-serif text-sm font-semibold md:text-base">
+          <div className="font-sans tabular-nums text-sm font-bold tracking-tight md:text-base">
             {development.minPrice ? `A partir de ${formatBRL(development.minPrice)}` : 'Preço sob consulta'}
           </div>
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">{development.location}</div>

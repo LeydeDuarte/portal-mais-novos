@@ -43,9 +43,13 @@ export type Development = {
 // Preço médio do m² do empreendimento — nunca cadastrado, sempre calculado a
 // partir do valor e da área de cada tipologia (mesma lógica de nunca digitar
 // à mão o que dá pra derivar — ver "Modelo de dados do empreendimento").
-function parseAreaM2(area: string): number {
-  const cleaned = area.replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');
-  return Number(cleaned);
+// "136,86 m²" (pt-BR) ou "136.86 m²" — ponto seguido de 1 ou 2 dígitos no fim é
+// decimal, não milhar (antes "136.86" virava 13.686 m² e a média do m² saía errada).
+export function parseAreaM2(area: string): number {
+  const t = area.replace(/[^\d.,]/g, '');
+  if (t.includes(',')) return Number(t.replace(/\./g, '').replace(',', '.'));
+  if (/\.\d{1,2}$/.test(t)) return Number(t);
+  return Number(t.replace(/\./g, ''));
 }
 
 function parsePriceBRL(price: string): number {
@@ -55,7 +59,8 @@ function parsePriceBRL(price: string): number {
 
 export function getAveragePricePerM2(units: PropertyDetail[]): number {
   const values = units
-    .map((u) => parsePriceBRL(u.price) / parseAreaM2(u.area))
+    .filter((u) => u.finalidade !== 'aluguel')
+    .map((u) => (u.priceValue ?? parsePriceBRL(u.price)) / (u.areaValue ?? parseAreaM2(u.area)))
     .filter((v) => Number.isFinite(v) && v > 0);
   if (values.length === 0) return 0;
   return values.reduce((sum, v) => sum + v, 0) / values.length;

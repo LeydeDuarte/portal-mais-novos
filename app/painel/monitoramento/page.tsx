@@ -73,7 +73,7 @@ export default function MonitoramentoPage() {
               <div key={ref.id} className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] p-4">
                 <div className="flex flex-col gap-0.5">
                   <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[ref.tipoUnidade]}</span>
-                  <span className="font-serif text-base font-semibold">{ref.precoAproximado}</span>
+                  <span className="font-sans tabular-nums text-base font-bold tracking-tight">{ref.precoAproximado}</span>
                   <span className="text-sm text-[var(--text-muted)]">
                     {ref.bairro}, {ref.cidade} — {ref.areaAproximada}
                     {ref.quartos !== '—' ? ` · ${ref.quartos} qts` : ''}
@@ -103,7 +103,7 @@ export default function MonitoramentoPage() {
             {leads.map((lead) => (
               <div key={lead.leadId} className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] p-4">
                 <div className="flex flex-col gap-0.5">
-                  <span className="font-serif text-base font-semibold">{lead.precoAproximado}</span>
+                  <span className="font-sans tabular-nums text-base font-bold tracking-tight">{lead.precoAproximado}</span>
                   <span className="text-sm text-[var(--text-muted)]">{lead.bairro}, {lead.cidade}</span>
                   {isAdmin && lead.corretorEmail ? (
                     <span className="text-xs text-[var(--text-faint)]">Corretor: {lead.corretorEmail}</span>

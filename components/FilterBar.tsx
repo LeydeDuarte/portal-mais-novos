@@ -156,6 +156,14 @@ export default function FilterBar({ filters, onChange }: Props) {
           ))}
         </div>
 
+        {/* Status logo ao lado do primeiro item (Todos / Lançamentos) */}
+        <select className={`${selectClass} ${filters.situacao !== 'todas' ? 'ring-2 ring-ink' : ''}`} style={selectStyle} value={filters.situacao} onChange={(e) => set('situacao', e.target.value as FilterState['situacao'])}>
+          <option value="todas">Status</option>
+          <option value="lancamento">Lançamento</option>
+          <option value="seminovo">Seminovo</option>
+          <option value="usado">Usado</option>
+        </select>
+
         {/* Balões de local (exatos) e de palavra-chave — cada um sai com o seu ✕ */}
         {filters.locais.map((l) => (
           <button
@@ -179,7 +187,7 @@ export default function FilterBar({ filters, onChange }: Props) {
             key={t}
             type="button"
             onClick={() => set('termos', filters.termos.filter((x) => x !== t))}
-            className={`${pillClass} flex items-center gap-1.5 bg-accent text-ink`}
+            className={`${pillClass} flex items-center gap-1.5 bg-accent text-white`}
             title={`Tirar "${t}" da busca`}
           >
             {t} <span aria-hidden>✕</span>
@@ -244,13 +252,6 @@ export default function FilterBar({ filters, onChange }: Props) {
           <option value="todas">Comprar ou alugar</option>
           <option value="venda">Comprar</option>
           <option value="aluguel">Alugar</option>
-        </select>
-
-        <select className={selectClass} style={selectStyle} value={filters.situacao} onChange={(e) => set('situacao', e.target.value as FilterState['situacao'])}>
-          <option value="todas">Situação</option>
-          <option value="lancamento">Lançamento</option>
-          <option value="seminovo">Seminovo</option>
-          <option value="usado">Usado</option>
         </select>
 
         <select className={selectClass} style={selectStyle} value={filters.aceitaTemporada} onChange={(e) => set('aceitaTemporada', e.target.value as FilterState['aceitaTemporada'])}>

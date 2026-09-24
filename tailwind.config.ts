@@ -6,7 +6,7 @@ const config: Config = {
     extend: {
       colors: {
         ink: '#14161A',
-        accent: '#C9A227'
+        accent: '#257CFF'
       },
       fontFamily: {
         serif: ['var(--font-playfair)', 'Georgia', 'serif'],

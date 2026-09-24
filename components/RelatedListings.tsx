@@ -53,7 +53,7 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
                 </div>
                 <div className="pt-2">
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[p.tipoUnidade]}</div>
-                  <div className="font-serif text-base font-semibold">{p.price}</div>
+                  <div className="font-sans tabular-nums text-base font-bold tracking-tight">{p.price}</div>
                   <div className="truncate text-xs text-[var(--text-muted)]">
                     {p.condominio ? `${formatTitulo(p.condominio)} · ` : ''}
                     {p.bairro || p.location}

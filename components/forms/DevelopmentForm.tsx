@@ -198,6 +198,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
       <PhotoUploadField
         label="Fotos do condomínio (fachada, área comum, decorado) — opcional"
         folder="empreendimentos"
+        nomeArquivo={f.name}
         photos={f.photos}
         onChange={(x) => set('photos', x)}
         onUploadingChange={setUploading}
@@ -245,6 +246,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
               <PhotoUploadField
                 label="Planta desta tipologia (opcional — duplex pode ter 2)"
                 folder="plantas"
+                nomeArquivo={`${f.name} planta ${TIPO_UNIDADE_LABEL[t.tipoUnidade]} ${t.area ? `${t.area} m2` : ''}`}
                 modo="plantas"
                 compacto
                 photos={t.plantas}

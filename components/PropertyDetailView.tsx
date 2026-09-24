@@ -7,6 +7,7 @@ import LocationCard from '@/components/LocationCard';
 import RichText from '@/components/RichText';
 import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
+import ContatoLateral from '@/components/ContatoLateral';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import type { PropertyDetail } from '@/lib/property-details';
 import { getDevelopmentById, getRelatedListings } from '@/lib/actions';
@@ -154,7 +155,7 @@ export default async function PropertyDetailView({ property }: { property: Prope
           <aside className="flex flex-col gap-5">
             <div className="rounded-2xl border border-[var(--border)] p-5">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[property.tipoUnidade]}</div>
-              <div className="font-serif text-2xl font-semibold">{property.price}</div>
+              <div className="font-sans tabular-nums text-2xl font-bold tracking-tight">{property.price}</div>
               <div className="mt-1 text-sm text-[var(--text-muted)]">{property.location}</div>
 
               <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-[var(--border)] pt-4">
@@ -197,19 +198,14 @@ export default async function PropertyDetailView({ property }: { property: Prope
               </div>
             </div>
 
-            <div className="rounded-2xl border border-[var(--border)] p-5">
-              <h2 className="mb-3 text-sm font-bold">Falar com um corretor</h2>
-              {/* Formulário só de interface — sem envio real ainda. Em produção isso
-                  vira um `lead` na tabela do documento de arquitetura, com o imóvel
-                  e o corretor responsável já associados. */}
-              <form className="flex flex-col gap-2.5">
-                <input type="text" placeholder="Seu nome" className="rounded-lg border border-[var(--border)] px-3 py-2.5 text-sm outline-none" />
-                <input type="tel" placeholder="WhatsApp" className="rounded-lg border border-[var(--border)] px-3 py-2.5 text-sm outline-none" />
-                <textarea placeholder="Mensagem" rows={3} className="resize-none rounded-lg border border-[var(--border)] px-3 py-2.5 text-sm outline-none" />
-                <button type="button" className="rounded-full bg-ink px-4 py-2.5 text-sm font-bold text-white hover:opacity-90">
-                  Enviar interesse
-                </button>
-              </form>
+            <div className="md:sticky md:top-24">
+              <ContatoLateral
+                titulo="Falar com um corretor"
+                condominio={nomeCondominio || titulo}
+                developmentId={property.empreendimentoId}
+                referencia={`${titulo} — /imovel/${property.id}`}
+                mensagemInicial={`Olá! Tenho interesse neste imóvel: ${titulo}. Ainda está disponível?`}
+              />
             </div>
           </aside>
         </div>

@@ -30,6 +30,18 @@ function getClient(): S3Client {
   return client;
 }
 
+function slugArquivo(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/²/g, '2')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 70)
+    .replace(/-+$/g, '');
+}
+
 export async function POST(request: Request) {
   const staff = verifySession(cookies().get('mn_staff')?.value);
   if (!staff) return NextResponse.json({ error: 'Faça login no painel para enviar fotos.' }, { status: 401 });
@@ -52,7 +64,10 @@ export async function POST(request: Request) {
 
   const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
   const now = new Date();
-  const key = `${folder}/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${crypto.randomUUID()}.${ext}`;
+  // Nome do arquivo com o nome do empreendimento/imóvel + nome do site (SEO de
+  // imagem), ex.: plantas/2026/09/marista-262-planta-136m2-mais-novos-imoveis-a1b2c3d4.jpg
+  const slug = slugArquivo(String(form.get('nome') || '')) || (folder === 'plantas' ? 'planta' : 'imovel');
+  const key = `${folder}/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${slug}-mais-novos-imoveis-${crypto.randomUUID().slice(0, 8)}.${ext}`;
 
   try {
     await getClient().send(

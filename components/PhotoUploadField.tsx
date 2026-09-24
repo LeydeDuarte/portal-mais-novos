@@ -11,6 +11,8 @@ type Props = {
   // Plantas: fundo branco, imagem inteira (sem cortar) e um pouco mais de resolução
   modo?: 'fotos' | 'plantas';
   compacto?: boolean;
+  // Base do nome do arquivo no armazenamento (ex.: "Marista 262" ou "Marista 262 planta 136 m²")
+  nomeArquivo?: string;
 };
 
 // Ctrl+V de print: com vários campos na tela (fotos + planta de cada tipologia),
@@ -60,7 +62,7 @@ async function resizeImage(file: File, maxSide = MAX_SIDE): Promise<Blob> {
   return blob ?? file;
 }
 
-export async function uploadOne(file: File, folder: string): Promise<string> {
+export async function uploadOne(file: File, folder: string, nomeArquivo?: string): Promise<string> {
   if (file.size > MAX_ORIGINAL_BYTES) throw new Error(`"${file.name}" tem mais de 30 MB — reduza a foto antes de enviar.`);
   const converted = await resizeImage(file, folder === 'plantas' ? MAX_SIDE_PLANTA : MAX_SIDE);
   // Se o navegador não conseguiu abrir a foto (ex: HEIC do iPhone no Chrome/Windows),
@@ -71,13 +73,14 @@ export async function uploadOne(file: File, folder: string): Promise<string> {
   const body = new FormData();
   body.append('file', converted, file.name.replace(/\.\w+$/, '') + '.jpg');
   body.append('folder', folder);
+  if (nomeArquivo) body.append('nome', nomeArquivo);
   const res = await fetch('/api/upload', { method: 'POST', body });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.url) throw new Error(data.error || 'Falha ao enviar a foto.');
   return data.url as string;
 }
 
-export default function PhotoUploadField({ photos, onChange, onUploadingChange, folder = 'imoveis', label = 'Fotos do imóvel', modo = 'fotos', compacto = false }: Props) {
+export default function PhotoUploadField({ photos, onChange, onUploadingChange, folder = 'imoveis', label = 'Fotos do imóvel', modo = 'fotos', compacto = false, nomeArquivo }: Props) {
   const id = useId();
   const [pending, setPending] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +106,7 @@ export default function PhotoUploadField({ photos, onChange, onUploadingChange, 
       while (next < files.length) {
         const i = next++;
         try {
-          results[i] = await uploadOne(files[i], folder);
+          results[i] = await uploadOne(files[i], folder, nomeArquivo);
         } catch (err) {
           falhas.push(err instanceof Error && err.message ? err.message : `"${files[i].name}": falha ao enviar.`);
         } finally {
@@ -174,7 +177,7 @@ export default function PhotoUploadField({ photos, onChange, onUploadingChange, 
           handleFiles(Array.from(e.dataTransfer.files));
         }}
         className={`flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-sm transition-colors hover:bg-[var(--pill-bg)] ${compacto ? 'px-3 py-3' : 'px-4 py-5'} ${
-          arrastando ? 'border-accent bg-[#fbf8ee]' : ativo ? 'border-accent' : 'border-[var(--border)]'
+          arrastando ? 'border-accent bg-[#eef4ff]' : ativo ? 'border-accent' : 'border-[var(--border)]'
         }`}
       >
         <span className="font-semibold">{plantas ? '+ Adicionar planta' : '+ Adicionar fotos'}</span>
@@ -214,7 +217,7 @@ export default function PhotoUploadField({ photos, onChange, onUploadingChange, 
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt={`${plantas ? 'Planta' : 'Foto'} ${i + 1}`} className={`h-full w-full ${plantas ? 'object-contain p-1' : 'object-cover'}`} loading="lazy" />
                 {i === 0 && !plantas && (
-                  <span className="absolute left-1.5 top-1.5 rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold uppercase text-ink">Capa</span>
+                  <span className="absolute left-1.5 top-1.5 rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Capa</span>
                 )}
                 <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-black/55 px-1.5 py-1 text-[11px] font-semibold text-white">
                   <div className="flex gap-1">

@@ -7,12 +7,18 @@ import RichText from '@/components/RichText';
 import InterestForm from '@/components/InterestForm';
 import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
+import ContatoLateral from '@/components/ContatoLateral';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getRelatedListings } from '@/lib/actions';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
 import { getStatusBadge } from '@/lib/classification';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
+
+function formatBRL(v: number): string {
+  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mi`;
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+}
 
 export default async function DevelopmentDetailView({ development }: { development: Development }) {
   const badge = development.deliveryDate
@@ -24,6 +30,14 @@ export default async function DevelopmentDetailView({ development }: { developme
   const embed = development.videoUrl ? getEmbedInfo(development.videoUrl) : null;
   // Preço médio do m² vem só da tabela de vendas (tipologias), não dos imóveis de revenda
   const avgPricePerM2 = getAveragePricePerM2(development.units.filter((u) => u.isTipologia));
+  const precosTabela = development.units.filter((u) => u.isTipologia && u.priceValue).map((u) => u.priceValue as number);
+  const precoInicial = precosTabela.length ? Math.min(...precosTabela) : null;
+  // Lançamento ou entregue há menos de 1 ano: ainda tem venda direta da incorporadora,
+  // então no lugar do "Registre seu interesse" vai o convite para falar conosco.
+  const entregueHaMeses = development.deliveryDate
+    ? (Date.now() - new Date(`${development.deliveryDate}-01T00:00:00`).getTime()) / (1000 * 60 * 60 * 24 * 30.4)
+    : null;
+  const vendaDireta = futuro || (entregueHaMeses != null && entregueHaMeses <= 12);
 
   const youtubeAspect = embed?.platform === 'youtube' ? await getYouTubeAspectRatio(embed.videoId) : null;
   const galleryVideo: GalleryVideo | null = embed
@@ -104,6 +118,8 @@ export default async function DevelopmentDetailView({ development }: { developme
         </div>
         )}
 
+        <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0">
         <div className={`${hasGallery ? 'mt-6' : 'mt-2'} flex flex-col gap-1`}>
           {!hasGallery && (
             <span className="mb-1 w-fit rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
@@ -124,9 +140,6 @@ export default async function DevelopmentDetailView({ development }: { developme
           )}
           {development.areaTerreno && (
             <span className="text-[var(--text-muted)]">Terreno de {development.areaTerreno}</span>
-          )}
-          {avgPricePerM2 > 0 && (
-            <span className="font-semibold text-ink">A partir de {formatPricePerM2(avgPricePerM2)}</span>
           )}
         </div>
 
@@ -156,7 +169,7 @@ export default async function DevelopmentDetailView({ development }: { developme
         )}
 
         {development.description?.trim() && (
-          <div className="mt-5 max-w-2xl">
+          <div className="mt-5">
             <h2 className="mb-2 text-lg font-bold">Sobre o empreendimento</h2>
             <CollapsibleText>
               <RichText texto={development.description} />
@@ -177,6 +190,34 @@ export default async function DevelopmentDetailView({ development }: { developme
             ))}
           </ul>
         </div>
+        </div>
+
+        {/* Lateral direita: resumo + Fale conosco (fica fixa ao rolar no computador) */}
+        <aside className={`${hasGallery ? 'md:mt-6' : ''} flex flex-col gap-4`}>
+          <div className="flex flex-col gap-4 md:sticky md:top-24">
+            {(precoInicial || avgPricePerM2 > 0 || development.deliveryDate) && (
+              <div className="rounded-2xl border border-[var(--border)] p-5">
+                {precoInicial ? (
+                  <>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Unidades a partir de</div>
+                    <div className="font-sans text-2xl font-bold tabular-nums tracking-tight">{formatBRL(precoInicial)}</div>
+                  </>
+                ) : (
+                  <div className="text-sm font-semibold">Valores sob consulta</div>
+                )}
+                {avgPricePerM2 > 0 && <div className="mt-1 text-sm text-[var(--text-muted)]">Média de {formatPricePerM2(avgPricePerM2)}</div>}
+                <div className="mt-3 border-t border-[var(--border)] pt-3 text-sm font-semibold text-accent">{development.deliveryNote}</div>
+              </div>
+            )}
+            <ContatoLateral
+              condominio={development.name}
+              developmentId={development.id}
+              referencia={`Condomínio ${development.name} — /empreendimento/${development.id}`}
+              mensagemInicial={`Olá! Quero saber mais sobre o ${development.name} — valores e unidades disponíveis.`}
+            />
+          </div>
+        </aside>
+        </div>
 
         {(tipologias.length > 0 || futuro) && (
         <div className="mt-8">
@@ -190,7 +231,7 @@ export default async function DevelopmentDetailView({ development }: { developme
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
               {[...tipologias]
-                .sort((a, b) => parseFloat(a.area) - parseFloat(b.area))
+                .sort((a, b) => (a.areaValue ?? parseFloat(a.area)) - (b.areaValue ?? parseFloat(b.area)))
                 .map((unit) => (
                 <div key={unit.id} className="flex flex-col overflow-hidden rounded-xl border border-[var(--border)]">
                 {unit.plantas && unit.plantas.length > 0 && (
@@ -207,7 +248,7 @@ export default async function DevelopmentDetailView({ development }: { developme
                   className="flex flex-1 flex-col gap-2 p-4 hover:bg-[var(--pill-bg)]"
                 >
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[unit.tipoUnidade]}</div>
-                  <div className="font-serif text-lg font-semibold">{unit.price}</div>
+                  <div className="font-sans tabular-nums text-lg font-bold tracking-tight">{unit.price}</div>
                   <div className="text-xs text-[var(--text-muted)]">{unit.beds} · {unit.parking} · {unit.area}</div>
                   <div className="text-xs text-[var(--text-faint)]">{formatPricePerM2(getAveragePricePerM2([unit]))}</div>
                   <span className="mt-1 text-xs font-semibold text-accent">Ver unidade →</span>
@@ -222,11 +263,23 @@ export default async function DevelopmentDetailView({ development }: { developme
         <RelatedListings
           title={`À venda no ${development.name}`}
           items={related.mesmoCondominio.filter((p) => p.finalidade === 'venda')}
-          emptyText={`Nenhum imóvel à venda no ${development.name} no momento — registre seu interesse abaixo e avisamos quando surgir uma oportunidade.`}
+          emptyText={vendaDireta ? `Nenhum anúncio particular no ${development.name} no momento — fale conosco para ver as unidades direto com a incorporadora.` : `Nenhum imóvel à venda no ${development.name} no momento — registre seu interesse abaixo e avisamos quando surgir uma oportunidade.`}
         />
         <RelatedListings title={`Para alugar no ${development.name}`} items={related.mesmoCondominio.filter((p) => p.finalidade === 'aluguel')} />
 
-        <InterestForm developmentId={development.id} condominio={development.name} destaque={related.mesmoCondominio.length === 0} />
+        {vendaDireta ? (
+          <section className="mt-10 flex flex-col items-start gap-3 rounded-2xl border border-accent/40 bg-[#f5f8ff] p-5 md:flex-row md:items-center md:justify-between md:p-6">
+            <div>
+              <h2 className="font-serif text-xl font-semibold">Quer comprar uma unidade no {development.name}?</h2>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">Fale conosco e verifique as disponibilidades particulares e direto pela incorporadora.</p>
+            </div>
+            <a href="#fale-conosco" className="shrink-0 rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:opacity-90">
+              Fale conosco
+            </a>
+          </section>
+        ) : (
+          <InterestForm developmentId={development.id} condominio={development.name} destaque={related.mesmoCondominio.length === 0} />
+        )}
 
         <RelatedListings title="Imóveis à venda nesta região" subtitle={faixaDePreco(related.precoReferencia)} items={related.regiao} />
 
