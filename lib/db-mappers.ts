@@ -1,3 +1,4 @@
+import { cleanPhotoUrl } from './r2-url';
 import type { PropertyDetail, Development } from './property-details';
 import type { TipoUnidade } from './tipologias';
 
@@ -36,6 +37,7 @@ export type PropertyRow = {
   uf?: string | null;
   condominio?: string | null;
   is_tipologia?: boolean;
+  video_vertical?: boolean;
 };
 
 export type DevelopmentRow = {
@@ -61,11 +63,12 @@ export type DevelopmentRow = {
   tipos_unidade?: unknown;
   quartos_opcoes?: unknown;
   status?: string;
+  video_vertical?: boolean;
 };
 
 // jsonb pode chegar como array ou (em casos raros) como texto — normaliza
 export function toStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string' && v.length > 0);
+  if (Array.isArray(value)) return value.filter((v): v is string => typeof v === 'string' && v.length > 0).map(cleanPhotoUrl);
   if (typeof value === 'string') {
     try {
       return toStringArray(JSON.parse(value));
@@ -132,7 +135,8 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
     condominio: row.condominio ?? undefined,
     bairro: row.bairro ?? undefined,
     cidade: row.cidade ?? undefined,
-    isTipologia: !!row.is_tipologia
+    isTipologia: !!row.is_tipologia,
+    videoVertical: !!row.video_vertical
   };
 }
 
@@ -162,6 +166,7 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     cidade: row.cidade ?? undefined,
     cep: row.cep ?? undefined,
     status: row.status === 'rascunho' ? 'rascunho' : 'publicado',
+    videoVertical: !!row.video_vertical,
     units
   };
 }

@@ -26,7 +26,7 @@ export default async function PropertyDetailView({ property }: { property: Prope
   // Instagram não expõe essa informação do mesmo jeito).
   const youtubeAspect = embed?.platform === 'youtube' ? await getYouTubeAspectRatio(embed.videoId) : null;
   const galleryVideo: GalleryVideo | null = embed
-    ? { embedUrl: embed.embedUrl, platform: embed.platform, ratio: youtubeAspect ? youtubeAspect.width / youtubeAspect.height : undefined }
+    ? { embedUrl: embed.embedUrl, platform: embed.platform, ratio: property.videoVertical ? 9 / 16 : youtubeAspect ? youtubeAspect.width / youtubeAspect.height : undefined }
     : null;
 
   const photos = property.photos ?? [];

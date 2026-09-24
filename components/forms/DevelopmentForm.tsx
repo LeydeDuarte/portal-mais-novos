@@ -5,6 +5,7 @@ import ChipSelect from '@/components/ChipSelect';
 import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
 import PhotoUploadField from '@/components/PhotoUploadField';
 import MultiChipSelect from '@/components/MultiChipSelect';
+import VideoFormato, { pareceVertical } from '@/components/forms/VideoFormato';
 import CepField, { ENDERECO_VAZIO, formatLocation, type Endereco } from '@/components/CepField';
 import type { DevelopmentEditData, DevelopmentFields, DevelopmentStatus, TipologiaInput } from '@/lib/actions';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
@@ -41,6 +42,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
     aceitaTemporada: initial?.aceitaTemporada ?? false,
     video: !!initial?.videoUrl,
     videoUrl: initial?.videoUrl ?? '',
+    videoVertical: (initial?.videoUrl ? !!initial.videoVertical : null) as boolean | null,
     photos: initial?.photos ?? [],
     tiposUnidade: (initial?.tiposUnidade ?? []) as TipoUnidade[],
     quartosOpcoes: (initial?.quartosOpcoes ?? []).map((n) => String(Math.min(n, 5)))
@@ -72,7 +74,8 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
     (!f.endereco.bairro || !f.endereco.cidade) && 'Endereço (CEP, ou bairro e cidade)',
     !f.deliveryDate && 'Data de entrega',
     f.description.trim().length < 60 && 'Narrativa do condomínio (pelo menos 60 caracteres)',
-    f.tiposUnidade.length === 0 && 'Tipos de imóvel que existem no condomínio'
+    f.tiposUnidade.length === 0 && 'Tipos de imóvel que existem no condomínio',
+    f.video && f.videoUrl.trim() && f.videoVertical === null && 'Formato do vídeo (Deitado ou Em pé)'
   ].filter(Boolean) as string[];
 
   const salvar = async (status: DevelopmentStatus) => {
@@ -80,6 +83,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
     setErro(null);
     setFaltando([]);
     if (!f.name.trim()) return setErro('Digite o nome do condomínio.');
+    if (f.video && f.videoUrl.trim() && f.videoVertical === null) return setErro('Escolha o formato do vídeo (Deitado ou Em pé) antes de salvar.');
     const tipologiasValidas = detalhar ? tips.filter((t) => t.quartos || t.area || t.priceDigits) : [];
     const tiposUnidade = Array.from(new Set([...f.tiposUnidade, ...tipologiasValidas.map((t) => t.tipoUnidade)]));
     const location = formatLocation(f.endereco);
@@ -97,6 +101,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
           amenities: f.amenities,
           aceitaTemporada: f.aceitaTemporada,
           videoUrl: f.video && f.videoUrl ? f.videoUrl : undefined,
+          videoVertical: f.video && !!f.videoVertical,
           photos: f.photos,
           tiposUnidade,
           quartosOpcoes: f.quartosOpcoes.map(Number),
@@ -254,7 +259,19 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
           Tem vídeo institucional
         </label>
         {f.video && (
-          <input type="url" className={inputClass} placeholder="Link do YouTube ou Instagram" value={f.videoUrl} onChange={(e) => set('videoUrl', e.target.value)} />
+          <>
+            <input
+              type="url"
+              className={inputClass}
+              placeholder="Link do YouTube ou Instagram"
+              value={f.videoUrl}
+              onChange={(e) => {
+                const url = e.target.value;
+                setF((prev) => ({ ...prev, videoUrl: url, videoVertical: pareceVertical(url) ? true : prev.videoVertical }));
+              }}
+            />
+            <VideoFormato vertical={f.videoVertical} onChange={(x) => set('videoVertical', x)} />
+          </>
         )}
       </div>
 

@@ -11,6 +11,8 @@ type Props = {
 };
 
 const MAX_SIDE = 2000;
+const MAX_ORIGINAL_BYTES = 30 * 1024 * 1024; // 30 MB por foto antes da compressão
+const ACEITOS_DIRETO = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 // Reduz a foto no próprio navegador antes de enviar: fica mais rápido pra
 // quem está cadastrando pelo celular e o site carrega mais leve pro cliente.
@@ -23,14 +25,23 @@ async function resizeImage(file: File): Promise<Blob> {
   canvas.height = Math.round(bitmap.height * scale);
   const ctx = canvas.getContext('2d');
   if (!ctx) return file;
+  ctx.fillStyle = '#ffffff'; // PNG com fundo transparente não fica preto no JPG
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
   return blob ?? file;
 }
 
 async function uploadOne(file: File, folder: string): Promise<string> {
+  if (file.size > MAX_ORIGINAL_BYTES) throw new Error(`"${file.name}" tem mais de 30 MB — reduza a foto antes de enviar.`);
+  const converted = await resizeImage(file);
+  // Se o navegador não conseguiu abrir a foto (ex: HEIC do iPhone no Chrome/Windows),
+  // ela volta sem converter — e só JPG, PNG e WEBP podem seguir.
+  if (converted === file && !ACEITOS_DIRETO.has(file.type)) {
+    throw new Error(`"${file.name}" está num formato que este navegador não abre (${file.type || 'desconhecido'}). Salve como JPG e envie de novo.`);
+  }
   const body = new FormData();
-  body.append('file', await resizeImage(file), file.name.replace(/\.\w+$/, '') + '.jpg');
+  body.append('file', converted, file.name.replace(/\.\w+$/, '') + '.jpg');
   body.append('folder', folder);
   const res = await fetch('/api/upload', { method: 'POST', body });
   const data = await res.json().catch(() => ({}));
@@ -56,15 +67,14 @@ export default function PhotoUploadField({ photos, onChange, onUploadingChange, 
     // Envia 3 por vez, mantendo a ordem em que as fotos foram escolhidas
     const results: (string | null)[] = new Array(files.length).fill(null);
     let next = 0;
-    let failures = 0;
+    const falhas: string[] = [];
     const worker = async () => {
       while (next < files.length) {
         const i = next++;
         try {
           results[i] = await uploadOne(files[i], folder);
         } catch (err) {
-          failures++;
-          setError(err instanceof Error ? err.message : 'Falha ao enviar a foto.');
+          falhas.push(err instanceof Error && err.message ? err.message : `"${files[i].name}": falha ao enviar.`);
         } finally {
           setPending((n) => n - 1);
         }
@@ -75,7 +85,7 @@ export default function PhotoUploadField({ photos, onChange, onUploadingChange, 
     const uploaded = results.filter((u): u is string => !!u);
     onChange([...photosRef.current, ...uploaded]);
     onUploadingChange?.(false);
-    if (failures) setError(`${failures} foto(s) não foram enviadas. Tente de novo só com elas.`);
+    if (falhas.length) setError(`${falhas.length} foto(s) não foram enviadas: ${falhas.slice(0, 3).join(' ')}${falhas.length > 3 ? ' …' : ''}`);
   };
 
   const remove = (url: string) => onChange(photos.filter((p) => p !== url));
@@ -98,9 +108,9 @@ export default function PhotoUploadField({ photos, onChange, onUploadingChange, 
         className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--border)] px-4 py-5 text-sm hover:bg-[var(--pill-bg)]"
       >
         <span className="font-semibold">+ Adicionar fotos</span>
-        <span className="text-xs text-[var(--text-faint)]">JPG, PNG ou WEBP — pode escolher várias de uma vez</span>
+        <span className="text-xs text-[var(--text-faint)]">JPG, PNG, WEBP ou foto do celular — pode escolher várias de uma vez (até 30 MB cada)</span>
       </button>
-      <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFiles} className="hidden" />
+      <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} className="hidden" />
 
       {pending > 0 && <span className="text-xs font-semibold text-accent">Enviando {pending} foto(s)… aguarde antes de publicar.</span>}
       {error && <span className="text-xs font-semibold text-red-600">{error}</span>}

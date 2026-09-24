@@ -17,6 +17,7 @@ export type Property = {
   banheiros?: string;
   escaninhos?: string; // depósito/escaninho privativo, comum em prédios
   titulo?: string; // título do anúncio — se não tiver, gera um genérico na exibição
+  videoVertical?: boolean; // vídeo gravado em pé (celular)
   videoUrl?: string; // link do YouTube/Instagram, quando "Tem vídeo de capa" está marcado
   area: string;
   // Fotos reais (URLs no R2) — a primeira é a capa. Vazio = mostra o espaço reservado.

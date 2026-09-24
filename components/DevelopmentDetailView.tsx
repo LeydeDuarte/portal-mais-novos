@@ -22,7 +22,7 @@ export default async function DevelopmentDetailView({ development }: { developme
 
   const youtubeAspect = embed?.platform === 'youtube' ? await getYouTubeAspectRatio(embed.videoId) : null;
   const galleryVideo: GalleryVideo | null = embed
-    ? { embedUrl: embed.embedUrl, platform: embed.platform, ratio: youtubeAspect ? youtubeAspect.width / youtubeAspect.height : undefined }
+    ? { embedUrl: embed.embedUrl, platform: embed.platform, ratio: development.videoVertical ? 9 / 16 : youtubeAspect ? youtubeAspect.width / youtubeAspect.height : undefined }
     : null;
 
   const photos = development.photos ?? [];

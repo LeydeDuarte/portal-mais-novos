@@ -8,6 +8,7 @@ import { signSession, verifySession, type StaffSessionPayload } from './session'
 import type { PropertyDetail, Development } from './property-details';
 import type { FilterState } from './filters';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from './tipologias';
+import { r2PublicBase, cleanPhotoUrl } from './r2-url';
 
 const PAGE_SIZE = 12;
 const STAFF_COOKIE = 'mn_staff';
@@ -443,6 +444,7 @@ export type CreatePropertyInput = {
   area?: number;
   video: boolean;
   videoUrl?: string;
+  videoVertical?: boolean; // vídeo gravado em pé (celular) — ocupa o espaço sem faixas pretas
   aceitaTemporada: boolean;
   description: string;
   amenities: string[];
@@ -461,9 +463,11 @@ export type PropertyFields = Omit<CreatePropertyInput, 'id' | 'corretorEmail' | 
 
 // Aceita só fotos do nosso próprio armazenamento (R2) — nunca link de terceiros
 function sanitizePhotos(photos: string[] | undefined): string[] {
-  const base = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, '').replace(/^https?:\/\//, '');
+  const base = r2PublicBase();
   return (photos ?? [])
-    .filter((u) => typeof u === 'string' && /^https:\/\//.test(u) && (!base || u.replace(/^https:\/\//, '').startsWith(base)))
+    .filter((u) => typeof u === 'string')
+    .map(cleanPhotoUrl)
+    .filter((u) => /^https:\/\//.test(u) && (!base || u.startsWith(`${base}/`)))
     .slice(0, 60);
 }
 
@@ -495,12 +499,13 @@ function propertyValues(input: PropertyFields) {
     clean(input.bairro),
     clean(input.cidade),
     clean(input.uf?.toUpperCase()),
-    clean(input.condominio)
+    clean(input.condominio),
+    !!input.videoVertical
   ];
 }
 const PROPERTY_COLS =
-  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio';
-const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', ''];
+  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical';
+const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', ''];
 
 export async function createProperty(input: CreatePropertyInput): Promise<void> {
   const staff = requireStaff();
@@ -555,6 +560,7 @@ export async function getPropertyForEdit(id: string): Promise<PropertyEditData |
     area: r.area != null ? Number(r.area) : undefined,
     video: r.video,
     videoUrl: r.video_url ?? undefined,
+    videoVertical: !!r.video_vertical,
     aceitaTemporada: r.aceita_temporada,
     description: r.description,
     amenities: toStringArray(r.amenities),
@@ -583,6 +589,7 @@ export type DevelopmentFields = {
   amenities: string[];
   aceitaTemporada: boolean;
   videoUrl?: string;
+  videoVertical?: boolean;
   heroHeight?: number;
   photos?: string[];
   tiposUnidade?: TipoUnidade[];
@@ -628,12 +635,13 @@ function developmentValues(input: DevelopmentFields) {
     clean(input.bairro),
     clean(input.cidade),
     clean(input.uf?.toUpperCase()),
-    input.status === 'rascunho' ? 'rascunho' : 'publicado'
+    input.status === 'rascunho' ? 'rascunho' : 'publicado',
+    !!input.videoVertical
   ];
 }
 const DEV_COLS =
-  'name, location, delivery_date, description, tipo, pavimentos, area_terreno, amenities, aceita_temporada, hero_height, video_url, photos, tipos_unidade, quartos_opcoes, cep, logradouro, bairro, cidade, uf, status';
-const DEV_CASTS = ['', '', '::date', '', '', '', '', '::jsonb', '', '', '', '::jsonb', '::jsonb', '::jsonb', '', '', '', '', '', ''];
+  'name, location, delivery_date, description, tipo, pavimentos, area_terreno, amenities, aceita_temporada, hero_height, video_url, photos, tipos_unidade, quartos_opcoes, cep, logradouro, bairro, cidade, uf, status, video_vertical';
+const DEV_CASTS = ['', '', '::date', '', '', '', '', '::jsonb', '', '', '', '::jsonb', '::jsonb', '::jsonb', '', '', '', '', '', '', ''];
 
 export async function createDevelopment(input: CreateDevelopmentInput): Promise<{ ok: true } | { ok: false; faltando: string[] }> {
   const staff = requireStaff();
@@ -744,6 +752,7 @@ export async function getDevelopmentForEdit(id: string): Promise<DevelopmentEdit
     amenities: toStringArray(d.amenities),
     aceitaTemporada: d.aceita_temporada,
     videoUrl: d.video_url ?? undefined,
+    videoVertical: !!d.video_vertical,
     heroHeight: d.hero_height,
     photos: toStringArray(d.photos),
     tiposUnidade: toStringArray(d.tipos_unidade) as TipoUnidade[],

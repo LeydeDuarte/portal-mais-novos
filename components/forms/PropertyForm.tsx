@@ -6,6 +6,7 @@ import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
 import PhotoUploadField from '@/components/PhotoUploadField';
 import CepField, { ENDERECO_VAZIO, formatLocation, type Endereco } from '@/components/CepField';
 import CondominioPicker from '@/components/forms/CondominioPicker';
+import VideoFormato, { pareceVertical } from '@/components/forms/VideoFormato';
 import { listCondominios, type CondominioResumo, type PropertyFields, type PropertyEditData } from '@/lib/actions';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { maskCurrencyInput } from '@/lib/currency';
@@ -30,6 +31,7 @@ type Values = {
   aceitaTemporada: boolean;
   video: boolean;
   videoUrl: string;
+  videoVertical: boolean | null; // null = ainda não escolheu (obrigatório quando tem vídeo)
   description: string;
   amenities: string[];
   empreendimentoId: string;
@@ -53,6 +55,7 @@ const EMPTY: Values = {
   aceitaTemporada: false,
   video: false,
   videoUrl: '',
+  videoVertical: null,
   description: '',
   amenities: [],
   empreendimentoId: '',
@@ -79,6 +82,7 @@ function fromEditData(d: PropertyEditData): Values {
     aceitaTemporada: d.aceitaTemporada,
     video: d.video,
     videoUrl: d.videoUrl ?? '',
+    videoVertical: d.video && d.videoUrl ? !!d.videoVertical : null,
     description: d.description,
     amenities: d.amenities,
     empreendimentoId: d.empreendimentoId ?? '',
@@ -136,6 +140,10 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
       setErro('Preencha o CEP (ou bairro e cidade) para o imóvel aparecer nas buscas por localização.');
       return;
     }
+    if (v.video && v.videoUrl.trim() && v.videoVertical === null) {
+      setErro('Escolha o formato do vídeo (Deitado ou Em pé) antes de publicar.');
+      return;
+    }
     setSubmitting(true);
     try {
       await onSave({
@@ -153,6 +161,7 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         area: v.area ? Number(v.area) : undefined,
         video: v.video,
         videoUrl: v.video ? v.videoUrl : undefined,
+        videoVertical: v.video && !!v.videoVertical,
         aceitaTemporada: v.aceitaTemporada,
         description:
           v.description ||
@@ -275,7 +284,17 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         </label>
         {v.video && (
           <div className="flex flex-col gap-1">
-            <input type="url" className={inputClass} placeholder="Link do YouTube ou Instagram" value={v.videoUrl} onChange={(e) => set('videoUrl', e.target.value)} />
+            <input
+              type="url"
+              className={inputClass}
+              placeholder="Link do YouTube ou Instagram"
+              value={v.videoUrl}
+              onChange={(e) => {
+                const url = e.target.value;
+                setV((prev) => ({ ...prev, videoUrl: url, videoVertical: pareceVertical(url) ? true : prev.videoVertical }));
+              }}
+            />
+            <VideoFormato vertical={v.videoVertical} onChange={(x) => set('videoVertical', x)} />
             <span className="text-xs text-[var(--text-faint)]">
               YouTube: cole o link da barra de endereço ao assistir o vídeo (ex: youtube.com/watch?v=... ou youtu.be/...). Instagram: abra o Reel/post,
               toque em &quot;...&quot; → Copiar link. Precisa ser um post público.

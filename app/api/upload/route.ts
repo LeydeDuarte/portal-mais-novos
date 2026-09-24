@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { verifySession } from '@/lib/session';
+import { r2PublicBase } from '@/lib/r2-url';
 
 // Upload de fotos para o Cloudflare R2 (bucket `portal-mais-novos-imoveis-fotos`).
 // Só a equipe logada pode enviar. O navegador já reduz a foto antes de mandar
@@ -68,7 +69,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Não foi possível salvar a foto agora. Tente novamente.' }, { status: 502 });
   }
 
-  const base = (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, '');
-  const publicBase = base.startsWith('http') ? base : `https://${base}`;
-  return NextResponse.json({ url: `${publicBase}/${key}` });
+  return NextResponse.json({ url: `${r2PublicBase()}/${key}` });
 }
