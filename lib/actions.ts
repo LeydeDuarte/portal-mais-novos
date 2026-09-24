@@ -114,10 +114,12 @@ export async function getFeedPage(page: number, filters: FilterState, opcoes?: {
   if (filters.aceitaTemporada === 'sim') devConds.push('d.aceita_temporada = true');
   // Só condomínios publicados; as tipologias da tabela de vendas aparecem dentro do card do empreendimento
   devConds.push("d.status = 'publicado'"); // sem ano de entrega também aparece (com "----" no lugar do ano)
-  // Condomínio sem fotos e sem nenhum imóvel/tipologia não entra no feed geral —
-  // só aparece quando a pessoa pesquisa (por local ou palavra-chave).
-  const pesquisando = (filters.termos ?? []).length > 0 || (filters.locais ?? []).length > 0;
-  if (!pesquisando) devConds.push("(jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) > 0 or coalesce(u.n, 0) > 0)");
+  // Para o público, condomínio que NÃO é lançamento e não tem foto nem anúncio
+  // ligado (tipologia da tabela não conta) não entra no feed — só aparece quando a
+  // pessoa pesquisa o nome dele (e no Google, pela página própria). A equipe logada vê tudo.
+  const pesquisandoNome = (filters.termos ?? []).length > 0 || (filters.locais ?? []).some((l) => l.tipo === 'condominio');
+  if (!pesquisandoNome && !currentStaff())
+    devConds.push("(d.delivery_date > now() or jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) > 0 or coalesce(u.avulsos, 0) > 0)");
   propConds.push('p.is_tipologia = false');
   // Anúncios PRIVADOS (portfólio, sem autorização do proprietário para publicar)
   // não entram no feed; aparecem só mascarados na seção "reservados" no fim da busca.
@@ -226,6 +228,7 @@ export async function getFeedPage(page: number, filters: FilterState, opcoes?: {
                   max(x.vagas) as max_vagas,
                   jsonb_agg(distinct x.tipo_unidade) as tipos,
                   count(x.id) as n,
+                  count(x.id) filter (where not x.is_tipologia and x.vendido_em is null) as avulsos,
                   string_agg(distinct xtl.label, ' ') as tipos_texto
              from properties x left join tl xtl on xtl.k = x.tipo_unidade
             where x.empreendimento_id = d.id and x.visibilidade = 'publico'
