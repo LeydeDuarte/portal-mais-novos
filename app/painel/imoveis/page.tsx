@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
-import { getPropertiesByCorretor, deleteProperty } from '@/lib/actions';
+import { getPropertiesByCorretor, deleteProperty, marcarComoVendido, getLinkPrivado } from '@/lib/actions';
 import type { PropertyDetail } from '@/lib/property-details';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 
@@ -29,8 +29,29 @@ export default function MeusImoveisPage() {
     }
   }, [staff]);
 
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<'todos' | 'publico' | 'privado'>('todos');
+
+  const handleVendido = async (id: string) => {
+    const valor = window.prompt('Marcar como VENDIDO. Ele sai do ar e fica no histórico de mercado.\n\nValor de venda (opcional, só números):', '');
+    if (valor === null) return;
+    await marcarComoVendido(id, Number(valor.replace(/\D/g, '')) || undefined);
+    setItems((prev) => prev.filter((p) => p.id !== id));
+    setAviso('Marcado como vendido — está no histórico de mercado.');
+  };
+
+  const copiarLink = async (id: string) => {
+    const link = await getLinkPrivado(id);
+    try {
+      await navigator.clipboard.writeText(link);
+      setAviso('Link privado copiado — é só colar no WhatsApp do cliente.');
+    } catch {
+      window.prompt('Copie o link privado:', link);
+    }
+  };
+
   const handleRemove = async (id: string) => {
-    if (!window.confirm('Excluir este imóvel? Isso não pode ser desfeito.')) return;
+    if (!window.confirm('Excluir este imóvel? Ele sai do site, mas os dados ficam guardados no histórico de mercado.')) return;
     await deleteProperty(id);
     setItems((prev) => prev.filter((p) => p.id !== id));
   };
@@ -49,16 +70,33 @@ export default function MeusImoveisPage() {
           </Link>
         </div>
 
+        {aviso && <p className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{aviso}</p>}
+        <div className="mt-4 flex gap-2">
+          {(['todos', 'publico', 'privado'] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFiltro(f)}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-bold ${filtro === f ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}
+            >
+              {f === 'todos' ? `Todos (${items.length})` : f === 'publico' ? 'Públicos' : `Privados (${items.filter((p) => p.visibilidade === 'privado').length})`}
+            </button>
+          ))}
+        </div>
+
         {!fetched ? (
           <p className="mt-8 text-sm text-[var(--text-muted)]">Carregando…</p>
         ) : items.length === 0 ? (
           <p className="mt-8 text-sm text-[var(--text-muted)]">Nenhum imóvel cadastrado ainda.</p>
         ) : (
           <div className="mt-6 flex flex-col gap-3">
-            {items.map((p) => (
+            {items.filter((p) => filtro === 'todos' || (p.visibilidade ?? 'publico') === filtro).map((p) => (
               <div key={p.id} className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] p-4">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[p.tipoUnidade]}</span>
+                  <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-accent">
+                    {TIPO_UNIDADE_LABEL[p.tipoUnidade]}
+                    {p.visibilidade === 'privado' && <span className="rounded bg-ink px-1.5 py-0.5 text-[10px] text-white">Privado</span>}
+                  </span>
                   <span className="font-sans tabular-nums text-base font-bold tracking-tight">{p.price}</span>
                   <span className="text-sm text-[var(--text-muted)]">
                     {p.condominio ? `${p.condominio} · ` : ''}
@@ -69,7 +107,17 @@ export default function MeusImoveisPage() {
                     <span className="text-xs text-[var(--text-faint)]">Cadastrado por {p.corretorEmail}</span>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
+                  {p.visibilidade === 'privado' && (
+                    <button type="button" onClick={() => copiarLink(p.id)} className="text-sm font-semibold text-accent hover:underline">
+                      Copiar link privado
+                    </button>
+                  )}
+                  {p.finalidade === 'venda' && (
+                    <button type="button" onClick={() => handleVendido(p.id)} className="text-sm font-semibold text-emerald-700 hover:underline">
+                      Vendido
+                    </button>
+                  )}
                   <Link href={`/imovel/${p.id}`} className="text-sm font-semibold text-accent hover:underline">
                     Ver
                   </Link>

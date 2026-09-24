@@ -1,5 +1,6 @@
 'use client';
 
+import TemporadaBadge from '@/components/TemporadaBadge';
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import type { Property } from '@/lib/mock-properties';
@@ -130,13 +131,7 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
               </span>
             )}
             {property.aceitaTemporada && (
-              <span className="flex items-center gap-1 rounded-md bg-emerald-700/85 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="7" width="18" height="13" rx="2" />
-                  <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                </svg>
-                Aceita temporada
-              </span>
+              <TemporadaBadge compacto />
             )}
             {property.video && (
               <span className="flex items-center gap-1 rounded-md bg-ink/70 px-2 py-1 text-[10px] font-bold text-white">

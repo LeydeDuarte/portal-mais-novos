@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import TemporadaBadge from '@/components/TemporadaBadge';
 import type { DevelopmentCardData } from '@/lib/actions';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
@@ -83,7 +84,7 @@ export default function DevelopmentCard({ development }: { development: Developm
             </span>
             <span className="rounded-md bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ink">Empreendimento</span>
             {development.aceitaTemporada && (
-              <span className="rounded-md bg-emerald-700/85 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">Aceita temporada</span>
+              <TemporadaBadge compacto />
             )}
           </div>
 

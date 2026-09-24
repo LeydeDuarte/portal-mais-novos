@@ -12,7 +12,9 @@ const LINKS = [
   { href: '/painel/monitoramento', label: 'Monitoramento' },
   { href: '/painel/imoveis', label: 'Meus imóveis' },
   { href: '/painel/condominios', label: 'Condomínios' },
-  { href: '/painel/interessados', label: 'Interessados' }
+  { href: '/painel/interessados', label: 'Interessados' },
+  { href: '/painel/clientes', label: 'Clientes' },
+  { href: '/painel/mercado', label: 'Mercado' }
 ];
 
 // Menu de ferramentas do painel — aparece em toda página interna, pra nunca

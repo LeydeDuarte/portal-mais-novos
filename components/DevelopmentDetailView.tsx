@@ -1,3 +1,4 @@
+import TemporadaBadge from '@/components/TemporadaBadge';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -9,7 +10,8 @@ import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
-import { getRelatedListings } from '@/lib/actions';
+import { getRelatedListings, getOcultosDoCondominio } from '@/lib/actions';
+import OcultoCard from '@/components/OcultoCard';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
 import { getStatusBadge } from '@/lib/classification';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
@@ -27,6 +29,7 @@ export default async function DevelopmentDetailView({ development }: { developme
   const tipologias = development.units.filter((u) => u.isTipologia);
   const related = await getRelatedListings({ developmentId: development.id }).catch(() => ({ mesmoCondominio: [], regiao: [], precoReferencia: null }));
   const futuro = !!development.deliveryDate && badge.bucket === 'lancamento';
+  const reservados = await getOcultosDoCondominio(development.id, development.name, development.cidade).catch(() => []);
   const embed = development.videoUrl ? getEmbedInfo(development.videoUrl) : null;
   // Preço médio do m² vem só da tabela de vendas (tipologias), não dos imóveis de revenda
   const avgPricePerM2 = getAveragePricePerM2(development.units.filter((u) => u.isTipologia));
@@ -106,13 +109,7 @@ export default async function DevelopmentDetailView({ development }: { developme
               {badge.text}
             </span>
             {development.aceitaTemporada && (
-              <span className="flex items-center gap-1.5 rounded-md bg-emerald-700/85 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="7" width="18" height="13" rx="2" />
-                  <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                </svg>
-                Aceita temporada
-              </span>
+              <TemporadaBadge grande />
             )}
           </div>
         </div>
@@ -265,6 +262,19 @@ export default async function DevelopmentDetailView({ development }: { developme
           items={related.mesmoCondominio.filter((p) => p.finalidade === 'venda')}
           emptyText={vendaDireta ? `Nenhum anúncio particular no ${development.name} no momento — fale conosco para ver as unidades direto com a incorporadora.` : `Nenhum imóvel à venda no ${development.name} no momento — registre seu interesse abaixo e avisamos quando surgir uma oportunidade.`}
         />
+        {reservados.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-lg font-bold">Imóveis reservados no {development.name}</h2>
+            <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+              Anúncios do nosso portfólio que não estão públicos a pedido do proprietário. Peça para ver e verificamos a disponibilidade.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+              {reservados.map((a) => (
+                <OcultoCard key={a.id} a={a} />
+              ))}
+            </div>
+          </section>
+        )}
         <RelatedListings title={`Para alugar no ${development.name}`} items={related.mesmoCondominio.filter((p) => p.finalidade === 'aluguel')} />
 
         {vendaDireta ? (

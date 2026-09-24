@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useFavorites } from '@/lib/use-favorites';
 import { useSession } from '@/lib/use-session';
 import LoginModal from './LoginModal';
+import type { Cliente } from '@/lib/cliente-auth';
 
 export default function DetailFavoriteButton({ propertyId }: { propertyId: string }) {
   const { favorites, toggleFavorite } = useFavorites();
@@ -19,8 +20,8 @@ export default function DetailFavoriteButton({ propertyId }: { propertyId: strin
     toggleFavorite(propertyId);
   };
 
-  const handleSignIn = () => {
-    signIn();
+  const handleSignIn = (cliente?: Cliente | null) => {
+    signIn(cliente);
     setModalOpen(false);
     toggleFavorite(propertyId);
   };

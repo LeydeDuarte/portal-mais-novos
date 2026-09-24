@@ -1,3 +1,4 @@
+import TemporadaBadge from '@/components/TemporadaBadge';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -9,7 +10,7 @@ import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
-import type { PropertyDetail } from '@/lib/property-details';
+import { getAveragePricePerM2, formatPricePerM2, type PropertyDetail } from '@/lib/property-details';
 import { getDevelopmentById, getRelatedListings } from '@/lib/actions';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
@@ -18,10 +19,12 @@ import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 const BED_PATH = 'M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6 M3 18h18 M5 10V7a2 2 0 0 1 2-2h3v5';
 
 // Visualização do imóvel — Server Component, busca no banco de dados.
-export default async function PropertyDetailView({ property }: { property: PropertyDetail }) {
+export default async function PropertyDetailView({ property, avisoPrivado }: { property: PropertyDetail; avisoPrivado?: 'completo' | 'link' }) {
   const development = property.empreendimentoId ? await getDevelopmentById(property.empreendimentoId) : null;
   const related = await getRelatedListings({ propertyId: property.id }).catch(() => ({ mesmoCondominio: [], regiao: [], precoReferencia: null }));
   const badge = getStatusBadge(property.deliveryDate);
+  // Valor do m² da unidade (só venda)
+  const precoM2 = property.finalidade === 'venda' ? getAveragePricePerM2([property]) || null : null;
   const embed = property.videoUrl ? getEmbedInfo(property.videoUrl) : null;
 
   // Descobre o formato real do vídeo (horizontal ou vertical) pra evitar
@@ -57,13 +60,7 @@ export default async function PropertyDetailView({ property }: { property: Prope
                   </span>
                 )}
                 {property.aceitaTemporada && (
-                  <span className="flex items-center gap-1.5 rounded-md bg-emerald-700/85 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="7" width="18" height="13" rx="2" />
-                      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                    Aceita temporada
-                  </span>
+                  <TemporadaBadge grande />
                 )}
               </div>
   );
@@ -77,6 +74,22 @@ export default async function PropertyDetailView({ property }: { property: Prope
           ← Voltar para a Home
         </Link>
 
+        {avisoPrivado && (
+          <div className="mb-5 flex items-start gap-2 rounded-xl border border-[var(--border)] bg-[var(--pill-bg)] p-4 text-sm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0" aria-hidden><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+            <span>
+              {avisoPrivado === 'link' ? (
+                <>
+                  <strong>Anúncio exclusivo.</strong> Você recebeu um link privado — este imóvel não está publicado para o público em geral.
+                </>
+              ) : (
+                <>
+                  <strong>Anúncio privado</strong> — só a equipe e quem recebe o link privado veem esta página completa. O público vê só o resumo.
+                </>
+              )}
+            </span>
+          </div>
+        )}
         <h1 className="font-serif text-2xl font-semibold">{titulo}</h1>
         <p className="mb-5 mt-1 text-sm text-[var(--text-muted)]">
           {property.condominio ? <strong className="font-semibold text-[var(--text)]">{property.condominio} · </strong> : null}
@@ -156,6 +169,7 @@ export default async function PropertyDetailView({ property }: { property: Prope
             <div className="rounded-2xl border border-[var(--border)] p-5">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[property.tipoUnidade]}</div>
               <div className="font-sans tabular-nums text-2xl font-bold tracking-tight">{property.price}</div>
+              {precoM2 && <div className="text-sm text-[var(--text-muted)]">{formatPricePerM2(precoM2)}</div>}
               <div className="mt-1 text-sm text-[var(--text-muted)]">{property.location}</div>
 
               <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-[var(--border)] pt-4">

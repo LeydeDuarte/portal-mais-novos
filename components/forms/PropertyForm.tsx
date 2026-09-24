@@ -30,6 +30,7 @@ type Values = {
   escaninhos: string;
   area: string;
   aceitaTemporada: boolean;
+  visibilidade: 'publico' | 'privado';
   video: boolean;
   videoUrl: string;
   videoVertical: boolean | null; // null = ainda não escolheu (obrigatório quando tem vídeo)
@@ -55,6 +56,7 @@ const EMPTY: Values = {
   escaninhos: '',
   area: '',
   aceitaTemporada: false,
+  visibilidade: 'publico',
   video: false,
   videoUrl: '',
   videoVertical: null,
@@ -75,7 +77,7 @@ function fromEditData(d: PropertyEditData): Values {
     tipoUnidade: d.tipoUnidade,
     finalidade: d.finalidade,
     deliveryDate: d.deliveryDate,
-    priceDigits: String(Math.round(d.priceValue || 0)),
+    priceDigits: d.priceValue ? String(Math.round(d.priceValue)) : '',
     priceSuffix: d.pricePeriod === 'mensal' ? '/mês' : '',
     quartos: chip(d.quartos),
     vagas: chip(d.vagas),
@@ -83,6 +85,7 @@ function fromEditData(d: PropertyEditData): Values {
     escaninhos: d.escaninhos == null ? '' : d.escaninhos >= 3 ? '3+' : String(d.escaninhos),
     area: d.area != null ? String(d.area) : '',
     aceitaTemporada: d.aceitaTemporada,
+    visibilidade: d.visibilidade === 'privado' ? 'privado' : 'publico',
     video: d.video,
     videoUrl: d.videoUrl ?? '',
     videoVertical: d.video && d.videoUrl ? !!d.videoVertical : null,
@@ -167,6 +170,7 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         videoUrl: v.video ? v.videoUrl : undefined,
         videoVertical: v.video && !!v.videoVertical,
         aceitaTemporada: v.aceitaTemporada,
+        visibilidade: v.visibilidade,
         description:
           v.description ||
           `Imóvel ${v.finalidade === 'aluguel' ? 'disponível para locação' : 'à venda'} em ${v.condominio ? `${v.condominio}, ` : ''}${location}.`,
@@ -217,16 +221,6 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         </div>
       </div>
 
-      <CondominioPicker
-        condominios={condominios}
-        selectedId={v.empreendimentoId}
-        onSelect={escolherCondominio}
-        onCreated={(c) => {
-          setCondominios((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)));
-          escolherCondominio(c);
-        }}
-      />
-
       <CepField
         value={v.endereco}
         onChange={(e) => set('endereco', e)}
@@ -234,6 +228,19 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
           const c = sug.id ? condominios.find((x) => x.id === sug.id) : undefined;
           if (c) escolherCondominio(c);
           else set('condominio', sug.nome);
+        }}
+      />
+
+      <CondominioPicker
+        condominios={condominios}
+        selectedId={v.empreendimentoId}
+        cidade={v.endereco.cidade}
+        textoInicial={v.empreendimentoId ? '' : v.condominio}
+        bairro={v.endereco.bairro}
+        onSelect={escolherCondominio}
+        onCreated={(c) => {
+          setCondominios((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)));
+          escolherCondominio(c);
         }}
       />
 
@@ -277,6 +284,29 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold text-[var(--text-muted)]">Comodidades (o lazer do condomínio entra sozinho ao escolher o condomínio)</label>
         <AmenitiesCheckboxes selected={v.amenities} onChange={(x) => set('amenities', x)} />
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-4">
+        <span className="text-xs font-semibold text-[var(--text-muted)]">Quem pode ver este anúncio?</span>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(
+            [
+              ['publico', 'Público', 'Aparece no feed, nas buscas e no Google, com fotos e endereço.'],
+              ['privado', 'Privado (portfólio)', 'O proprietário não autorizou publicar. Fora do feed; o público vê só as características e pede para ver. Você manda o link privado para o cliente.']
+            ] as const
+          ).map(([val, titulo, desc]) => (
+            <label
+              key={val}
+              className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm ${v.visibilidade === val ? 'border-accent bg-[#f5f8ff]' : 'border-[var(--border)]'}`}
+            >
+              <span className="flex items-center gap-2 font-semibold">
+                <input type="radio" name="visibilidade" checked={v.visibilidade === val} onChange={() => set('visibilidade', val)} />
+                {titulo}
+              </span>
+              <span className="text-xs text-[var(--text-muted)]">{desc}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
       <PhotoUploadField photos={v.photos} onChange={(x) => set('photos', x)} onUploadingChange={setUploading} nomeArquivo={nomeArquivo} />

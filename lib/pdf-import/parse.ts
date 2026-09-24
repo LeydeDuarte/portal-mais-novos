@@ -332,7 +332,7 @@ export const perto = (a: number, b: number, tol = 0.012) => Math.abs(a - b) / Ma
 
 // ---------- lazer ----------
 
-const AMENIDADE_REGRAS: [string, RegExp][] = [
+export const AMENIDADE_REGRAS: [string, RegExp][] = [
   ['Piscina', /piscina|raia/],
   ['Academia', /academia|fitness|crossfit/],
   ['Salão de festas', /sal[aã]o de festas|\bfestas\b/],

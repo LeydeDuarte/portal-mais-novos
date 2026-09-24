@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { query } from './db';
-import { verifySession } from './session';
+import { verifySession, verificarAssinado } from './session';
 import type { MarketReference } from './market-mock';
 import type { TipoUnidade } from './tipologias';
 
@@ -21,6 +21,9 @@ const STAFF_COOKIE = 'mn_staff';
 // de "visitor:xxx" para o e-mail) e os favoritos vão junto.
 function getVisitorKey(createIfMissing: boolean): string | null {
   const jar = cookies();
+  // Cliente logado com Google: favoritos ficam no e-mail dele
+  const cliente = verificarAssinado<{ email: string }>(jar.get('mn_cliente')?.value);
+  if (cliente?.email) return cliente.email;
   let id = jar.get(VISITOR_COOKIE)?.value;
   if (!id || !/^[0-9a-f-]{36}$/.test(id)) {
     if (!createIfMissing) return null;
@@ -177,4 +180,17 @@ export async function updateMarketLeadStatus(leadId: string, status: MarketLeadS
   } else {
     await query('update market_leads set status = $1 where id = $2::uuid and corretor_email = $3', [status, leadId, staff.email]);
   }
+}
+
+// Imóveis favoritados (só os que continuam publicados)
+export async function getMyFavoriteProperties(): Promise<import('./property-details').PropertyDetail[]> {
+  const key = getVisitorKey(false);
+  if (!key) return [];
+  const { mapPropertyRow } = await import('./db-mappers');
+  const rows = await query<import('./db-mappers').PropertyRow>(
+    `select p.* from favorites f join properties p on p.id = f.property_id
+      where f.user_email = $1 and p.visibilidade = 'publico' order by f.created_at desc`,
+    [key]
+  );
+  return rows.map(mapPropertyRow);
 }

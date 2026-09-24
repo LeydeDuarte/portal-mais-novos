@@ -12,6 +12,7 @@ import { r2PublicBase, cleanPhotoUrl } from './r2-url';
 import { formatTitulo } from './text';
 import { enviarEmail, emailConfigurado, emailLayout, escapeHtml } from './email';
 import { SITE_URL } from './seo';
+import { chaveLinkPrivado } from './session';
 
 const PAGE_SIZE = 12;
 const STAFF_COOKIE = 'mn_staff';
@@ -67,7 +68,8 @@ const TIPOS_CTE = `tl(k, label) as (values ${Object.entries(TIPO_UNIDADE_LABEL)
   .map(([k, v]) => `('${k}', '${v.replace(/'/g, "''")}')`)
   .join(', ')})`;
 
-export async function getFeedPage(page: number, filters: FilterState): Promise<{ items: FeedItem[]; hasMore: boolean }> {
+export async function getFeedPage(page: number, filters: FilterState, opcoes?: { ocultos?: boolean }): Promise<{ items: FeedItem[]; hasMore: boolean }> {
+  const ocultos = !!opcoes?.ocultos;
   const params: unknown[] = [];
   const p = (value: unknown) => {
     params.push(value);
@@ -115,6 +117,10 @@ export async function getFeedPage(page: number, filters: FilterState): Promise<{
   const pesquisando = (filters.termos ?? []).length > 0 || (filters.locais ?? []).length > 0;
   if (!pesquisando) devConds.push("(jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) > 0 or coalesce(u.n, 0) > 0)");
   propConds.push('p.is_tipologia = false');
+  // Anúncios PRIVADOS (portfólio, sem autorização do proprietário para publicar)
+  // não entram no feed; aparecem só mascarados na seção "reservados" no fim da busca.
+  propConds.push(ocultos ? "p.visibilidade = 'privado'" : "p.visibilidade = 'publico'");
+  if (ocultos) devConds.push('false');
 
   // ---- Condições que valem para os dois ----
   const situacaoSql = (col: string) => {
@@ -218,7 +224,7 @@ export async function getFeedPage(page: number, filters: FilterState): Promise<{
                   count(x.id) as n,
                   string_agg(distinct xtl.label, ' ') as tipos_texto
              from properties x left join tl xtl on xtl.k = x.tipo_unidade
-            where x.empreendimento_id = d.id
+            where x.empreendimento_id = d.id and x.visibilidade = 'publico'
          ) u on true
          left join lateral (
            select max(v::int) as max_quartos from jsonb_array_elements_text(d.quartos_opcoes) v
@@ -281,7 +287,7 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
                 min(x.quartos) as q_min, max(x.quartos) as q_max,
                 min(x.area) as a_min, max(x.area) as a_max,
                 count(*) as n, jsonb_agg(distinct x.tipo_unidade) as unit_tipos
-           from properties x where x.empreendimento_id = d.id
+           from properties x where x.empreendimento_id = d.id and x.visibilidade = 'publico'
        ) u on true
       where d.id = any($1::text[])`,
     [ids]
@@ -392,9 +398,13 @@ async function assertCanEdit(table: 'properties' | 'developments', id: string, s
 }
 
 // ---------------- Leitura para as páginas públicas ----------------
-export async function getPropertyById(id: string): Promise<PropertyDetail | null> {
+// Anúncio privado só volta completo para a equipe ou com a chave do link privado
+export async function getPropertyById(id: string, chave?: string): Promise<PropertyDetail | null> {
   const rows = await query<PropertyRow>('select * from properties where id = $1', [id]);
-  return rows[0] ? mapPropertyRow(rows[0]) : null;
+  const r = rows[0];
+  if (!r) return null;
+  if (r.visibilidade === 'privado' && !currentStaff() && chave !== chaveLinkPrivado(id)) return null;
+  return mapPropertyRow(r);
 }
 
 // Condomínio em rascunho só aparece para quem está logado no painel
@@ -404,7 +414,7 @@ export async function getDevelopmentById(id: string): Promise<Development | null
   if (!dev) return null;
   if (dev.status === 'rascunho' && !currentStaff()) return null;
   const unitRows = await query<PropertyRow>(
-    'select * from properties where empreendimento_id = $1 order by is_tipologia desc, area asc nulls last',
+    "select * from properties where empreendimento_id = $1 and visibilidade = 'publico' order by is_tipologia desc, area asc nulls last",
     [id]
   );
   return mapDevelopmentRow(dev, unitRows.map(mapPropertyRow));
@@ -487,7 +497,7 @@ export async function getRelatedListings(target: { propertyId?: string; developm
   // Mesmo condomínio: vinculados ao empreendimento ou com o mesmo nome de condomínio na mesma cidade
   const condoRows = await query<PropertyRow>(
     `select * from properties
-      where is_tipologia = false and id <> $1
+      where is_tipologia = false and visibilidade = 'publico' and id <> $1
         and (($2::text is not null and empreendimento_id = $2)
           or ($3::text is not null and ${norm('condominio')} = ${norm('$3::text')} and ${norm("coalesce(cidade, '')")} = ${norm("coalesce($4::text, '')")}))
       order by created_at desc limit 12`,
@@ -507,6 +517,7 @@ export async function getRelatedListings(target: { propertyId?: string; developm
   };
   const conds = [
     'is_tipologia = false',
+    "visibilidade = 'publico'",
     'not (id = any($1::text[]))',
     `${norm("coalesce(cidade, '')")} = ${norm('$2::text')}`,
     'finalidade = $4',
@@ -558,6 +569,9 @@ export type CreatePropertyInput = {
   corretorEmail?: string; // ignorado — o corretor vem sempre do login
   photos?: string[];
   plantas?: string[]; // imagens da planta da unidade (duplex pode ter 2: inferior e superior)
+  // 'privado' = anúncio do nosso portfólio que o proprietário não autorizou publicar:
+  // fica fora do feed, mostra só um resumo e o anúncio completo só pelo link privado.
+  visibilidade?: 'publico' | 'privado';
   cep?: string;
   logradouro?: string;
   bairro?: string;
@@ -608,12 +622,13 @@ function propertyValues(input: PropertyFields) {
     clean(input.uf?.toUpperCase()),
     clean(input.condominio ? formatTitulo(input.condominio) : undefined),
     !!input.videoVertical,
-    JSON.stringify(sanitizePhotos(input.plantas))
+    JSON.stringify(sanitizePhotos(input.plantas)),
+    input.visibilidade === 'privado' ? 'privado' : 'publico'
   ];
 }
 const PROPERTY_COLS =
-  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical, plantas';
-const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', '', '::jsonb'];
+  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical, plantas, visibilidade';
+const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', '', '::jsonb', ''];
 
 export async function createProperty(input: CreatePropertyInput): Promise<void> {
   const staff = requireStaff();
@@ -636,10 +651,105 @@ export async function updateProperty(id: string, input: PropertyFields): Promise
   await query(`update properties set ${sets} where id = $1`, [id, ...values]);
 }
 
+// Nada se perde: antes de sair do ar (excluído ou vendido), o anúncio vai para
+// o histórico — base das médias de mercado e do preço do m² por bairro.
+async function arquivarNoHistorico(id: string, motivo: 'excluido' | 'vendido', valorVenda?: number | null) {
+  await query(
+    `insert into imoveis_historico (property_id, motivo, titulo, tipo_unidade, finalidade, price_value, valor_venda, area, quartos, vagas,
+        bairro, cidade, uf, condominio, empreendimento_id, delivery_date, visibilidade, corretor_email, anunciado_em, dados)
+     select p.id, $2, p.titulo, p.tipo_unidade, p.finalidade, p.price_value, $3, p.area, p.quartos, p.vagas,
+        p.bairro, p.cidade, p.uf, coalesce(d.name, p.condominio), p.empreendimento_id, p.delivery_date, p.visibilidade, p.corretor_email, p.created_at, to_jsonb(p)
+       from properties p left join developments d on d.id = p.empreendimento_id
+      where p.id = $1 and p.is_tipologia = false`,
+    [id, motivo, valorVenda && valorVenda > 0 ? valorVenda : null]
+  );
+}
+
 export async function deleteProperty(id: string): Promise<void> {
   const staff = requireStaff();
   await assertCanEdit('properties', id, staff);
+  await arquivarNoHistorico(id, 'excluido');
+  await query('delete from favorites where property_id = $1', [id]).catch(() => {});
   await query('delete from properties where id = $1', [id]);
+}
+
+// Só anúncio avulso pode ser marcado como vendido (sai do ar e fica no histórico)
+export async function marcarComoVendido(id: string, valorVenda?: number): Promise<void> {
+  const staff = requireStaff();
+  await assertCanEdit('properties', id, staff);
+  const r = await query<{ is_tipologia: boolean }>('select is_tipologia from properties where id = $1', [id]);
+  if (!r[0] || r[0].is_tipologia) throw new Error('Só anúncio avulso pode ser marcado como vendido.');
+  await arquivarNoHistorico(id, 'vendido', valorVenda ?? null);
+  await query('delete from favorites where property_id = $1', [id]).catch(() => {});
+  await query('delete from properties where id = $1', [id]);
+}
+
+// Link privado (para mandar ao cliente) de um anúncio oculto
+export async function getLinkPrivado(id: string): Promise<string> {
+  const staff = requireStaff();
+  await assertCanEdit('properties', id, staff);
+  return `${SITE_URL}/imovel/${id}?k=${chaveLinkPrivado(id)}`;
+}
+
+// ---------------- Anúncios reservados (privados), mascarados ----------------
+export type AnuncioOculto = {
+  id: string;
+  tipoUnidade: TipoUnidade;
+  finalidade: 'venda' | 'aluguel';
+  bairro: string | null;
+  cidade: string | null;
+  quartos: number | null;
+  vagas: number | null;
+  area: number | null;
+  preco: number | null;
+  precoM2: number | null;
+  condominio?: string | null;
+};
+
+function mascarar(r: PropertyRow, comCondominio = false): AnuncioOculto {
+  const area = r.area != null ? Number(r.area) : null;
+  const preco = Number(r.price_value) || null;
+  return {
+    id: r.id,
+    tipoUnidade: r.tipo_unidade as TipoUnidade,
+    finalidade: r.finalidade,
+    bairro: r.bairro ?? null,
+    cidade: r.cidade ?? null,
+    quartos: r.quartos ?? null,
+    vagas: r.vagas ?? null,
+    area,
+    preco,
+    precoM2: preco && area && r.finalidade === 'venda' ? Math.round(preco / area) : null,
+    condominio: comCondominio ? (r.condominio ? formatTitulo(r.condominio) : null) : undefined
+  };
+}
+
+/** Resumos dos anúncios privados que atendem a mesma busca do feed */
+export async function getAnunciosOcultos(filters: FilterState): Promise<AnuncioOculto[]> {
+  const { items } = await getFeedPage(0, filters, { ocultos: true });
+  const ids = items.filter((i) => i.kind === 'imovel').map((i) => (i as { property: { id: string } }).property.id);
+  if (!ids.length) return [];
+  const rows = await query<PropertyRow>('select * from properties where id = any($1::text[])', [ids]);
+  const map = new Map(rows.map((r) => [r.id, r]));
+  return ids.map((id) => map.get(id)).filter(Boolean).slice(0, 12).map((r) => mascarar(r!));
+}
+
+/** Privados de um condomínio (página do condomínio) */
+export async function getOcultosDoCondominio(developmentId: string, nome: string, cidade?: string | null): Promise<AnuncioOculto[]> {
+  const rows = await query<PropertyRow>(
+    `select * from properties
+      where is_tipologia = false and visibilidade = 'privado'
+        and (empreendimento_id = $1 or (${norm('condominio')} = ${norm('$2::text')} and ${norm("coalesce(cidade, '')")} = ${norm("coalesce($3::text, '')")}))
+      order by created_at desc limit 12`,
+    [developmentId, nome, cidade ?? null]
+  );
+  return rows.map((r) => mascarar(r, true));
+}
+
+/** Resumo para a página de um anúncio privado (sem título, fotos ou descrição) */
+export async function getResumoOculto(id: string): Promise<AnuncioOculto | null> {
+  const rows = await query<PropertyRow>("select * from properties where id = $1 and visibilidade = 'privado'", [id]);
+  return rows[0] ? mascarar(rows[0], true) : null;
 }
 
 // Dados crus para preencher o formulário de edição
@@ -676,6 +786,7 @@ export async function getPropertyForEdit(id: string): Promise<PropertyEditData |
     empreendimentoId: r.empreendimento_id ?? undefined,
     photos: toStringArray(r.photos),
     plantas: toStringArray(r.plantas),
+    visibilidade: r.visibilidade === 'privado' ? 'privado' : 'publico',
     cep: r.cep ?? undefined,
     logradouro: r.logradouro ?? undefined,
     bairro: r.bairro ?? undefined,
@@ -901,6 +1012,7 @@ export type CondominioResumo = {
   tipologias: number;
   temFotos: boolean;
   corretorEmail: string | null;
+  criadoEm?: string | null;
 };
 
 export async function listCondominios(): Promise<CondominioResumo[]> {
@@ -925,7 +1037,8 @@ export async function listCondominios(): Promise<CondominioResumo[]> {
     anuncios: Number(d.anuncios) || 0,
     tipologias: Number(d.tipologias) || 0,
     temFotos: toStringArray(d.photos).length > 0,
-    corretorEmail: d.corretor_email
+    corretorEmail: d.corretor_email,
+    criadoEm: (d as unknown as { created_at?: Date | string | null }).created_at ? new Date((d as unknown as { created_at: Date | string }).created_at).toISOString() : null
   }));
 }
 
@@ -1043,7 +1156,7 @@ export async function updateInteresseStatus(id: string, status: InteresseLead['s
 // Quando um imóvel entra num condomínio, avisa por e-mail quem registrou interesse nele
 async function avisarInteressados(propertyId: string): Promise<void> {
   if (!emailConfigurado()) return;
-  const props = await query<PropertyRow>('select * from properties where id = $1 and is_tipologia = false', [propertyId]);
+  const props = await query<PropertyRow>("select * from properties where id = $1 and is_tipologia = false and visibilidade = 'publico'", [propertyId]);
   const p = props[0];
   if (!p) return;
   const devRows = p.empreendimento_id ? await query<{ name: string }>('select name from developments where id = $1', [p.empreendimento_id]) : [];
@@ -1105,4 +1218,110 @@ export async function staffLogout(): Promise<void> {
 
 export async function getStaffSession(): Promise<StaffSessionPayload | null> {
   return verifySession(cookies().get(STAFF_COOKIE)?.value);
+}
+
+// ---------------- Mercado (histórico) ----------------
+// Tudo que já passou pelo portal: anúncios ativos (públicos e privados) +
+// histórico (vendidos e excluídos). Base do preço médio do m² por bairro.
+export type MercadoBairro = {
+  bairro: string;
+  cidade: string;
+  ativos: number;
+  privados: number;
+  vendidos: number;
+  excluidos: number;
+  m2Anuncios: number | null; // média do m² pedido (venda) — todos os anúncios
+  m2Vendidos: number | null; // média do m² dos vendidos (valor de venda, se informado)
+};
+export type MercadoMes = { mes: string; m2Anuncios: number | null; nAnuncios: number; m2Vendidos: number | null; nVendidos: number };
+
+const BASE_MERCADO = `
+  select p.bairro, p.cidade, p.tipo_unidade, p.price_value as preco, p.area, p.created_at as data_anuncio, null::timestamptz as data_fim,
+         case when p.visibilidade = 'privado' then 'privado' else 'ativo' end as estado
+    from properties p where p.is_tipologia = false and p.finalidade = 'venda'
+  union all
+  select h.bairro, h.cidade, h.tipo_unidade, coalesce(h.valor_venda, h.price_value), h.area, h.anunciado_em, h.encerrado_em, h.motivo
+    from imoveis_historico h where h.finalidade = 'venda'`;
+
+export async function getMercado(tipos?: string[]): Promise<MercadoBairro[]> {
+  requireStaff();
+  const filtroTipo = tipos?.length ? 'and tipo_unidade = any($1::text[])' : '';
+  const rows = await query<{ bairro: string; cidade: string; ativos: string; privados: string; vendidos: string; excluidos: string; m2a: string | null; m2v: string | null }>(
+    `with base as (${BASE_MERCADO})
+     select mode() within group (order by bairro) as bairro, mode() within group (order by cidade) as cidade,
+            count(*) filter (where estado = 'ativo') as ativos,
+            count(*) filter (where estado = 'privado') as privados,
+            count(*) filter (where estado = 'vendido') as vendidos,
+            count(*) filter (where estado = 'excluido') as excluidos,
+            avg(preco / area) filter (where preco > 0 and area > 0) as m2a,
+            avg(preco / area) filter (where preco > 0 and area > 0 and estado = 'vendido') as m2v
+       from base
+      where bairro is not null ${filtroTipo}
+      group by ${norm('bairro')}, ${norm("coalesce(cidade, '')")}
+      order by count(*) desc limit 200`,
+    tipos?.length ? [tipos] : []
+  );
+  const n = (v: string | null) => (v != null ? Math.round(Number(v)) : null);
+  return rows.map((r) => ({
+    bairro: r.bairro,
+    cidade: r.cidade,
+    ativos: Number(r.ativos),
+    privados: Number(r.privados),
+    vendidos: Number(r.vendidos),
+    excluidos: Number(r.excluidos),
+    m2Anuncios: n(r.m2a),
+    m2Vendidos: n(r.m2v)
+  }));
+}
+
+export async function getMercadoMensal(bairro: string, cidade: string, tipos?: string[]): Promise<MercadoMes[]> {
+  requireStaff();
+  const params: unknown[] = [bairro, cidade];
+  const filtroTipo = tipos?.length ? `and tipo_unidade = any($3::text[])` : '';
+  if (tipos?.length) params.push(tipos);
+  const rows = await query<{ mes: string; m2a: string | null; na: string; m2v: string | null; nv: string }>(
+    `with base as (${BASE_MERCADO}),
+     sel as (select * from base where ${norm("coalesce(bairro, '')")} = ${norm('$1::text')} and ${norm("coalesce(cidade, '')")} = ${norm('$2::text')} ${filtroTipo}),
+     anuncios as (
+       select to_char(date_trunc('month', data_anuncio), 'YYYY-MM') as mes, avg(preco / area) as m2, count(*) as n
+         from sel where preco > 0 and area > 0 and data_anuncio is not null group by 1
+     ),
+     vendas as (
+       select to_char(date_trunc('month', data_fim), 'YYYY-MM') as mes, avg(preco / area) as m2, count(*) as n
+         from sel where estado = 'vendido' and preco > 0 and area > 0 group by 1
+     )
+     select coalesce(a.mes, v.mes) as mes, a.m2 as m2a, coalesce(a.n, 0) as na, v.m2 as m2v, coalesce(v.n, 0) as nv
+       from anuncios a full join vendas v on v.mes = a.mes
+      order by 1`,
+    params
+  );
+  return rows.map((r) => ({
+    mes: r.mes,
+    m2Anuncios: r.m2a != null ? Math.round(Number(r.m2a)) : null,
+    nAnuncios: Number(r.na),
+    m2Vendidos: r.m2v != null ? Math.round(Number(r.m2v)) : null,
+    nVendidos: Number(r.nv)
+  }));
+}
+
+export type HistoricoLinha = { propertyId: string; motivo: string; titulo: string | null; tipoUnidade: string; preco: number | null; valorVenda: number | null; area: number | null; bairro: string | null; cidade: string | null; condominio: string | null; encerradoEm: string };
+
+export async function listHistorico(): Promise<HistoricoLinha[]> {
+  requireStaff();
+  const rows = await query<{ property_id: string; motivo: string; titulo: string | null; tipo_unidade: string; price_value: string | null; valor_venda: string | null; area: string | null; bairro: string | null; cidade: string | null; condominio: string | null; encerrado_em: Date }>(
+    'select * from imoveis_historico order by encerrado_em desc limit 300'
+  );
+  return rows.map((r) => ({
+    propertyId: r.property_id,
+    motivo: r.motivo,
+    titulo: r.titulo,
+    tipoUnidade: r.tipo_unidade,
+    preco: r.price_value ? Number(r.price_value) : null,
+    valorVenda: r.valor_venda ? Number(r.valor_venda) : null,
+    area: r.area ? Number(r.area) : null,
+    bairro: r.bairro,
+    cidade: r.cidade,
+    condominio: r.condominio,
+    encerradoEm: new Date(r.encerrado_em).toISOString()
+  }));
 }

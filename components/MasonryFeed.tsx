@@ -1,13 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getFeedPage, type FeedItem } from '@/lib/actions';
-import type { FilterState } from '@/lib/filters';
+import { getFeedPage, getAnunciosOcultos, type FeedItem, type AnuncioOculto } from '@/lib/actions';
+import { countActiveFilters, type FilterState } from '@/lib/filters';
+import OcultoCard from './OcultoCard';
 import { useFavorites } from '@/lib/use-favorites';
 import { useSession } from '@/lib/use-session';
 import PropertyCard from './PropertyCard';
 import DevelopmentCard from './DevelopmentCard';
 import LoginModal from './LoginModal';
+import type { Cliente } from '@/lib/cliente-auth';
 
 export default function MasonryFeed({ filters }: { filters: FilterState }) {
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -15,6 +17,8 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [ocultos, setOcultos] = useState<AnuncioOculto[]>([]);
+  const filtrando = countActiveFilters(filters) > 0;
   const pendingFavoriteId = useRef<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -44,6 +48,20 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
   // A filtragem agora acontece no banco de dados, não mais sobre o que já
   // carregou no navegador — então quando os filtros mudam, a busca
   // recomeça do zero em vez de só re-filtrar a lista local.
+  // Fim da busca com filtro: mostra os anúncios RESERVADOS (privados) que
+  // atendem a mesma busca — só características, sem fotos nem endereço.
+  useEffect(() => {
+    setOcultos([]);
+    if (!done || !filtrando) return;
+    let vivo = true;
+    getAnunciosOcultos(filters)
+      .then((o) => vivo && setOcultos(o))
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [done, filtrando, filters]);
+
   useEffect(() => {
     setPage(0);
     loadPage(0, true);
@@ -77,8 +95,8 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
     toggleFavorite(id);
   };
 
-  const handleSignIn = () => {
-    signIn();
+  const handleSignIn = (cliente?: Cliente | null) => {
+    signIn(cliente);
     setModalOpen(false);
     if (pendingFavoriteId.current) {
       toggleFavorite(pendingFavoriteId.current);
@@ -140,6 +158,21 @@ export default function MasonryFeed({ filters }: { filters: FilterState }) {
         {loading && 'Carregando…'}
         {done && items.length > 0 && 'Você viu todos os imóveis desta busca.'}
       </div>
+
+      {done && ocultos.length > 0 && (
+        <section className="mx-auto mb-16 w-full max-w-6xl px-4 md:px-8" aria-label="Anúncios reservados">
+          <h2 className="text-lg font-bold">Anúncios reservados que podem atender sua busca</h2>
+          <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
+            Imóveis do nosso portfólio que o proprietário preferiu não publicar abertamente. Mostramos só as características — peça para ver o anúncio
+            completo e verificamos a disponibilidade para você.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+            {ocultos.map((a) => (
+              <OcultoCard key={a.id} a={a} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <LoginModal open={modalOpen} onClose={() => setModalOpen(false)} onSignIn={handleSignIn} />
     </>

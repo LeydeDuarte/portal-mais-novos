@@ -74,6 +74,7 @@ export async function lerPdf(
 // fica fora do bundle do Next e decodifica imagens JPEG 2000, muito usadas em
 // cadernos de plantas (numa versão enxuta a planta saía em branco).
 type PdfJs = {
+  OPS: Record<string, number>;
   GlobalWorkerOptions: { workerSrc: string };
   getDocument: (src: { data: Uint8Array; isEvalSupported?: boolean }) => { promise: Promise<PdfJsDoc> };
 };
@@ -82,6 +83,9 @@ type PdfJsDoc = {
     getViewport: (o: { scale: number }) => { width: number; height: number };
     render: (o: unknown) => { promise: Promise<void> };
     getTextContent: () => Promise<{ items: unknown[] }>;
+    getOperatorList: () => Promise<{ fnArray: number[]; argsArray: unknown[][] }>;
+    objs: { get: (id: string, cb?: (v: unknown) => void) => unknown };
+    commonObjs: { get: (id: string, cb?: (v: unknown) => void) => unknown };
     cleanup: () => void;
   }>;
   numPages: number;
@@ -127,6 +131,67 @@ export async function renderizarPaginas(
       if (blob) {
         out.push(blob);
         onPronta?.(i, blob);
+      }
+      page.cleanup();
+    }
+  } finally {
+    await pdf.destroy();
+  }
+  return out;
+}
+
+type ImgObj = { bitmap?: ImageBitmap; data?: Uint8ClampedArray; width: number; height: number; kind?: number };
+
+/** Fotos de dentro do PDF (anúncio, folder): extrai as imagens embutidas com
+ *  pelo menos `minLado` px, sem repetir. Se o PDF não tiver imagens soltas
+ *  (página inteira "achatada"), devolve vazio — aí dá para usar a página inteira. */
+export async function extrairImagensPdf(arquivo: File, minLado = 480, maxImagens = 40): Promise<Blob[]> {
+  const pdfjs = await carregarPdfJs();
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await arquivo.arrayBuffer()), isEvalSupported: false }).promise;
+  const out: Blob[] = [];
+  const vistos = new Set<string>();
+  try {
+    for (let p = 1; p <= pdf.numPages && out.length < maxImagens; p++) {
+      const page = await pdf.getPage(p);
+      // renderizar resolve os objetos de imagem da página
+      const vp = page.getViewport({ scale: 0.2 });
+      const c0 = document.createElement('canvas');
+      c0.width = Math.max(1, Math.round(vp.width));
+      c0.height = Math.max(1, Math.round(vp.height));
+      await page.render({ canvasContext: c0.getContext('2d')!, viewport: vp }).promise;
+      const ops = await page.getOperatorList();
+      for (let i = 0; i < ops.fnArray.length && out.length < maxImagens; i++) {
+        const fn = ops.fnArray[i];
+        if (fn !== pdfjs.OPS.paintImageXObject && fn !== pdfjs.OPS.paintJpegXObject) continue;
+        const nome = String(ops.argsArray[i][0]);
+        if (vistos.has(nome)) continue;
+        vistos.add(nome);
+        const store = nome.startsWith('g_') ? page.commonObjs : page.objs;
+        const img = (await new Promise<unknown>((res) => {
+          try {
+            store.get(nome, res);
+          } catch {
+            res(null);
+          }
+        })) as ImgObj | null;
+        if (!img || Math.min(img.width, img.height) < minLado) continue;
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d')!;
+        if (img.bitmap) ctx.drawImage(img.bitmap, 0, 0);
+        else if (img.data) {
+          const rgba = new Uint8ClampedArray(img.width * img.height * 4);
+          const src = img.data;
+          const n = img.width * img.height;
+          if (src.length === n * 4) rgba.set(src);
+          else if (src.length === n * 3) for (let k = 0; k < n; k++) { rgba[k * 4] = src[k * 3]; rgba[k * 4 + 1] = src[k * 3 + 1]; rgba[k * 4 + 2] = src[k * 3 + 2]; rgba[k * 4 + 3] = 255; }
+          else if (src.length === n) for (let k = 0; k < n; k++) { rgba[k * 4] = rgba[k * 4 + 1] = rgba[k * 4 + 2] = src[k]; rgba[k * 4 + 3] = 255; }
+          else continue;
+          ctx.putImageData(new ImageData(rgba, img.width, img.height), 0, 0);
+        } else continue;
+        const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', 0.9));
+        if (blob) out.push(blob);
       }
       page.cleanup();
     }

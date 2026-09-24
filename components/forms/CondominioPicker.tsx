@@ -16,29 +16,71 @@ type Props = {
   selectedId: string;
   onSelect: (c: CondominioResumo | null) => void;
   onCreated: (c: CondominioResumo) => void;
+  cidade?: string; // do CEP do imóvel — prioriza condomínios da mesma cidade (e bairro)
+  bairro?: string;
+  textoInicial?: string; // nome lido do anúncio (preenchimento rápido) — já aparece digitado
 };
+
+const RECENTES_KEY = 'mn_condos_recentes';
+function lerRecentes(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENTES_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+function guardarRecente(id: string) {
+  try {
+    localStorage.setItem(RECENTES_KEY, JSON.stringify([id, ...lerRecentes().filter((x) => x !== id)].slice(0, 10)));
+  } catch {
+    // ignora
+  }
+}
 
 // Campo "Este imóvel fica em qual condomínio?": digita parte do nome e vai
 // filtrando os condomínios já cadastrados. Se não existir, cadastra ali mesmo
 // (nome, endereço, tipo e lazer) — ele nasce como RASCUNHO, sem aparecer no
 // site, até alguém finalizar e publicar em Painel → Condomínios.
-export default function CondominioPicker({ condominios, selectedId, onSelect, onCreated }: Props) {
+export default function CondominioPicker({ condominios, selectedId, onSelect: onSelectRaw, onCreated, cidade = '', bairro = '', textoInicial = '' }: Props) {
+  const onSelect = (c: CondominioResumo | null) => {
+    if (c) guardarRecente(c.id);
+    onSelectRaw(c);
+  };
   const selected = condominios.find((c) => c.id === selectedId) ?? null;
-  const [text, setText] = useState('');
+  const [text, setText] = useState(textoInicial);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Sem digitar nada: só os 3 últimos usados (ou os 3 mais recentes cadastrados).
+  // Digitando: condomínios com esse nome, primeiro os da mesma cidade/bairro do CEP —
+  // com endereço à mostra, porque muitos nomes se repetem em lugares diferentes.
   const matches = useMemo(() => {
     const tokens = normalize(text).split(/\s+/).filter(Boolean);
-    if (!tokens.length) return condominios.slice(0, 8);
+    if (!tokens.length) {
+      const rec = lerRecentes()
+        .map((id) => condominios.find((c) => c.id === id))
+        .filter((c): c is CondominioResumo => !!c);
+      const novos = [...condominios].sort((a, b) => (b.criadoEm ?? '').localeCompare(a.criadoEm ?? ''));
+      return Array.from(new Set([...rec, ...novos])).slice(0, 3);
+    }
+    const cid = normalize(cidade);
+    const bai = normalize(bairro);
     return condominios
-      .filter((c) => {
-        const hay = normalize(`${c.name} ${c.bairro ?? ''} ${c.cidade ?? ''}`);
-        return tokens.every((t) => hay.includes(t));
+      .filter((c) => tokens.every((t) => normalize(c.name).includes(t) || normalize(`${c.bairro ?? ''} ${c.cidade ?? ''}`).includes(t)))
+      .map((c) => {
+        const nome = normalize(c.name);
+        let score = tokens.every((t) => nome.includes(t)) ? 0 : 5;
+        if (nome.startsWith(tokens[0])) score -= 1;
+        if (cid && normalize(c.cidade ?? '') !== cid) score += 10;
+        if (bai && normalize(c.bairro ?? '') === bai) score -= 2;
+        return { c, score };
       })
-      .slice(0, 8);
-  }, [text, condominios]);
+      .sort((a, b) => a.score - b.score || a.c.name.localeCompare(b.c.name))
+      .slice(0, 8)
+      .map((x) => x.c);
+  }, [text, condominios, cidade, bairro]);
+  const semTexto = !text.trim();
 
   // ---- mini cadastro ----
   const [novo, setNovo] = useState({ name: '', endereco: ENDERECO_VAZIO as Endereco, tipo: 'vertical' as 'vertical' | 'horizontal', amenities: [] as string[] });
@@ -46,7 +88,7 @@ export default function CondominioPicker({ condominios, selectedId, onSelect, on
   const [erro, setErro] = useState<string | null>(null);
 
   const startCreate = () => {
-    setNovo((n) => ({ ...n, name: text.trim() }));
+    setNovo((n) => ({ ...n, name: text.trim(), endereco: n.endereco.cidade ? n.endereco : { ...ENDERECO_VAZIO, cidade, bairro } }));
     setCreating(true);
     setOpen(false);
   };
@@ -139,6 +181,9 @@ export default function CondominioPicker({ condominios, selectedId, onSelect, on
               className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--bg)] p-1 shadow-xl"
               onMouseDown={() => blurTimer.current && clearTimeout(blurTimer.current)}
             >
+              <p className="px-3 pb-1 pt-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">
+                {semTexto ? 'Últimos usados — digite para buscar' : cidade ? `Resultados (primeiro os de ${cidade})` : 'Resultados — preencha o CEP para priorizar a cidade'}
+              </p>
               {matches.map((c) => (
                 <button
                   key={c.id}
@@ -150,14 +195,21 @@ export default function CondominioPicker({ condominios, selectedId, onSelect, on
                   }}
                   className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[var(--pill-bg)]"
                 >
-                  <span>
+                  <span className="min-w-0">
                     <strong>{c.name}</strong>
-                    <span className="text-[var(--text-muted)]"> — {[c.bairro, c.cidade].filter(Boolean).join(', ')}</span>
+                    <span className="block truncate text-xs text-[var(--text-muted)]">
+                      {[c.logradouro, c.bairro, [c.cidade, c.uf].filter(Boolean).join('/')].filter(Boolean).join(' · ') || 'Endereço não informado'}
+                    </span>
                   </span>
+                  {cidade && c.cidade && normalize(c.cidade) !== normalize(cidade) && (
+                    <span className="shrink-0 rounded bg-[var(--pill-bg)] px-1.5 py-0.5 text-[10px] font-bold uppercase text-[var(--text-muted)]">outra cidade</span>
+                  )}
                   {c.status === 'rascunho' && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">rascunho</span>}
                 </button>
               ))}
-              {matches.length === 0 && <p className="px-3 py-2 text-sm text-[var(--text-muted)]">Nenhum condomínio com esse nome ainda.</p>}
+              {matches.length === 0 && (
+                <p className="px-3 py-2 text-sm text-[var(--text-muted)]">{semTexto ? 'Digite o nome do condomínio.' : 'Nenhum condomínio com esse nome ainda.'}</p>
+              )}
               <button
                 type="button"
                 onClick={startCreate}

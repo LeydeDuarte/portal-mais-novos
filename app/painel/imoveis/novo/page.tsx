@@ -6,8 +6,9 @@ import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import PropertyForm from '@/components/forms/PropertyForm';
 import DevelopmentForm from '@/components/forms/DevelopmentForm';
+import PreenchimentoRapido from '@/components/forms/PreenchimentoRapido';
 import { useStaffSession } from '@/lib/use-staff-session';
-import { createProperty, createDevelopment, saveTipologias } from '@/lib/actions';
+import { createProperty, createDevelopment, saveTipologias, type PropertyEditData } from '@/lib/actions';
 
 type Sucesso = { kind: 'imovel' | 'condominio'; id: string; status?: 'rascunho' | 'publicado' };
 
@@ -17,6 +18,8 @@ export default function NovoImovelPage() {
   const [modo, setModo] = useState<'imovel' | 'empreendimento'>('imovel');
   const [success, setSuccess] = useState<Sucesso | null>(null);
   const [formKey, setFormKey] = useState(0);
+  const [inicial, setInicial] = useState<PropertyEditData | undefined>(undefined);
+  const [resumo, setResumo] = useState<string[]>([]);
 
   useEffect(() => {
     if (loaded && !staff) router.replace('/painel/login');
@@ -53,6 +56,8 @@ export default function NovoImovelPage() {
               type="button"
               onClick={() => {
                 setSuccess(null);
+                setInicial(undefined);
+                setResumo([]);
                 setFormKey((k) => k + 1);
               }}
               className="rounded-full border border-[var(--border)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--pill-bg)]"
@@ -90,9 +95,24 @@ export default function NovoImovelPage() {
           </button>
         </div>
 
+        {modo === 'imovel' && (
+          <PreenchimentoRapido
+            onAplicar={(d, res) => {
+              setInicial(d);
+              setResumo(res);
+              setFormKey((k) => k + 1);
+            }}
+          />
+        )}
+        {modo === 'imovel' && resumo.length > 0 && (
+          <div className="mb-5 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <strong>Preenchido automaticamente — confira antes de publicar:</strong> {resumo.join(' · ')}
+          </div>
+        )}
         {modo === 'imovel' ? (
           <PropertyForm
             key={`p${formKey}`}
+            initial={inicial}
             submitLabel="Publicar imóvel"
             onSave={async (fields) => {
               const id = `manual-${Date.now()}`;

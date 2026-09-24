@@ -26,6 +26,7 @@ export type Property = {
   // Fotos reais (URLs no R2) — a primeira é a capa. Vazio = mostra o espaço reservado.
   photos?: string[];
   plantas?: string[]; // imagens da planta da unidade
+  visibilidade?: 'publico' | 'privado'; // privado = portfólio, fora do feed (só pelo link privado)
   condominio?: string; // nome do condomínio/edifício, quando o imóvel fica em um
   bairro?: string;
   cidade?: string;
