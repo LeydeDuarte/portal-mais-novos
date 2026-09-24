@@ -13,7 +13,7 @@ import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getRelatedListings, getOcultosDoCondominio } from '@/lib/actions';
 import OcultoCard from '@/components/OcultoCard';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
-import { getStatusBadge } from '@/lib/classification';
+import { getBadgeCondominio } from '@/lib/classification';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import ContarVisita from '@/components/ContarVisita';
@@ -24,7 +24,7 @@ function formatBRL(v: number): string {
 }
 
 export default async function DevelopmentDetailView({ development }: { development: Development }) {
-  const badge = getStatusBadge(development.deliveryDate);
+  const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
   const tipologias = development.units.filter((u) => u.isTipologia);
   const related = await getRelatedListings({ developmentId: development.id }).catch(() => ({ mesmoCondominio: [], regiao: [], precoReferencia: null }));
   const futuro = !!development.deliveryDate && badge.bucket === 'lancamento';

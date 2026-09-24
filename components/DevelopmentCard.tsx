@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Visualizacoes from '@/components/Visualizacoes';
 import TemporadaBadge from '@/components/TemporadaBadge';
 import type { DevelopmentCardData } from '@/lib/actions';
-import { getStatusBadge } from '@/lib/classification';
+import { getBadgeCondominio } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -28,7 +28,7 @@ function range(min: number | null, max: number | null, suffix: string): string |
 // mas mostrando o resumo do condomínio: tipos que existem, faixa de quartos e
 // metragem, "a partir de" e a data de entrega.
 export default function DevelopmentCard({ development }: { development: DevelopmentCardData }) {
-  const badge = getStatusBadge(development.deliveryDate);
+  const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
   const cover = development.photos[0];
   const [ano, mes] = development.deliveryDate.split('-');
   const tipos = development.tiposUnidade.map((t) => TIPO_UNIDADE_LABEL[t]).filter(Boolean);
@@ -94,7 +94,7 @@ export default function DevelopmentCard({ development }: { development: Developm
           <div className="absolute bottom-3 left-3 right-3 z-10 text-white">
             <div className="font-serif text-base font-semibold leading-tight drop-shadow md:text-lg">{development.name}</div>
             <div className="text-[11px] opacity-90 md:text-xs">
-              Entrega {ano ? `${MESES[Number(mes) - 1] ?? mes}/${ano}` : '--/----'}
+              {development.tipo === 'horizontal' ? 'Condomínio entregue' : 'Entrega'} {ano ? `${MESES[Number(mes) - 1] ?? mes}/${ano}` : '--/----'}
             </div>
           </div>
         </div>

@@ -9,7 +9,7 @@ import CondominioPicker from '@/components/forms/CondominioPicker';
 import VideoFormato, { pareceVertical } from '@/components/forms/VideoFormato';
 import DescriptionEditor from '@/components/forms/DescriptionEditor';
 import { listCondominios, type CondominioResumo, type PropertyFields, type PropertyEditData } from '@/lib/actions';
-import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
+import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, ehCasa, type TipoUnidade } from '@/lib/tipologias';
 import { maskCurrencyInput } from '@/lib/currency';
 
 const inputClass = 'rounded-lg border border-[var(--border)] px-3 py-2.5 text-sm outline-none';
@@ -245,7 +245,11 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
       />
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-semibold text-[var(--text-muted)]">Data de entrega (mês/ano — se já pronto, pode ser uma data passada; se não souber, deixe vazio)</label>
+        <label className="text-xs font-semibold text-[var(--text-muted)]">
+          {ehCasa(v.tipoUnidade)
+            ? 'Ano de entrega da casa (habite-se — é a idade da CASA, não a do condomínio; se não souber, deixe vazio)'
+            : 'Data de entrega (mês/ano — se já pronto, pode ser uma data passada; se não souber, deixe vazio)'}
+        </label>
         <input type="month" className={inputClass} value={v.deliveryDate} onChange={(e) => set('deliveryDate', e.target.value)} />
       </div>
 

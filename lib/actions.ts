@@ -40,6 +40,7 @@ export type DevelopmentCardData = {
   aceitaTemporada: boolean;
   height: number;
   visualizacoes: number;
+  tipo: 'vertical' | 'horizontal';
 };
 
 export type FeedItem = { kind: 'imovel'; property: PropertyDetail } | { kind: 'empreendimento'; development: DevelopmentCardData };
@@ -319,7 +320,8 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       unitsCount: Number(row.n) || 0,
       aceitaTemporada: base.aceitaTemporada,
       height: heightFromId(base.id) + 40,
-      visualizacoes: Number(row.visualizacoes) || 0
+      visualizacoes: Number(row.visualizacoes) || 0,
+      tipo: base.tipo
     };
   });
 }

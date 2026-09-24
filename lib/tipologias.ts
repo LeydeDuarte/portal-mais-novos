@@ -84,3 +84,8 @@ export const TIPO_UNIDADE_SCHEMA_ORG: Record<TipoUnidade, string> = {
   galpao: 'Place',
   predio_comercial: 'Place'
 };
+
+// Casas e lotes: a idade é a da CASA (ano de entrega/habite-se da própria casa),
+// nunca a do condomínio horizontal onde ela fica — um condomínio de 1999 pode ter casa nova.
+export const TIPOS_CASA: TipoUnidade[] = ['casa', 'casa_condominio', 'sobrado', 'chacara_sitio_fazenda', 'terreno_lote'];
+export const ehCasa = (t?: string | null) => !!t && (TIPOS_CASA as string[]).includes(t);

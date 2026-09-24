@@ -17,7 +17,7 @@ import { AMENIDADE_REGRAS } from './pdf-import/parse';
 import { TIPOS, formatarDescricao } from './anuncio-parser';
 import { chaveNome, mesmoCondominio, padronizarBairro } from './planilha-condominios';
 import { enviarParaR2, r2Configurado } from './r2';
-import type { TipoUnidade } from './tipologias';
+import { ehCasa, type TipoUnidade } from './tipologias';
 
 const BASE = 'https://api.jetimob.com';
 const sa = (s: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -333,8 +333,12 @@ export async function sincronizarImoveis(
       const area = areaBruta ? Math.round(areaBruta * fator * 100) / 100 : null;
       const condo = i.id_condominio ? condoPorJt.get(String(i.id_condominio)) : undefined;
       const condoData = condo?.delivery_date ? new Date(condo.delivery_date).toISOString().slice(0, 10) : null;
-      // Sem ano de entrega na Jetimob (nem no condomínio): fica vazio e o site mostra "----"
-      const entrega = entregaDe(i.entrega_ano, i.entrega_mes) ?? condoData ?? entregaDoNome(i.condominio_nome) ?? null;
+      // Sem ano de entrega na Jetimob (nem no condomínio): fica vazio e o site mostra "----".
+      // Casa/lote: só vale o ano da própria casa — não herda a data do condomínio.
+      const casa = ehCasa(tipoDoImovel(i));
+      const entrega = casa
+        ? entregaDe(i.entrega_ano, i.entrega_mes) ?? null
+        : entregaDe(i.entrega_ano, i.entrega_mes) ?? condoData ?? entregaDoNome(i.condominio_nome) ?? null;
       const bairro = txt(i.endereco_bairro) ? padronizarBairro(i.endereco_bairro!) : null;
       const cidade = txt(i.endereco_cidade) ? formatTitulo(i.endereco_cidade!) : null;
       const estado = uf(i.endereco_estado);
@@ -381,9 +385,11 @@ export async function sincronizarImoveis(
       if (e && !opcoes.sobrescrever) {
         // já importado: o portal é a fonte agora. Correção única: a 1ª importação
         // inventava um ano quando a Jetimob não tinha — volta para vazio ("----").
+        // Casa que herdou a data do condomínio também volta para vazio.
         if (!entrega && e.delivery_date) {
           const atual = new Date(e.delivery_date).toISOString().slice(0, 10);
-          if (atual === entregaEstimada(i.status, i.data_cadastro)) await query('update properties set delivery_date = null where id = $1', [e.id]);
+          const herdadas = [entregaEstimada(i.status, i.data_cadastro), condoData, entregaDoNome(i.condominio_nome)].filter(Boolean);
+          if (herdadas.includes(atual)) await query('update properties set delivery_date = null where id = $1', [e.id]);
         }
         // só recoloca as fotos se ainda não vieram
         if (

@@ -81,3 +81,19 @@ export function getStatusBadge(deliveryDate: string | null | undefined, today: D
   const { bg, text: color } = BUCKET_COLOR[bucket];
   return { bucket, label: BUCKET_LABEL[bucket], year, text: `${BUCKET_LABEL[bucket]} · ${year}`, bg, color };
 }
+
+// Condomínio HORIZONTAL (casas/lotes) já entregue: não recebe Novo/Seminovo/Usado —
+// as casas têm idades diferentes da do condomínio. Mostra "Casas · desde 1999".
+// Lançamento (entrega futura) continua como Lançamento.
+export function getBadgeCondominio(deliveryDate: string | null | undefined, tipo?: string | null, today: Date = new Date()): StatusBadge {
+  const b = getStatusBadge(deliveryDate, today);
+  if (tipo !== 'horizontal' || b.bucket === 'lancamento') return b;
+  return {
+    ...b,
+    bucket: 'usado',
+    label: 'Condomínio de casas',
+    text: temEntrega(deliveryDate) ? `Casas · desde ${getDeliveryYear(deliveryDate)}` : 'Condomínio de casas',
+    bg: 'rgba(20,22,26,0.72)',
+    color: '#FFFFFF'
+  };
+}

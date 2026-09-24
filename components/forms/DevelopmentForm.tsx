@@ -154,8 +154,9 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-[var(--text-muted)]">Data de entrega</label>
+          <label className="text-xs font-semibold text-[var(--text-muted)]">{f.tipo === 'horizontal' ? 'Entrega do condomínio' : 'Data de entrega'}</label>
           <input type="month" className={inputClass} value={f.deliveryDate} onChange={(e) => set('deliveryDate', e.target.value)} />
+          {f.tipo === 'horizontal' && <span className="text-[11px] text-[var(--text-faint)]">A idade de cada casa é cadastrada no anúncio da casa.</span>}
         </div>
       </div>
 

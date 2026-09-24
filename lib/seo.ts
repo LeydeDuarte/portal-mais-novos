@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import type { PropertyDetail, Development } from './property-details';
-import { getStatusBadge } from './classification';
+import { getStatusBadge, getBadgeCondominio } from './classification';
 import { TIPO_UNIDADE_LABEL, TIPO_UNIDADE_SCHEMA_ORG } from './tipologias';
 import { descricaoTextoPuro } from './text';
 
@@ -85,7 +85,7 @@ export function buildAgentJsonLd() {
 }
 
 export function buildDevelopmentMetadata(development: Development): Metadata {
-  const badge = getStatusBadge(development.deliveryDate);
+  const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
   const title = `${development.name} — ${development.location}${badge.label ? ` | ${badge.label}` : ''} | ${SITE_NAME}`;
   const description = (descricaoTextoPuro(development.description) || `${development.name} em ${development.location}.`).slice(0, 155);
   const url = `${SITE_URL}/empreendimento/${development.id}`;

@@ -166,7 +166,7 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     location: row.location,
     deliveryDate: deliveryDateFormatted,
     deliveryNote: deliveryDateFormatted
-      ? `${new Date(`${deliveryDateFormatted}-01T00:00:00`) > new Date() ? 'Previsão de entrega' : 'Entregue em'}${
+      ? `${new Date(`${deliveryDateFormatted}-01T00:00:00`) > new Date() ? 'Previsão de entrega' : row.tipo === 'horizontal' ? 'Condomínio entregue em' : 'Entregue em'}${
           new Date(`${deliveryDateFormatted}-01T00:00:00`) > new Date() ? ':' : ''
         } ${MESES[Number(month) - 1] ?? month} de ${year}`
       : 'Entrega: --/----',
