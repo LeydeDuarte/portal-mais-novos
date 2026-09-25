@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   const folder = FOLDERS.has(folderRaw) ? folderRaw : 'imoveis';
 
   if (!(file instanceof Blob)) return NextResponse.json({ error: 'Nenhuma foto recebida.' }, { status: 400 });
-  if (!ALLOWED.has(file.type)) return NextResponse.json({ error: 'Formato não aceito — use JPG, PNG ou WEBP.' }, { status: 400 });
+  if (!ALLOWED.has(file.type)) return NextResponse.json({ error: 'Formato não aceito. Use JPG, PNG ou WEBP.' }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: 'Foto muito grande (máx. 4 MB).' }, { status: 400 });
 
   // Confere o conteúdo de verdade (não só o tipo declarado pelo navegador)

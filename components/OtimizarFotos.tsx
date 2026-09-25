@@ -18,9 +18,9 @@ export default function OtimizarFotos() {
         setMsg(`${total} miniatura(s) prontas · faltam ${r.restantes}`);
         if (!r.restantes || (!r.feitas && r.erros.length)) break;
       }
-      setMsg((m) => `${m ?? ''} — pronto!`);
+      setMsg((m) => `${m ?? ''}. Pronto!`);
     } catch {
-      setMsg('Parou no meio — clique de novo para continuar.');
+      setMsg('Parou no meio. Clique de novo para continuar.');
     }
     setRodando(false);
   };

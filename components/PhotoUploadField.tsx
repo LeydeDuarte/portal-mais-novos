@@ -63,7 +63,7 @@ async function resizeImage(file: File, maxSide = MAX_SIDE): Promise<Blob> {
 }
 
 export async function uploadOne(file: File, folder: string, nomeArquivo?: string): Promise<string> {
-  if (file.size > MAX_ORIGINAL_BYTES) throw new Error(`"${file.name}" tem mais de 30 MB — reduza a foto antes de enviar.`);
+  if (file.size > MAX_ORIGINAL_BYTES) throw new Error(`"${file.name}" tem mais de 30 MB. Reduza a foto antes de enviar.`);
   const converted = await resizeImage(file, folder === 'plantas' ? MAX_SIDE_PLANTA : MAX_SIDE);
   // Se o navegador não conseguiu abrir a foto (ex: HEIC do iPhone no Chrome/Windows),
   // ela volta sem converter — e só JPG, PNG e WEBP podem seguir.
@@ -184,7 +184,7 @@ export default function PhotoUploadField({ photos, onChange, onUploadingChange, 
         <span className="text-xs text-[var(--text-faint)]">
           {compacto
             ? 'Clique, arraste ou cole um print (Ctrl+V)'
-            : 'JPG, PNG, WEBP ou foto do celular — várias de uma vez (até 30 MB cada). Também dá para arrastar ou colar um print com Ctrl+V.'}
+            : 'JPG, PNG, WEBP ou foto do celular, várias de uma vez (até 30 MB cada). Também dá para arrastar ou colar um print com Ctrl+V.'}
         </span>
         {ativo && <span className="text-[10px] font-bold uppercase tracking-wide text-accent">Ctrl+V cola aqui</span>}
       </button>
@@ -208,8 +208,8 @@ export default function PhotoUploadField({ photos, onChange, onUploadingChange, 
         <>
           <span className="text-xs text-[var(--text-faint)]">
             {plantas
-              ? `${photos.length} planta(s) — use as setas para mudar a ordem.`
-              : `${photos.length} foto(s). A primeira é a capa do anúncio — use as setas para mudar a ordem da galeria.`}
+              ? `${photos.length} planta(s). Use as setas para mudar a ordem.`
+              : `${photos.length} foto(s). A primeira é a capa do anúncio. Use as setas para mudar a ordem da galeria.`}
           </span>
           <div className={`grid gap-2 ${compacto ? 'grid-cols-3' : 'grid-cols-3 sm:grid-cols-4'}`}>
             {photos.map((url, i) => (

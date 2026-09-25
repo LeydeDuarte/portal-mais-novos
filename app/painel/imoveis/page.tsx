@@ -133,7 +133,7 @@ export default function MeusImoveisPage() {
                     {p.location}
                     {p.codigo ? ` · ${p.codigo}` : ''}
                   </span>
-                  <span className="text-xs text-[var(--text-faint)]">{p.photos?.length ? `${p.photos.length} foto(s)` : 'Sem fotos — edite para adicionar'}</span>
+                  <span className="text-xs text-[var(--text-faint)]">{p.photos?.length ? `${p.photos.length} foto(s)` : 'Sem fotos, edite para adicionar'}</span>
                   {veTudo(staff.role) && p.corretorEmail && (
                     <span className="text-xs text-[var(--text-faint)]">Cadastrado por {p.corretorEmail}</span>
                   )}

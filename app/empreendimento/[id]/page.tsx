@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const development = await getDevelopmentById(params.id);
-  if (!development) return { title: 'Empreendimento — Mais Novos Imóveis' };
+  if (!development) return { title: 'Empreendimento | Mais Novos Imóveis' };
   return buildDevelopmentMetadata(development);
 }
 

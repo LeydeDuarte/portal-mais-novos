@@ -32,11 +32,11 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     return property.visibilidade === 'privado' ? { ...meta, robots: { index: false, follow: false } } : meta;
   }
   const a = await getResumoOculto(params.id);
-  if (!a) return { title: 'Imóvel — Mais Novos Imóveis' };
+  if (!a) return { title: 'Imóvel | Mais Novos Imóveis' };
   const t = tituloOculto(a);
   return {
-    title: `${t} — anúncio privado | Mais Novos Imóveis`,
-    description: `${t}${a.preco ? `, ${brlCurto(a.preco)}` : ''}. Anúncio privado — solicite as fotos e o endereço com a Mais Novos Imóveis.`,
+    title: `${t}, anúncio privado | Mais Novos Imóveis`,
+    description: `${t}${a.preco ? `, ${brlCurto(a.preco)}` : ''}. Anúncio privado: solicite as fotos e o endereço com a Mais Novos Imóveis.`,
     alternates: { canonical: `${SITE_URL}/imovel/${params.id}` },
     ...(searchParams.l ? { robots: { index: false, follow: false } } : {})
   };

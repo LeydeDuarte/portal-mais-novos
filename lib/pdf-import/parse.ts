@@ -389,7 +389,7 @@ export function analisarDocs(docs: PdfDoc[]): ImportResult {
     semTexto: doc.paginas.flat().join('').replace(/\s/g, '').length < 30
   }));
   for (const d of docsInfo)
-    if (d.semTexto) avisos.push(`"${d.nome}" não tem texto selecionável (parece imagem/escaneado) — sem OCR não dá para ler este arquivo.`);
+    if (d.semTexto) avisos.push(`"${d.nome}" não tem texto selecionável (parece imagem/escaneado). Sem OCR não dá para ler este arquivo.`);
 
   // Linhas "de ficha" (ficha técnica primeiro, depois os outros)
   const ordem: TipoDoc[] = ['ficha', 'tabela', 'plantas', 'book', 'outro'];
@@ -405,7 +405,7 @@ export function analisarDocs(docs: PdfDoc[]): ImportResult {
   // Nome
   const nome = formatTitulo(acharNome(ordenados.map((c) => c.doc)) ?? '');
   if (nome) achou('Nome', nome, 'repetição nos documentos / título da tabela');
-  else avisos.push('Não encontrei o nome do empreendimento — preencha na conferência.');
+  else avisos.push('Não encontrei o nome do empreendimento. Preencha na conferência.');
 
   // Construtora
   const cons = campo(/construtora(?:\s*\/\s*incorporadora)?|incorporadora(?:\s*\/\s*construtora)?|realiza[cç][aã]o|incorpora[cç][aã]o/);
@@ -421,7 +421,7 @@ export function analisarDocs(docs: PdfDoc[]): ImportResult {
     if (!/[A-Z]{2}\s*$/.test(bruto) && prox && !prox.includes(':') && prox.length < 60) bruto += ', ' + prox;
     endereco = parseEndereco(bruto);
     achou('Endereço', bruto, end.doc);
-  } else avisos.push('Endereço não encontrado — informe o CEP na conferência.');
+  } else avisos.push('Endereço não encontrado. Informe o CEP na conferência.');
 
   // Entrega
   let entrega: string | undefined;
@@ -446,7 +446,7 @@ export function analisarDocs(docs: PdfDoc[]): ImportResult {
       }
     }
   }
-  if (!entrega) avisos.push('Data de entrega não encontrada — é obrigatória para publicar.');
+  if (!entrega) avisos.push('Data de entrega não encontrada. Sem ela, o site mostra ---- no lugar do ano.');
 
   // Pavimentos, torres, terreno, total de unidades
   const pav = campo(/n[uú]mero de pavimentos|pavimentos|andares/);
@@ -537,7 +537,7 @@ export function analisarDocs(docs: PdfDoc[]): ImportResult {
     tipologias = tipologias.filter((t, _, all) => !all.some((o) => o !== t && /duplex|penthouse|cobertura_duplex/.test(o.tipoUnidade) && t.area < o.area * 0.7 && all.some((x) => x !== o && x !== t && Math.abs(x.area + t.area - o.area) < 3)));
   }
   tipologias.sort((a, b) => a.area - b.area);
-  if (tipologias.some((t) => !t.quartos)) avisos.push('Algumas tipologias estão sem nº de quartos/suítes — confira nas plantas.');
+  if (tipologias.some((t) => !t.quartos)) avisos.push('Algumas tipologias estão sem nº de quartos/suítes. Confira nas plantas.');
 
   // Lazer
   const textoTudo = semAcento(docs.map((d) => d.paginas.flat().join(' ')).join(' ').toLowerCase());
@@ -603,7 +603,7 @@ export function gerarDescricao(r: ImportResult): string {
     l.push('', '## Plantas e tipologias');
     for (const t of r.tipologias) {
       const partes = [t.quartos ? `${t.quartos} ${t.quartos === 1 ? 'suíte' : 'suítes'}` : null, t.vagas ? `${t.vagas} vagas` : null, t.rotulo ?? null].filter(Boolean);
-      l.push(`- **${TIPO_UNIDADE_LABEL[t.tipoUnidade]} de ${areaTxt(t.area)}**${partes.length ? ` — ${partes.join(', ')}` : ''}${t.precoMin ? ` — a partir de ${brlCurto(t.precoMin)}` : ''}`);
+      l.push(`- **${TIPO_UNIDADE_LABEL[t.tipoUnidade]} de ${areaTxt(t.area)}**${partes.length ? `: ${partes.join(', ')}` : ''}${t.precoMin ? ` — a partir de ${brlCurto(t.precoMin)}` : ''}`);
     }
   }
   if (r.destaquesLazer.length || r.amenities.length) {

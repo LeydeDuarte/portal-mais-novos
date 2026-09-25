@@ -15,7 +15,7 @@ export async function GET() {
     '',
     `> Portal de imóveis à venda em Goiânia (GO) e região: apartamentos, casas em condomínio, coberturas, lançamentos e imóveis novos, com fotos e vídeos. Atendimento da corretora Leyde Duarte (${EMPRESA.creci}), com especialização em financiamento e crédito imobiliário (Mais Valor Capital).`,
     '',
-    `Empresa: ${EMPRESA.razao} — CNPJ ${EMPRESA.cnpj} — ${EMPRESA.creci} — ${EMPRESA.cidade}/${EMPRESA.uf}.`,
+    `Empresa: ${EMPRESA.razao}, CNPJ ${EMPRESA.cnpj}, ${EMPRESA.creci}, ${EMPRESA.cidade}/${EMPRESA.uf}.`,
     'Cada anúncio tem página própria com preço, metragem, quartos, vagas, fotos, condomínio, bairro e, quando existe, vídeo.',
     'Classificação: Lançamento (entrega futura), Novo (até 3 anos da entrega), Seminovo (3 a 6 anos), Usado (mais de 6 anos).',
     '',
@@ -36,7 +36,7 @@ export async function GET() {
         .map((k) => `[${CATEGORIAS[k].nome.toLowerCase()}](${base}/${k})`)
         .join(', ');
       const qtd = [b.n ? `${b.n} anúncios` : null, b.condominios ? `${b.condominios} condomínios` : null].filter(Boolean).join(', ');
-      return `- [${b.bairro}, ${b.cidade}](${base}): ${qtd}${cats ? ` — ${cats}` : ''}`;
+      return `- [${b.bairro}, ${b.cidade}](${base}): ${qtd}${cats ? `: ${cats}` : ''}`;
     }),
     '',
     '## Observações',

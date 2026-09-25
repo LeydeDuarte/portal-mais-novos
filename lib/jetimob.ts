@@ -218,7 +218,7 @@ export async function sincronizarCondominios(pagina: number, email: string, troc
       const desc = txt(c.observacoes) ? formatarDescricao(c.observacoes!) : '';
       const reg = {
         name: nome,
-        location: [bairro, [cidade, estado].filter(Boolean).join(' — ')].filter(Boolean).join(', '),
+        location: [bairro, [cidade, estado].filter(Boolean).join('/')].filter(Boolean).join(', '),
         delivery_date: entrega,
         description: desc,
         amenities: amenidadesDe(c.infraestruturas),
@@ -354,7 +354,7 @@ export async function sincronizarImoveis(
         delivery_date: entrega,
         price_value: preco,
         price_period: venda ? 'unico' : 'mensal',
-        location: [bairro, [cidade, estado].filter(Boolean).join(' — ')].filter(Boolean).join(', ') || cidade || 'Goiânia — GO',
+        location: [bairro, [cidade, estado].filter(Boolean).join('/')].filter(Boolean).join(', ') || cidade || 'Goiânia/GO',
         quartos: i.dormitorios ?? null,
         vagas: i.garagens ?? null,
         banheiros: i.banheiros ?? null,
@@ -617,7 +617,7 @@ export async function importarLeadsJetimob(): Promise<{ importados: number; jaEx
     await query(
       `insert into interest_leads (development_id, condominio, nome, email, telefone, finalidade, mensagem, aceita_contato)
        values (null, 'Jetimob (importado)', $1, $2, $3, 'venda', $4, false)`,
-      [nome, email, tel, [l.subject, l.message].filter(Boolean).join(' — ').slice(0, 1000) || null]
+      [nome, email, tel, [l.subject, l.message].filter(Boolean).join(': ').slice(0, 1000) || null]
     );
     importados++;
   }

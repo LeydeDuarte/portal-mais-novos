@@ -48,7 +48,7 @@ export default function OcultoView({ a, bloqueado = false }: { a: AnuncioOculto;
               <div className="mt-6 rounded-2xl border border-[#e62f2f]/40 bg-[#fff5f5] p-5">
                 <h2 className="text-base font-bold">Este link é pessoal</h2>
                 <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-                  Ele foi liberado para outra pessoa e só abre no aparelho dela. Quer ver este imóvel? Deixe seu nome e telefone ao lado — o nosso
+                  Ele foi liberado para outra pessoa e só abre no aparelho dela. Quer ver este imóvel? Deixe seu nome e telefone ao lado e o nosso
                   atendimento envia um link exclusivo para você.
                 </p>
               </div>
@@ -78,7 +78,8 @@ export default function OcultoView({ a, bloqueado = false }: { a: AnuncioOculto;
               <ContatoLateral
                 titulo="Quero ver este imóvel"
                 condominio={a.condominio || titulo}
-                referencia={`Anúncio reservado ${a.id} — ${titulo} — /imovel/${a.id}`}
+                referencia={`Anúncio reservado ${a.id} · ${titulo} · /imovel/${a.id}`}
+                whatsapp={{ titulo: `Anúncio privado: ${titulo}`, caminho: `/imovel/${a.id}`, condominio: a.condominio ?? undefined }}
                 mensagemInicial={
                   bloqueado
                     ? `Olá! Recebi o link do anúncio ${titulo}, mas ele não abriu no meu aparelho. Podem me enviar um link?`

@@ -228,7 +228,7 @@ export function mesclarCondominios(todas: CondoPlanilha[]): { lista: CondoPlanil
   const porNome = new Map<string, CondoPlanilha[]>();
   for (const c0 of todas) {
     const c = { ...c0, cepGenerico: !!c0.cep && genericos.has(c0.cep) };
-    if (c.cepGenerico) c.problemas = [...c.problemas.filter((p) => p !== 'sem CEP'), 'CEP genérico (repetido em vários condomínios) — não usado'];
+    if (c.cepGenerico) c.problemas = [...c.problemas.filter((p) => p !== 'sem CEP'), 'CEP genérico (repetido em vários condomínios), não usado'];
     const k = chaveNome(c.nome);
     const iguais = porNome.get(k) ?? [];
     const alvo = iguais.find((o) => mesmoCondominio(o, c, genericos));
@@ -259,7 +259,7 @@ export function mesclarCondominios(todas: CondoPlanilha[]): { lista: CondoPlanil
     alvo.fonte = Array.from(new Set([alvo.fonte, c.fonte].filter(Boolean))).join(' + ');
     alvo.problemas = [
       ...(!alvo.entrega ? ['sem data de entrega (entra como rascunho)'] : []),
-      ...(!alvo.cep ? ['sem CEP'] : alvo.cepGenerico ? ['CEP genérico (repetido em vários condomínios) — não usado'] : [])
+      ...(!alvo.cep ? ['sem CEP'] : alvo.cepGenerico ? ['CEP genérico (repetido em vários condomínios), não usado'] : [])
     ];
   }
   for (const c of out) if (c.cepGenerico) c.cep = '';

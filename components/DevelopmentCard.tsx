@@ -62,7 +62,7 @@ export default function DevelopmentCard({ development, prioridade = false }: { d
           <div className="mt-1 text-xs text-[var(--text-muted)]">
             {development.unitsCount > 0
               ? [development.minPrice ? `A partir de ${formatBRL(development.minPrice)}` : null, quartos, area].filter(Boolean).join(' · ')
-              : 'Sem anúncios no momento — registre seu interesse'}
+              : 'Sem anúncios no momento. Registre seu interesse'}
           </div>
           <span className="mt-2 inline-block text-xs font-semibold text-accent">Ver condomínio →</span>
         </Link>
@@ -79,7 +79,7 @@ export default function DevelopmentCard({ development, prioridade = false }: { d
         >
           {cover ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <ImagemCapa mini={development.capaMini} original={cover} alt={`${development.name} — ${development.location}`} prioridade={prioridade} className="absolute inset-0 h-full w-full object-cover" />
+            <ImagemCapa mini={development.capaMini} original={cover} alt={`${development.name}, ${development.location} | Mais Novos Imóveis`} prioridade={prioridade} className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <span className="text-[11px] text-[var(--text-faint)]">[FOTO DO EMPREENDIMENTO]</span>
           )}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { registrarInteresse } from '@/lib/actions';
+import BotaoWhatsapp, { type WhatsappContexto } from '@/components/BotaoWhatsapp';
 
 type Props = {
   titulo?: string; // "Fale conosco" / "Falar com um corretor"
@@ -9,6 +10,7 @@ type Props = {
   developmentId?: string;
   referencia?: string; // ex.: "Apartamento de 130 m² · /imovel/abc" — ajuda a equipe a saber de onde veio
   mensagemInicial?: string;
+  whatsapp?: WhatsappContexto; // mostra o botão "Falar com Leyde Duarte pelo WhatsApp"
 };
 
 const inputClass = 'w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-sm outline-none focus:border-accent';
@@ -22,7 +24,7 @@ function maskTelefone(v: string): string {
 
 // Caixa "Fale conosco" da lateral direita (imóvel e empreendimento). Vira um
 // lead em Painel → Interessados (e e-mail para a equipe, se configurado).
-export default function ContatoLateral({ titulo = 'Fale conosco', condominio, developmentId, referencia, mensagemInicial }: Props) {
+export default function ContatoLateral({ titulo = 'Fale conosco', condominio, developmentId, referencia, mensagemInicial, whatsapp }: Props) {
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
   const [email, setEmail] = useState('');
@@ -58,6 +60,18 @@ export default function ContatoLateral({ titulo = 'Fale conosco', condominio, de
   return (
     <div id="fale-conosco" className="scroll-mt-24 rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-5">
       <h2 className="text-base font-bold">{titulo}</h2>
+      {whatsapp && (
+        <>
+          <div className="mt-3">
+            <BotaoWhatsapp ctx={whatsapp} />
+          </div>
+          <div className="my-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">
+            <span className="h-px flex-1 bg-[var(--border)]" />
+            ou deixe sua mensagem
+            <span className="h-px flex-1 bg-[var(--border)]" />
+          </div>
+        </>
+      )}
       {ok ? (
         <p className="mt-2 text-sm text-emerald-800">Mensagem enviada! Um corretor vai falar com você em breve.</p>
       ) : (

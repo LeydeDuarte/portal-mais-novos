@@ -43,7 +43,7 @@ export default function NovoImovelPage() {
               ? rascunho
                 ? 'Ele ainda não aparece no site. Termine o cadastro quando quiser em Painel → Condomínios.'
                 : 'Já aparece no feed e em Lançamentos. Os imóveis vinculados a ele aparecem na página do condomínio.'
-              : 'Já está publicado — aparece no feed do Comprar e tem página própria.'}
+              : 'Já está publicado, aparece no feed do Comprar e tem página própria.'}
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <a
@@ -106,7 +106,7 @@ export default function NovoImovelPage() {
         )}
         {modo === 'imovel' && resumo.length > 0 && (
           <div className="mb-5 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
-            <strong>Preenchido automaticamente — confira antes de publicar:</strong> {resumo.join(' · ')}
+            <strong>Preenchido automaticamente, confira antes de publicar:</strong> {resumo.join(' · ')}
           </div>
         )}
         {modo === 'imovel' ? (

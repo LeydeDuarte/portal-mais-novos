@@ -16,7 +16,7 @@ export const ENDERECO_VAZIO: Endereco = { cep: '', logradouro: '', bairro: '', c
 // "Setor Bueno, Goiânia — GO" — é o texto público do anúncio (rua e número
 // ficam guardados só para a equipe, não aparecem para o cliente).
 export function formatLocation(e: Endereco): string {
-  const cidadeUf = [e.cidade, e.uf].filter(Boolean).join(' — ');
+  const cidadeUf = [e.cidade, e.uf].filter(Boolean).join('/');
   return [e.bairro, cidadeUf].filter(Boolean).join(', ');
 }
 
@@ -111,8 +111,8 @@ export default function CepField({ value, onChange, onPickCondominio, modo = 'im
         </div>
         <span className="pb-2.5 text-xs text-[var(--text-faint)]">
           {status === 'loading' && 'Buscando endereço…'}
-          {status === 'ok' && 'Endereço preenchido — confira e corrija à vontade abaixo.'}
-          {status === 'notfound' && 'CEP não encontrado — preencha o endereço à mão.'}
+          {status === 'ok' && 'Endereço preenchido. Confira e corrija à vontade abaixo.'}
+          {status === 'notfound' && 'CEP não encontrado. Preencha o endereço à mão.'}
           {status === 'idle' && 'Digite o CEP e o endereço é preenchido sozinho (dá para editar depois).'}
         </span>
       </div>
@@ -121,14 +121,14 @@ export default function CepField({ value, onChange, onPickCondominio, modo = 'im
         <div className="flex flex-col gap-2 rounded-lg bg-[var(--pill-bg)] p-3">
           <span className="text-xs font-bold">
             {modo === 'empreendimento'
-              ? 'Atenção: já existe cadastro neste CEP — confira se não é o mesmo empreendimento:'
+              ? 'Atenção: já existe cadastro neste CEP. Confira se não é o mesmo empreendimento:'
               : 'Encontramos condomínio(s) já cadastrado(s) neste CEP:'}
           </span>
           {sugestoes.map((s) => (
             <div key={`${s.kind}-${s.id ?? s.nome}`} className="flex items-center justify-between gap-3 text-sm">
               <span>
                 <strong>{s.nome}</strong>
-                <span className="text-[var(--text-muted)]"> — {s.kind === 'empreendimento' ? 'empreendimento cadastrado' : 'condomínio de imóvel já anunciado'}</span>
+                <span className="text-[var(--text-muted)]"> · {s.kind === 'empreendimento' ? 'empreendimento cadastrado' : 'condomínio de imóvel já anunciado'}</span>
               </span>
               {modo === 'imovel' && onPickCondominio && (
                 <button

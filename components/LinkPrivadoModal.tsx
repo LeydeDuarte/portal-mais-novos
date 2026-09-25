@@ -46,7 +46,7 @@ export default function LinkPrivadoModal({ propertyId, titulo, onClose }: { prop
       if (enviar === 'whatsapp' && janela) {
         const d = telefone.replace(/\D/g, '');
         janela.location.href = `https://wa.me/${d.length <= 11 ? `55${d}` : d}?text=${encodeURIComponent(texto)}`;
-        setAviso('Link gerado — confira a conversa que abriu no WhatsApp.');
+        setAviso('Link gerado. Confira a conversa que abriu no WhatsApp.');
       } else {
         try {
           await navigator.clipboard.writeText(texto);
@@ -76,8 +76,8 @@ export default function LinkPrivadoModal({ propertyId, titulo, onClose }: { prop
           </button>
         </div>
         <p className="mt-3 rounded-lg bg-[var(--pill-bg)] p-3 text-xs leading-relaxed text-[var(--text-muted)]">
-          O link é <strong>pessoal</strong>: abre só no aparelho de quem abrir primeiro. Se a pessoa repassar (para o marido, um grupo…), o link <strong>não abre</strong>{' '}
-          — quem recebeu repassado pede acesso ao atendimento e você gera outro link para o telefone dele. As fotos saem com uma marca d&apos;água com esse telefone.
+          O link é <strong>pessoal</strong>: abre só no aparelho de quem abrir primeiro. Se a pessoa repassar (para o marido, um grupo…), o link <strong>não abre</strong>.{' '}
+          Quem recebeu repassado pede acesso ao atendimento e você gera outro link para o telefone dele. As fotos saem com uma marca d&apos;água com esse telefone.
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">

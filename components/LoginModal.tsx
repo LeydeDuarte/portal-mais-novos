@@ -112,7 +112,7 @@ export default function LoginModal({ open, onClose, onSignIn, titulo = 'Entre pa
               disabled={!termos}
               onClick={() => onSignIn(null)}
               className="flex w-full items-center justify-center gap-2.5 rounded-full border border-[var(--border)] py-2.5 text-sm font-semibold hover:bg-[var(--pill-bg)] disabled:opacity-40"
-              title="Login com Google ainda não configurado — modo de teste"
+              title="Login com Google ainda não configurado (modo de teste)"
             >
               Continuar com Google (modo de teste)
             </button>

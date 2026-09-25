@@ -55,14 +55,14 @@ export default function DuplicadosPage() {
     setOcupado(g.chave);
     const r = await juntarCondominios(alvo, outros);
     setOcupado(null);
-    setMsg(r.ok ? `Pronto — juntados em ${nome}.` : r.erro ?? 'Falhou.');
+    setMsg(r.ok ? `Pronto, juntados em ${nome}.` : r.erro ?? 'Falhou.');
     carregar();
   };
   const confirmarDiferentes = async (g: GrupoDup) => {
     setOcupado(g.chave);
     await marcarDiferentes(g.itens.map((i) => i.id));
     setOcupado(null);
-    setMsg('Marcados como condomínios diferentes — não aparecem mais aqui.');
+    setMsg('Marcados como condomínios diferentes, não aparecem mais aqui.');
     carregar();
   };
 
@@ -76,7 +76,7 @@ export default function DuplicadosPage() {
         </Link>
         <h1 className="mt-2 font-serif text-2xl font-semibold">Possíveis condomínios duplicados</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Mesmo nome na mesma cidade. Confira lado a lado: se for o <strong>mesmo condomínio</strong>, escolha qual cadastro fica (o principal) e junte — os
+          Mesmo nome na mesma cidade. Confira lado a lado: se for o <strong>mesmo condomínio</strong>, escolha qual cadastro fica (o principal) e junte, os
           anúncios, tipologias e interessados passam para ele, e o que estiver vazio nele é completado com os dados do outro. Se forem{' '}
           <strong>prédios diferentes</strong> (ex.: mesmo nome em bairros diferentes), marque &quot;São diferentes&quot;.
         </p>
@@ -118,7 +118,7 @@ export default function DuplicadosPage() {
                         {c.cep ? ` · CEP ${c.cep}` : ''}
                       </div>
                       <div className="text-xs text-[var(--text-muted)]">
-                        {c.anuncios} anúncio(s) · {c.fotos} foto(s) · entrega {c.entrega ?? '—'} · {c.status}
+                        {c.anuncios} anúncio(s) · {c.fotos} foto(s) · entrega {c.entrega ?? '-'} · {c.status}
                         {c.jetimob ? ' · Jetimob' : c.origem ? ` · ${c.origem}` : ''}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-3 text-xs font-semibold">

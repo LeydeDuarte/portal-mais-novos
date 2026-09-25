@@ -111,12 +111,12 @@ export default function PhotoGallery({ photos, alt, video, badges, vendido, marc
 
   const renderThumb = (item: Item, index: number, extraClass = '') =>
     item.kind === 'video' ? (
-      <VideoFrame video={item.video} title={`${alt} — vídeo`} />
+      <VideoFrame video={item.video} title={`${alt}, vídeo`} />
     ) : (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={item.url}
-        alt={`${alt} — foto ${video ? index : index + 1}`}
+        alt={`${alt}, foto ${video ? index : index + 1}`}
         loading={index < 2 ? 'eager' : 'lazy'}
         decoding="async"
         fetchPriority={index === 0 ? 'high' : 'auto'}
@@ -209,13 +209,13 @@ export default function PhotoGallery({ photos, alt, video, badges, vendido, marc
               if (item.kind === 'video') {
                 return (
                   <div className="relative h-full w-full">
-                    <VideoFrame video={item.video} title={`${alt} — vídeo`} fullscreen />
+                    <VideoFrame video={item.video} title={`${alt}, vídeo`} fullscreen />
                   </div>
                 );
               }
               return (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.url} alt={`${alt} — foto`} className="h-full max-h-full w-full max-w-full object-contain" />
+                <img src={item.url} alt={`${alt}, foto`} className="h-full max-h-full w-full max-w-full object-contain" />
               );
             })()}
             {marcaDagua && <MarcaDagua texto={marcaDagua} />}

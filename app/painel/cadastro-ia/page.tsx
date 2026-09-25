@@ -183,7 +183,7 @@ export default function CadastroIAPage() {
       <main className="mx-auto w-full max-w-xl px-5 py-8 md:px-8">
         <h1 className="font-serif text-2xl font-semibold">Cadastro assistido por IA</h1>
         <p className="mt-1 mb-6 text-sm text-[var(--text-muted)]">
-          Protótipo: cole o texto do anúncio ou da tabela — o reconhecimento de padrão tenta preencher os campos, mas{' '}
+          Protótipo: cole o texto do anúncio ou da tabela, o reconhecimento de padrão tenta preencher os campos, mas{' '}
           <strong>você sempre revisa antes de publicar</strong>. Upload de PDF/fotos e a extração por IA de verdade entram
           numa fase seguinte (precisa de uma API de IA conectada).
         </p>
@@ -197,7 +197,7 @@ export default function CadastroIAPage() {
               className={inputClass}
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
-              placeholder={'Ex: Apartamento 3 quartos, 2 vagas, 2 banheiros, 98 m², Setor Bueno, Goiânia — GO. R$ 890.000. Piscina, academia, portaria 24h.'}
+              placeholder={'Ex: Apartamento 3 quartos, 2 vagas, 2 banheiros, 98 m², Setor Bueno, Goiânia, GO. R$ 890.000. Piscina, academia, portaria 24h.'}
             />
             <button
               type="submit"
@@ -210,11 +210,11 @@ export default function CadastroIAPage() {
         ) : (
           <form onSubmit={handlePublish} className="flex flex-col gap-3">
             <div className="rounded-lg bg-[var(--pill-bg)] p-3 text-xs text-[var(--text-muted)]">
-              Rascunho pré-preenchido — confira e ajuste antes de publicar. Campos que o reconhecimento não achou ficaram em branco.
+              Rascunho pré-preenchido, confira e ajuste antes de publicar. Campos que o reconhecimento não achou ficaram em branco.
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">Título do anúncio (gerado automaticamente — pode editar)</label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Título do anúncio (gerado automaticamente, pode editar)</label>
               <input className={inputClass} value={form.titulo} onChange={(e) => update('titulo', e.target.value)} />
             </div>
 
@@ -248,7 +248,7 @@ export default function CadastroIAPage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-[var(--text-muted)]">Preço (confira — o reconhecimento pode errar)</label>
+              <label className="text-xs font-semibold text-[var(--text-muted)]">Preço (confira, o reconhecimento pode errar)</label>
               <input required className={inputClass} value={form.priceDigits} onChange={(e) => update('priceDigits', e.target.value)} />
             </div>
 

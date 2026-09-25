@@ -81,8 +81,8 @@ function GraficoM2({ dados }: { dados: MercadoMes[] }) {
       {h && (
         <div className="pointer-events-none absolute right-2 top-8 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3 text-xs shadow-lg">
           <div className="font-bold">{mesLabel(h.mes)}</div>
-          <div>Anunciado: {h.m2Anuncios != null ? `${brl(h.m2Anuncios)}/m² (${h.nAnuncios})` : '—'}</div>
-          <div>Vendido: {h.m2Vendidos != null ? `${brl(h.m2Vendidos)}/m² (${h.nVendidos})` : '—'}</div>
+          <div>Anunciado: {h.m2Anuncios != null ? `${brl(h.m2Anuncios)}/m² (${h.nAnuncios})` : '-'}</div>
+          <div>Vendido: {h.m2Vendidos != null ? `${brl(h.m2Vendidos)}/m² (${h.nVendidos})` : '-'}</div>
         </div>
       )}
     </div>
@@ -133,7 +133,7 @@ export default function MercadoPage() {
       <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
         <h1 className="font-serif text-2xl font-semibold">Mercado</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Anúncios de venda ativos (públicos e privados) + histórico de vendidos e excluídos. Uso interno — base para o preço médio do m² por bairro.
+          Anúncios de venda ativos (públicos e privados) + histórico de vendidos e excluídos. Uso interno, base para o preço médio do m² por bairro.
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -179,7 +179,7 @@ export default function MercadoPage() {
             {sel && (
               <section className="mt-5 rounded-2xl border border-[var(--border)] p-4">
                 <h2 className="text-base font-bold">
-                  Preço médio do m² — {sel.bairro}, {sel.cidade}
+                  Preço médio do m², {sel.bairro}, {sel.cidade}
                 </h2>
                 <div className="mt-3">{mensal ? <GraficoM2 dados={mensal} /> : <p className="text-sm text-[var(--text-muted)]">Carregando…</p>}</div>
               </section>
@@ -217,8 +217,8 @@ export default function MercadoPage() {
                       <td className="px-3 py-2 text-right">{b.privados}</td>
                       <td className="px-3 py-2 text-right">{b.vendidos}</td>
                       <td className="px-3 py-2 text-right">{b.excluidos}</td>
-                      <td className="px-3 py-2 text-right">{b.m2Anuncios ? brl(b.m2Anuncios) : '—'}</td>
-                      <td className="px-3 py-2 text-right">{b.m2Vendidos ? brl(b.m2Vendidos) : '—'}</td>
+                      <td className="px-3 py-2 text-right">{b.m2Anuncios ? brl(b.m2Anuncios) : '-'}</td>
+                      <td className="px-3 py-2 text-right">{b.m2Vendidos ? brl(b.m2Vendidos) : '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -243,7 +243,7 @@ export default function MercadoPage() {
               <tbody>
                 {historico.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-4 text-[var(--text-muted)]">Nada no histórico ainda — aparece aqui o que for marcado como vendido ou excluído.</td>
+                    <td colSpan={6} className="px-3 py-4 text-[var(--text-muted)]">Nada no histórico ainda, aparece aqui o que for marcado como vendido ou excluído.</td>
                   </tr>
                 )}
                 {historico.map((h, i) => (
@@ -258,9 +258,9 @@ export default function MercadoPage() {
                       {TIPO_UNIDADE_LABEL[h.tipoUnidade as TipoUnidade] ?? h.tipoUnidade}
                       <span className="text-[var(--text-muted)]"> · {[h.condominio, h.bairro, h.cidade].filter(Boolean).join(', ')}</span>
                     </td>
-                    <td className="px-3 py-2 text-right">{h.preco ? brl(h.preco) : '—'}</td>
-                    <td className="px-3 py-2 text-right">{h.valorVenda ? brl(h.valorVenda) : '—'}</td>
-                    <td className="px-3 py-2 text-right">{h.area ? `${h.area.toLocaleString('pt-BR')} m²` : '—'}</td>
+                    <td className="px-3 py-2 text-right">{h.preco ? brl(h.preco) : '-'}</td>
+                    <td className="px-3 py-2 text-right">{h.valorVenda ? brl(h.valorVenda) : '-'}</td>
+                    <td className="px-3 py-2 text-right">{h.area ? `${h.area.toLocaleString('pt-BR')} m²` : '-'}</td>
                   </tr>
                 ))}
               </tbody>

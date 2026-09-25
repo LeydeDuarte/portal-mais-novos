@@ -83,7 +83,7 @@ export default function InterestForm({ developmentId, condominio, destaque }: Pr
     <section className={`mt-10 rounded-2xl border p-5 md:p-6 ${destaque ? 'border-accent/60 bg-[#f5f8ff]' : 'border-[var(--border)]'}`}>
       <h2 className="font-serif text-xl font-semibold">Quer um imóvel no {condominio}?</h2>
       <p className="mt-1 text-sm text-[var(--text-muted)]">
-        Registre seu interesse e avisamos por e-mail ou WhatsApp quando surgir uma oportunidade aqui — muitas vendas acontecem antes de o imóvel ser anunciado.
+        Registre seu interesse e avisamos por e-mail ou WhatsApp quando surgir uma oportunidade aqui. Muitas vendas acontecem antes de o imóvel ser anunciado.
       </p>
 
       <form onSubmit={enviar} className="mt-4 grid gap-3 md:grid-cols-2">

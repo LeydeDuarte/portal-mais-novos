@@ -28,7 +28,7 @@ export default function JetimobPage() {
     if (staff) carregar();
   }, [staff]);
 
-  const add = (m: string) => setLog((l) => [...l, `${new Date().toLocaleTimeString('pt-BR')} — ${m}`]);
+  const add = (m: string) => setLog((l) => [...l, `${new Date().toLocaleTimeString('pt-BR')}, ${m}`]);
 
   const testar = async () => {
     setTeste(null);
@@ -53,7 +53,7 @@ export default function JetimobPage() {
           resumo.condominiosNovos += r.criados;
           resumo.condominiosAtualizados += r.atualizados;
           resumo.condominiosVinculados += r.vinculados;
-          add(`Condomínios — página ${p} de ${total}: ${r.criados} novo(s), ${r.atualizados} atualizado(s)${r.vinculados ? `, ${r.vinculados} ligado(s) a condomínios que já existiam` : ''}${r.erros.length ? ` · ${r.erros.length} erro(s)` : ''}`);
+          add(`Condomínios, página ${p} de ${total}: ${r.criados} novo(s), ${r.atualizados} atualizado(s)${r.vinculados ? `, ${r.vinculados} ligado(s) a condomínios que já existiam` : ''}${r.erros.length ? ` · ${r.erros.length} erro(s)` : ''}`);
           r.erros.slice(0, 3).forEach((e) => add(`  ⚠ ${e}`));
           p++;
         } while (p <= total && !parar.current);
@@ -64,7 +64,7 @@ export default function JetimobPage() {
           total = r.totalPaginas || 1;
           resumo.imoveisNovos += r.criados;
           resumo.imoveisAtualizados += r.atualizados;
-          add(`Imóveis — página ${p} de ${total}: ${r.criados} novo(s), ${r.atualizados} atualizado(s)${r.erros.length ? ` · ${r.erros.length} erro(s)` : ''}`);
+          add(`Imóveis, página ${p} de ${total}: ${r.criados} novo(s), ${r.atualizados} atualizado(s)${r.erros.length ? ` · ${r.erros.length} erro(s)` : ''}`);
           r.erros.slice(0, 3).forEach((e) => add(`  ⚠ ${e}`));
           p++;
         } while (p <= total && !parar.current);
@@ -77,7 +77,7 @@ export default function JetimobPage() {
         add(`Fotos: +${f.enviadas} (faltam ${f.restantes})${f.erros.length ? ` · ${f.erros[0]}` : ''}`);
         if (!f.restantes || (!f.enviadas && f.erros.length)) break;
       }
-      add(parar.current ? 'Interrompido — dá para continuar depois.' : 'Pronto!');
+      add(parar.current ? 'Interrompido, dá para continuar depois.' : 'Pronto!');
     } catch (e) {
       add(`Erro: ${e instanceof Error ? e.message : 'falha'}`);
     }
@@ -94,7 +94,7 @@ export default function JetimobPage() {
       <main className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8">
         <h1 className="font-serif text-2xl font-semibold">Migração da Jetimob</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Traz <strong>uma vez</strong> tudo o que está na Jetimob para o portal — condomínios, imóveis, fotos, plantas e contatos. Depois disso o portal passa a ser a
+          Traz <strong>uma vez</strong> tudo o que está na Jetimob para o portal, condomínios, imóveis, fotos, plantas e contatos. Depois disso o portal passa a ser a
           fonte: rodar de novo só acrescenta o que ainda não veio, <strong>nunca apaga nem sobrescreve</strong> o que foi editado aqui. Imóveis publicados no site da
           Jetimob entram como <strong>públicos</strong>; os demais, como <strong>privados</strong>. Condomínios que já existem aqui (inclusive os da planilha) são
           ligados, não duplicados.
@@ -104,7 +104,7 @@ export default function JetimobPage() {
           <li>Importar tudo (condomínios → imóveis → fotos)</li>
           <li>Importar contatos (leads do CRM → Interessados)</li>
           <li>
-            Só cancele a Jetimob quando <strong>Fotos na fila = 0</strong> — as fotos ficam hospedadas na Jetimob até serem copiadas para cá.
+            Só cancele a Jetimob quando <strong>Fotos na fila = 0</strong>, as fotos ficam hospedadas na Jetimob até serem copiadas para cá.
           </li>
         </ol>
 
@@ -130,7 +130,7 @@ export default function JetimobPage() {
         <label className="mt-5 flex items-start gap-2 rounded-xl border border-[var(--border)] p-3 text-sm">
           <input type="checkbox" className="mt-0.5" checked={trocarFotos} onChange={(e) => setTrocarFotos(e.target.checked)} disabled={rodando} />
           <span>
-            <strong>Trocar todas as fotos</strong> — baixa de novo todas as fotos e plantas da Jetimob e substitui as que já vieram (use depois de tirar a marca
+            <strong>Trocar todas as fotos</strong>, baixa de novo todas as fotos e plantas da Jetimob e substitui as que já vieram (use depois de tirar a marca
             d&apos;água na Jetimob). As fotos atuais ficam no ar até as novas terminarem de chegar.
           </span>
         </label>
@@ -173,7 +173,7 @@ export default function JetimobPage() {
                   <div className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
                     {Object.entries(teste.exemplo).map(([k, v]) => (
                       <div key={k}>
-                        <span className="text-[var(--text-muted)]">{k}:</span> <strong>{String(v ?? '—')}</strong>
+                        <span className="text-[var(--text-muted)]">{k}:</span> <strong>{String(v ?? '-')}</strong>
                       </div>
                     ))}
                   </div>
@@ -211,7 +211,7 @@ export default function JetimobPage() {
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-[var(--text-faint)]">Não há sincronização automática — a Jetimob vai ser desligada; depois da migração, tudo é editado aqui no portal.</p>
+            <p className="mt-2 text-xs text-[var(--text-faint)]">Não há sincronização automática, a Jetimob vai ser desligada; depois da migração, tudo é editado aqui no portal.</p>
           </section>
         )}
       </main>

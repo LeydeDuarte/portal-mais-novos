@@ -7,7 +7,7 @@ import { montarFeedInicial } from '@/lib/feed-inicial';
 export const metadata: Metadata = {
   title: { absolute: `Imóveis à venda em Goiânia com vídeo | ${SITE_NAME}` },
   description:
-    'Apartamentos, casas em condomínio, coberturas e lançamentos à venda em Goiânia, com fotos e vídeos. Busque por bairro, condomínio e preço — com crédito imobiliário especializado.',
+    'Apartamentos, casas em condomínio, coberturas e lançamentos à venda em Goiânia, com fotos e vídeos. Busque por bairro, condomínio e preço, com crédito imobiliário especializado.',
   alternates: { canonical: SITE_URL },
   openGraph: {
     title: `Imóveis à venda em Goiânia com vídeo | ${SITE_NAME}`,
@@ -26,7 +26,7 @@ export default async function Page({ searchParams }: { searchParams: { q?: strin
   return (
     <>
       <JsonLd data={buildAgentJsonLd()} />
-      <h1 className="sr-only">Imóveis à venda em Goiânia — apartamentos, casas em condomínio, coberturas e lançamentos com vídeo</h1>
+      <h1 className="sr-only">Imóveis à venda em Goiânia: apartamentos, casas em condomínio, coberturas e lançamentos com vídeo</h1>
       <Home initialQuery={q} inicial={inicial} />
     </>
   );

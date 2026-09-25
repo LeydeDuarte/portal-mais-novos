@@ -14,8 +14,8 @@ export const metadata: Metadata = {
 
 const ITENS = [
   { t: 'Financiamento imobiliário', d: 'Comparamos as condições de vários bancos para você comprar com a melhor taxa e a parcela que cabe no seu planejamento.' },
-  { t: 'Home equity (crédito com garantia de imóvel)', d: 'Use o imóvel que você já tem para conseguir crédito com juros menores e prazo longo — para investir, quitar dívidas ou crescer.' },
-  { t: 'Estruturação de crédito', d: 'Organizamos a sua documentação e o seu perfil de crédito antes da análise do banco — o que aumenta a chance de aprovação.' },
+  { t: 'Home equity (crédito com garantia de imóvel)', d: 'Use o imóvel que você já tem para conseguir crédito com juros menores e prazo longo, para investir, quitar dívidas ou crescer.' },
+  { t: 'Estruturação de crédito', d: 'Organizamos a sua documentação e o seu perfil de crédito antes da análise do banco, o que aumenta a chance de aprovação.' },
   { t: 'Brasileiros no exterior', d: 'Atendimento a distância para quem mora fora e quer comprar ou financiar um imóvel no Brasil com segurança.' }
 ];
 

@@ -131,7 +131,7 @@ export default function SearchBox({ locais, onToggleLocal, onSearchText }: Props
                         <span className="flex min-w-0 flex-1 flex-col">
                           <span className="truncate text-sm font-semibold">{s.nome}</span>
                           <span className="text-xs text-[var(--text-muted)]">
-                            {TIPO_LABEL[s.tipo]} · {s.tipo === 'cidade' ? s.uf : `${s.cidade}${s.uf ? ` — ${s.uf}` : ''}`} · {s.total} anúncio{s.total === 1 ? '' : 's'}
+                            {TIPO_LABEL[s.tipo]} · {s.tipo === 'cidade' ? s.uf : `${s.cidade}${s.uf ? `/${s.uf}` : ''}`} · {s.total} anúncio{s.total === 1 ? '' : 's'}
                           </span>
                         </span>
                         <span

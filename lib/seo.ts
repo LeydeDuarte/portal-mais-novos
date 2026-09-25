@@ -39,7 +39,7 @@ export function tituloSeoImovel(p: Property): string {
   const detalhes = [q ? `${q} ${q === 1 ? 'quarto' : 'quartos'}` : null, p.areaValue ? `${Math.round(p.areaValue)} m²` : null].filter(Boolean).join(', ');
   const partes = `${tipo} ${acao(p)}${detalhes ? ` com ${detalhes}` : ''}`;
   const local = p.condominio ? `${p.condominio}, ${p.bairro || p.cidade || ''}`.replace(/, $/, '') : onde(p);
-  return `${partes} — ${local}`.slice(0, 95);
+  return `${partes}, ${local}`.slice(0, 95);
 }
 
 /** Descrição de ~155 caracteres com o que o buscador (e a pessoa) quer saber */
@@ -63,12 +63,12 @@ export function descricaoSeoImovel(p: Property): string {
 /** Texto alternativo das fotos: o que é + onde + "à venda" + marca (SEO de imagem) */
 export function altFoto(p: Property, i?: number): string {
   const tipo = TIPO_UNIDADE_LABEL[p.tipoUnidade];
-  return `${tipo} ${acao(p)}${p.condominio ? ` no ${p.condominio}` : ''}, ${onde(p)}${i != null ? ` — foto ${i + 1}` : ''} | ${SITE_NAME}`;
+  return `${tipo} ${acao(p)}${p.condominio ? ` no ${p.condominio}` : ''}, ${onde(p)}${i != null ? `, foto ${i + 1}` : ''} | ${SITE_NAME}`;
 }
 
 // ---------- metadados das páginas ----------
 export function buildPropertyMetadata(property: PropertyDetail): Metadata {
-  const title = property.titulo ? `${property.titulo} — ${onde(property)}`.slice(0, 95) : tituloSeoImovel(property);
+  const title = property.titulo ? `${property.titulo}, ${onde(property)}`.slice(0, 95) : tituloSeoImovel(property);
   const description = descricaoSeoImovel(property);
   const url = `${SITE_URL}/imovel/${property.id}`;
   const imagem = property.photos?.[0];
@@ -194,7 +194,7 @@ export function buildDevelopmentMetadata(development: Development): Metadata {
   const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
   const onde = [development.bairro, development.cidade].filter(Boolean).join(', ') || development.location;
   const tipoTxt = development.tipo === 'horizontal' ? 'Condomínio de casas' : 'Edifício';
-  const title = `${development.name} — ${tipoTxt} ${badge.label && development.tipo !== 'horizontal' ? `${badge.label.toLowerCase()} ` : ''}no ${onde}`.slice(0, 95);
+  const title = `${development.name}: ${tipoTxt} ${badge.label && development.tipo !== 'horizontal' ? `${badge.label.toLowerCase()} ` : ''}no ${onde}`.slice(0, 95);
   const desc =
     descricaoTextoPuro(development.description) ||
     `${development.name}, ${tipoTxt.toLowerCase()} em ${onde}. Veja imóveis à venda, fotos, lazer, plantas e valores na Mais Novos Imóveis.`;
@@ -212,7 +212,7 @@ export function buildDevelopmentMetadata(development: Development): Metadata {
       siteName: SITE_NAME,
       type: 'website',
       locale: 'pt_BR',
-      images: imagem ? [{ url: imagem, alt: `${development.name} — ${onde} | ${SITE_NAME}` }] : undefined
+      images: imagem ? [{ url: imagem, alt: `${development.name}, ${onde} | ${SITE_NAME}` }] : undefined
     },
     twitter: { card: imagem ? 'summary_large_image' : 'summary', title, description, images: imagem ? [imagem] : undefined }
   };

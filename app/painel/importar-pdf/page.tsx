@@ -244,7 +244,7 @@ export default function ImportarPdfPage() {
       });
       if (!r.ok && r.duplicado) {
         if (condos.some((c) => c.id === r.duplicado!.id)) setDestino(r.duplicado.id);
-        throw new Error(`O condomínio ${r.duplicado.name} já está cadastrado — para não duplicar, selecionei ele em "Atualizar só a tabela". Confira e salve de novo.`);
+        throw new Error(`O condomínio ${r.duplicado.name} já está cadastrado, para não duplicar, selecionei ele em "Atualizar só a tabela". Confira e salve de novo.`);
       }
       if (!r.ok) throw new Error('Faltando: ' + r.faltando.join(', '));
       if (f.entrega) {
@@ -269,7 +269,7 @@ export default function ImportarPdfPage() {
       <main className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8">
         <h1 className="font-serif text-2xl font-semibold">Importar lançamento por PDF</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Envie a ficha técnica, a tabela de vendas, o caderno de plantas e/ou o book. O sistema lê o texto dos arquivos (sem IA), monta o condomínio e as tipologias, e você confere antes de salvar. Os PDFs são lidos aqui no navegador — não sobem para o servidor.
+          Envie a ficha técnica, a tabela de vendas, o caderno de plantas e/ou o book. O sistema lê o texto dos arquivos (sem IA), monta o condomínio e as tipologias, e você confere antes de salvar. Os PDFs são lidos aqui no navegador, não sobem para o servidor.
         </p>
 
         {/* 1. Arquivos */}
@@ -288,7 +288,7 @@ export default function ImportarPdfPage() {
           className={`mt-5 cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center text-sm transition-colors ${arrastando ? 'border-accent bg-[#eef4ff]' : 'border-[var(--border)] hover:bg-[var(--pill-bg)]'}`}
         >
           <strong>Clique ou arraste os PDFs aqui</strong>
-          <div className="mt-1 text-xs text-[var(--text-muted)]">Pode mandar vários de uma vez, inclusive books de 100 MB ou mais — a leitura é feita aqui no seu computador, nada sobe para o servidor.</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">Pode mandar vários de uma vez, inclusive books de 100 MB ou mais, a leitura é feita aqui no seu computador, nada sobe para o servidor.</div>
           <input ref={inputRef} type="file" accept="application/pdf,.pdf" multiple className="hidden" onChange={(e) => adicionar(e.target.files)} />
         </div>
 
@@ -345,7 +345,7 @@ export default function ImportarPdfPage() {
                   <input type="radio" checked={destino !== 'novo'} onChange={() => setDestino(condos[0]?.id ?? 'novo')} disabled={!condos.length} /> Atualizar só a tabela (tipologias e preços) de:
                 </label>
                 <select className={`${inputClass} w-auto`} value={destino === 'novo' ? '' : destino} onChange={(e) => setDestino(e.target.value || 'novo')}>
-                  <option value="">— escolha —</option>
+                  <option value="">Escolha…</option>
                   {condos.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -355,7 +355,7 @@ export default function ImportarPdfPage() {
                 </select>
               </div>
               {existente && norm(existente.name) === norm(f.nome) && (
-                <p className="mt-2 text-xs text-[var(--text-muted)]">Já existe um condomínio com este nome — por isso a atualização da tabela foi pré-selecionada. Fotos, descrição e endereço dele não mudam.</p>
+                <p className="mt-2 text-xs text-[var(--text-muted)]">Já existe um condomínio com este nome, por isso a atualização da tabela foi pré-selecionada. Fotos, descrição e endereço dele não mudam.</p>
               )}
             </section>
 
@@ -438,7 +438,7 @@ export default function ImportarPdfPage() {
                     <div className="mt-3">
                       <div className="mb-1.5 text-[11px] font-semibold text-[var(--text-muted)]">
                         Planta{t.plantas.length !== 1 ? 's' : ''} ({t.plantas.length}){' '}
-                        {t.plantas.length === 0 && <span className="font-normal">— nenhuma página de planta com esta metragem; adicione depois na tela do condomínio (dá para colar print com Ctrl+V).</span>}
+                        {t.plantas.length === 0 && <span className="font-normal">nenhuma página de planta com esta metragem; adicione depois na tela do condomínio (dá para colar print com Ctrl+V).</span>}
                       </div>
                       {t.plantas.length > 0 && (
                         <div className="flex flex-wrap gap-2">
@@ -462,7 +462,7 @@ export default function ImportarPdfPage() {
                     </div>
                   </div>
                 ))}
-                {!tips.length && <p className="text-sm text-[var(--text-muted)]">Nenhuma tipologia encontrada — dá para cadastrar depois na tela do condomínio.</p>}
+                {!tips.length && <p className="text-sm text-[var(--text-muted)]">Nenhuma tipologia encontrada, dá para cadastrar depois na tela do condomínio.</p>}
               </div>
             </section>
 

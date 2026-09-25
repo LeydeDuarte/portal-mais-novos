@@ -175,7 +175,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
       <div className="flex flex-col gap-4 rounded-xl border border-[var(--border)] p-4">
         <MultiChipSelect
           label="Quais tipos de imóvel existem no condomínio? (marque todos que souber)"
-          hint="Não precisa saber metragem nem preço — isso já faz o condomínio aparecer no filtro por tipo."
+          hint="Não precisa saber metragem nem preço, isso já faz o condomínio aparecer no filtro por tipo."
           options={TODOS_OS_TIPOS}
           value={f.tiposUnidade}
           onChange={(x) => set('tiposUnidade', x)}
@@ -190,7 +190,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
       </div>
 
       <DescriptionEditor
-        label="Narrativa do condomínio (opcional — pode completar depois de publicar)"
+        label="Narrativa do condomínio (opcional, pode completar depois de publicar)"
         value={f.description}
         onChange={(x) => set('description', x)}
       />
@@ -201,7 +201,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
       </div>
 
       <PhotoUploadField
-        label="Fotos do condomínio (fachada, área comum, decorado) — opcional"
+        label="Fotos do condomínio (fachada, área comum, decorado), opcional"
         folder="empreendimentos"
         nomeArquivo={f.name}
         photos={f.photos}
@@ -249,7 +249,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
                 <input className={inputClass} placeholder="Preço" value={maskCurrencyInput(t.priceDigits)} onChange={(e) => updTip(t.key, 'priceDigits', e.target.value)} />
               </div>
               <PhotoUploadField
-                label="Planta desta tipologia (opcional — duplex pode ter 2)"
+                label="Planta desta tipologia (opcional, duplex pode ter 2)"
                 folder="plantas"
                 nomeArquivo={`${f.name} planta ${TIPO_UNIDADE_LABEL[t.tipoUnidade]} ${t.area ? `${t.area} m2` : ''}`}
                 modo="plantas"
@@ -304,19 +304,19 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
               ))}
             </ul>
             <p className="mt-2 text-xs text-[var(--text-faint)]">
-              Você pode salvar como rascunho e terminar depois. Narrativa, fotos, tipos e lazer são opcionais — dá para publicar e completar depois.
+              Você pode salvar como rascunho e terminar depois. Narrativa, fotos, tipos e lazer são opcionais, dá para publicar e completar depois.
             </p>
           </>
         )}
       </div>
 
       {faltando.length > 0 && (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Ainda não dá para publicar — falta: {faltando.join(', ')}.</p>
+        <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Ainda não dá para publicar, falta: {faltando.join(', ')}.</p>
       )}
       {duplicado && (
         <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
           Este condomínio já está cadastrado: <strong>{duplicado.name}</strong>
-          {duplicado.bairro ? ` (${duplicado.bairro})` : ''}. Para não duplicar, complete o que já existe —{' '}
+          {duplicado.bairro ? ` (${duplicado.bairro})` : ''}. Para não duplicar, complete o que já existe,{' '}
           <a href={`/painel/condominios/${duplicado.id}/editar`} className="font-bold underline">
             abrir o cadastro existente
           </a>

@@ -52,7 +52,7 @@ export default function PlantaViewer({ plantas, titulo, compacta = false }: Prop
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={url}
-              alt={`Planta ${plantas.length > 1 ? `${i + 1} ` : ''}— ${titulo}`}
+              alt={`Planta ${plantas.length > 1 ? `${i + 1} ` : ''}do ${titulo}`}
               loading="lazy"
               className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-[1.02]"
             />
@@ -67,7 +67,7 @@ export default function PlantaViewer({ plantas, titulo, compacta = false }: Prop
         <div className="fixed inset-0 z-[100] flex flex-col bg-black/95" role="dialog" aria-modal="true" aria-label="Planta ampliada">
           <div className="flex items-center justify-between gap-2 px-4 py-3 text-white">
             <span className="truncate text-sm font-semibold">
-              Planta{plantas.length > 1 ? ` ${aberta + 1} de ${plantas.length}` : ''} — {titulo}
+              Planta{plantas.length > 1 ? ` ${aberta + 1} de ${plantas.length}` : ''}: {titulo}
             </span>
             <div className="flex shrink-0 items-center gap-1">
               <button type="button" onClick={() => setZoom((z) => Math.max(1, z - 0.5))} className="rounded-full bg-white/15 px-3 py-1.5 text-sm font-bold hover:bg-white/25" aria-label="Diminuir zoom">
@@ -87,7 +87,7 @@ export default function PlantaViewer({ plantas, titulo, compacta = false }: Prop
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={plantas[aberta]}
-                alt={`Planta — ${titulo}`}
+                alt={`Planta do ${titulo}`}
                 onClick={() => setZoom((z) => (z >= 2 ? 1 : 2))}
                 className={`rounded-lg bg-white p-2 ${zoom === 1 ? 'max-h-[calc(100vh-90px)] max-w-full cursor-zoom-in object-contain' : 'w-full cursor-zoom-out'}`}
               />

@@ -35,11 +35,11 @@ export default function MonitoramentoPage() {
       <main className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8">
         <h1 className="font-serif text-2xl font-semibold">Monitoramento de mercado</h1>
         <p className="mt-1 mb-2 text-sm text-[var(--text-muted)]">
-          Imóveis anunciados recentemente na cidade selecionada, que ainda não estão na nossa base — use como referência pra
+          Imóveis anunciados recentemente na cidade selecionada, que ainda não estão na nossa base, use como referência pra
           contatar o proprietário e tentar a captação.
         </p>
         <p className="mb-6 rounded-lg bg-[var(--pill-bg)] p-3 text-xs text-[var(--text-muted)]">
-          Protótipo com dados de exemplo — ainda sem nenhuma fonte de mercado real conectada. Nunca copiamos fotos de
+          Protótipo com dados de exemplo, ainda sem nenhuma fonte de mercado real conectada. Nunca copiamos fotos de
           anúncios de terceiros; a ideia é só te avisar que aquele imóvel existe, pra você buscar a captação diretamente com
           o proprietário.
         </p>
@@ -76,8 +76,8 @@ export default function MonitoramentoPage() {
                   <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[ref.tipoUnidade]}</span>
                   <span className="font-sans tabular-nums text-base font-bold tracking-tight">{ref.precoAproximado}</span>
                   <span className="text-sm text-[var(--text-muted)]">
-                    {ref.bairro}, {ref.cidade} — {ref.areaAproximada}
-                    {ref.quartos !== '—' ? ` · ${ref.quartos} qts` : ''}
+                    {ref.bairro}, {ref.cidade}, {ref.areaAproximada}
+                    {ref.quartos !== '-' ? ` · ${ref.quartos} qts` : ''}
                   </span>
                   <span className="text-xs text-[var(--text-faint)]">Fonte: {ref.fonte}</span>
                 </div>

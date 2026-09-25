@@ -42,6 +42,6 @@ export function emailLayout(titulo: string, corpo: string): string {
       <h1 style="font-family:Georgia,serif;font-size:22px;margin:0 0 12px">${titulo}</h1>
       ${corpo}
     </div>
-    <p style="font-size:11px;color:#9aa0a8;margin-top:16px">Mais Novos Inteligência Imobiliária · CRECI C17586 · Goiânia — GO</p>
+    <p style="font-size:11px;color:#9aa0a8;margin-top:16px">Mais Novos Inteligência Imobiliária · CRECI C17586 · Goiânia/GO</p>
   </div></body></html>`;
 }

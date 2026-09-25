@@ -18,6 +18,7 @@ import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import ContarVisita from '@/components/ContarVisita';
 import Trilha from '@/components/Trilha';
+import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import { trilhaDoImovel } from '@/lib/seo';
 
 function formatBRL(v: number): string {
@@ -40,6 +41,11 @@ export default async function DevelopmentDetailView({ development }: { developme
   // então no lugar do "Registre seu interesse" vai o convite para falar conosco.
   const entregueHaMeses = development.deliveryDate
     ? (Date.now() - new Date(`${development.deliveryDate}-01T00:00:00`).getTime()) / (1000 * 60 * 60 * 24 * 30.4)
+    : null;
+  // WhatsApp da Leyde: condomínios lançamento, novo ou seminovo (entregues há até 6 anos)
+  const recente = !!development.deliveryDate && new Date(`${development.deliveryDate}-01T00:00:00`).getTime() > Date.now() - 6 * 365.25 * 864e5;
+  const whats = recente
+    ? { titulo: `${development.name}, ${[development.bairro, development.cidade].filter(Boolean).join(', ') || development.location}`, caminho: `/empreendimento/${development.id}`, condominio: development.name, developmentId: development.id }
     : null;
   const vendaDireta = futuro || (entregueHaMeses != null && entregueHaMeses <= 12);
 
@@ -64,6 +70,7 @@ export default async function DevelopmentDetailView({ development }: { developme
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
+      {whats && <BotaoWhatsapp ctx={whats} variante="flutuante" />}
       <ContarVisita tipo="empreendimento" id={development.id} perfil={{ tipos: development.tiposUnidade ?? [], bairros: development.bairro ? [development.bairro] : [] }} />
 
       <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
@@ -72,7 +79,7 @@ export default async function DevelopmentDetailView({ development }: { developme
         {development.status === 'rascunho' && (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <span>
-              <strong>Rascunho — não aparece no site.</strong> Só a equipe logada vê esta página.
+              <strong>Rascunho: não aparece no site.</strong> Só a equipe logada vê esta página.
             </span>
             <Link href={`/painel/condominios/${development.id}/editar`} className="rounded-full bg-ink px-4 py-2 text-xs font-bold text-white">
               Finalizar e publicar
@@ -85,7 +92,7 @@ export default async function DevelopmentDetailView({ development }: { developme
             <PhotoGallery
               photos={photos}
               video={galleryVideo}
-              alt={`${development.name} — ${development.tipo === 'horizontal' ? 'condomínio de casas' : 'edifício'} em ${[development.bairro, development.cidade].filter(Boolean).join(', ') || development.location} | Mais Novos Imóveis`}
+              alt={`${development.name}, ${development.tipo === 'horizontal' ? 'condomínio de casas' : 'edifício'} em ${[development.bairro, development.cidade].filter(Boolean).join(', ') || development.location} | Mais Novos Imóveis`}
               badges={
                 <span className="rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
                   {badge.text}
@@ -209,8 +216,9 @@ export default async function DevelopmentDetailView({ development }: { developme
             <ContatoLateral
               condominio={development.name}
               developmentId={development.id}
-              referencia={`Condomínio ${development.name} — /empreendimento/${development.id}`}
-              mensagemInicial={`Olá! Quero saber mais sobre o ${development.name} — valores e unidades disponíveis.`}
+              referencia={`Condomínio ${development.name} · /empreendimento/${development.id}`}
+              mensagemInicial={`Olá! Quero saber mais sobre o ${development.name}: valores e unidades disponíveis.`}
+              whatsapp={whats ?? undefined}
             />
           </div>
         </aside>
@@ -260,7 +268,7 @@ export default async function DevelopmentDetailView({ development }: { developme
         <RelatedListings
           title={`À venda no ${development.name}`}
           items={related.mesmoCondominio.filter((p) => p.finalidade === 'venda')}
-          emptyText={vendaDireta ? `Nenhum anúncio particular no ${development.name} no momento — fale conosco para ver as unidades direto com a incorporadora.` : `Nenhum imóvel à venda no ${development.name} no momento — registre seu interesse abaixo e avisamos quando surgir uma oportunidade.`}
+          emptyText={vendaDireta ? `Nenhum anúncio particular no ${development.name} no momento. Fale conosco para ver as unidades direto com a incorporadora.` : `Nenhum imóvel à venda no ${development.name} no momento — registre seu interesse abaixo e avisamos quando surgir uma oportunidade.`}
         />
         {reservados.length > 0 && (
           <section className="mt-10">
@@ -296,7 +304,7 @@ export default async function DevelopmentDetailView({ development }: { developme
         <LocationCard
           title={development.name}
           subtitle={development.location}
-          mapsQuery={`${development.name}, ${development.location.replace(' — ', ', ')}`}
+          mapsQuery={`${development.name}, ${development.location.replace(/\s*—\s*/g, ', ')}`}
         />
       </main>
 

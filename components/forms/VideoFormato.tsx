@@ -17,14 +17,14 @@ export default function VideoFormato({ vertical, onChange }: { vertical: boolean
   return (
     <div className="flex flex-col gap-1.5">
       <span className={`text-xs font-semibold ${vertical === null ? 'text-red-600' : 'text-[var(--text-muted)]'}`}>
-        Formato do vídeo {vertical === null ? '— obrigatório: escolha antes de publicar' : ''}
+        Formato do vídeo {vertical === null ? 'obrigatório: escolha antes de publicar' : ''}
       </span>
       <div className="flex gap-2">
         {opt(false, 'Deitado', 'Horizontal, 16:9')}
         {opt(true, 'Em pé', 'Gravado no celular, Reels/Shorts')}
       </div>
       <span className="text-xs text-[var(--text-faint)]">
-        Marque como o vídeo foi GRAVADO, não como aparece no YouTube. Vídeos longos gravados em pé aparecem deitados no YouTube, com faixas pretas — marcando
+        Marque como o vídeo foi GRAVADO, não como aparece no YouTube. Vídeos longos gravados em pé aparecem deitados no YouTube, com faixas pretas, marcando
         &quot;Em pé&quot;, ele preenche o espaço da foto principal sem sobrar preto.
       </span>
     </div>

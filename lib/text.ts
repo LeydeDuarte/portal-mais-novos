@@ -17,7 +17,7 @@ function capitalizar(palavra: string): string {
 // (ex: "T-55", "3Q") ficam como foram digitadas.
 export function formatTitulo(texto?: string | null): string {
   if (!texto) return '';
-  const limpo = texto.replace(/\s+/g, ' ').trim();
+  const limpo = semTravessoes(texto).replace(/\s+/g, ' ').trim();
   return limpo
     .split(' ')
     .map((original, i) => {
@@ -84,7 +84,7 @@ function rotuloAutomatico(linha: string): string {
 
 export function parseDescricao(texto?: string | null): Bloco[] {
   if (!texto) return [];
-  const linhas = suavizarCaixaAlta(texto.replace(/\r\n/g, '\n')).split('\n');
+  const linhas = suavizarCaixaAlta(semTravessoes(texto).replace(/\r\n/g, '\n')).split('\n');
   const blocos: Bloco[] = [];
   let lista: Inline[][] | null = null;
   let paragrafo: string[] = [];
@@ -134,11 +134,17 @@ export function parseDescricao(texto?: string | null): Bloco[] {
 
 // Versão em texto puro (sem ** ## -) — para meta description, cards, SEO
 export function descricaoTextoPuro(texto?: string | null): string {
-  return (texto ?? '')
+  return semTravessoes(texto ?? '')
     .replace(/^#{1,3}\s+/gm, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/^[-•]\s+/gm, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// Sem travessões nos textos do site: " — " vira vírgula; travessão no começo de
+// linha (item de lista) vira hífen.
+export function semTravessoes(texto: string): string {
+  return texto.replace(/^(\s*)[—–]\s*/gm, '$1- ').replace(/\s*[—–]\s*/g, ', ');
 }

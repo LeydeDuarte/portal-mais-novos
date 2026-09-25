@@ -187,7 +187,7 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
       {modoEquipe && (
         <p className="mx-4 mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 md:mx-8">
           <strong>Visão da equipe:</strong> você está logada no painel, então o feed mostra <strong>todos</strong> os condomínios. Visitantes só veem no
-          feed os condomínios com foto — os demais aparecem quando pesquisam o nome.
+          feed os condomínios com foto; os demais aparecem quando pesquisam o nome.
         </p>
       )}
 
@@ -211,7 +211,7 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
 
       {items.length === 0 && !loading && (
         <div className="px-4 pb-16 text-center text-sm text-[var(--text-muted)]">
-          Nenhum resultado com esses filtros — tente ajustar algum deles ou limpar a busca.
+          Nenhum resultado com esses filtros. Tente ajustar algum deles ou limpar a busca.
         </div>
       )}
 
@@ -225,7 +225,7 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
         <section className="mx-auto mb-16 w-full max-w-6xl px-4 md:px-8" aria-label="Anúncios reservados">
           <h2 className="text-lg font-bold">Anúncios reservados que podem atender sua busca</h2>
           <p className="mt-1 max-w-2xl text-sm text-[var(--text-muted)]">
-            Imóveis do nosso portfólio que o proprietário preferiu não publicar abertamente. Mostramos só as características — peça para ver o anúncio
+            Imóveis do nosso portfólio que o proprietário preferiu não publicar abertamente. Mostramos só as características. Peça para ver o anúncio
             completo e verificamos a disponibilidade para você.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
@@ -241,7 +241,7 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
           <h2 className="text-lg font-bold">
             Condomínios {filters.locais.filter((l) => l.tipo === 'bairro').length > 1 ? 'nestes bairros' : `no ${filters.locais.find((l) => l.tipo === 'bairro')?.nome}`}
           </h2>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">Conheça os condomínios da região — toque no nome para ver fotos, lazer e o que está à venda.</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Conheça os condomínios da região. Toque no nome para ver fotos, lazer e o que está à venda.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {(verTodosCondos ? condosBairro : condosBairro.slice(0, 40)).map((c) => (
               <Link

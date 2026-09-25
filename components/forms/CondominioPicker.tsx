@@ -16,9 +16,9 @@ type Props = {
   selectedId: string;
   onSelect: (c: CondominioResumo | null) => void;
   onCreated: (c: CondominioResumo) => void;
-  cidade?: string; // do CEP do imóvel — prioriza condomínios da mesma cidade (e bairro)
+  cidade?: string; // do CEP do imóvel, prioriza condomínios da mesma cidade (e bairro)
   bairro?: string;
-  textoInicial?: string; // nome lido do anúncio (preenchimento rápido) — já aparece digitado
+  textoInicial?: string; // nome lido do anúncio (preenchimento rápido), já aparece digitado
 };
 
 const RECENTES_KEY = 'mn_condos_recentes';
@@ -122,7 +122,7 @@ export default function CondominioPicker({ condominios, selectedId, onSelect: on
         // já existe: usa o cadastrado em vez de criar outro
         const existente = condominios.find((c) => c.id === r.duplicado!.id);
         if (existente) onSelect(existente);
-        else setErro(`Já existe o condomínio ${r.duplicado.name}${r.duplicado.bairro ? ` (${r.duplicado.bairro})` : ''} — procure pelo nome acima.`);
+        else setErro(`Já existe o condomínio ${r.duplicado.name}${r.duplicado.bairro ? ` (${r.duplicado.bairro})` : ''}, procure pelo nome acima.`);
         setCreating(false);
         return;
       }
@@ -160,7 +160,7 @@ export default function CondominioPicker({ condominios, selectedId, onSelect: on
         <div className="flex items-center justify-between gap-3 rounded-lg border border-ink bg-[var(--pill-bg)] px-3 py-2.5">
           <span className="text-sm">
             <strong>{selected.name}</strong>
-            <span className="text-[var(--text-muted)]"> — {[selected.bairro, selected.cidade].filter(Boolean).join(', ')}</span>
+            <span className="text-[var(--text-muted)]">, {[selected.bairro, selected.cidade].filter(Boolean).join(', ')}</span>
             {selected.status === 'rascunho' && (
               <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">rascunho</span>
             )}
@@ -182,7 +182,7 @@ export default function CondominioPicker({ condominios, selectedId, onSelect: on
             onBlur={() => {
               blurTimer.current = setTimeout(() => setOpen(false), 150);
             }}
-            placeholder="Digite parte do nome do condomínio — ex: “jardins”, “alphaville”"
+            placeholder="Digite parte do nome do condomínio, ex: “jardins”, “alphaville”"
           />
           {open && (
             <div
@@ -190,7 +190,7 @@ export default function CondominioPicker({ condominios, selectedId, onSelect: on
               onMouseDown={() => blurTimer.current && clearTimeout(blurTimer.current)}
             >
               <p className="px-3 pb-1 pt-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">
-                {semTexto ? 'Últimos usados — digite para buscar' : cidade ? `Resultados (primeiro os de ${cidade})` : 'Resultados — preencha o CEP para priorizar a cidade'}
+                {semTexto ? 'Últimos usados, digite para buscar' : cidade ? `Resultados (primeiro os de ${cidade})` : 'Resultados, preencha o CEP para priorizar a cidade'}
               </p>
               {matches.map((c) => (
                 <button

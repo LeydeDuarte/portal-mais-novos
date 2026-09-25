@@ -113,7 +113,7 @@ function mapLead(row: MarketLeadRow): MarketLead {
     tipoUnidade: row.tipo_unidade as TipoUnidade,
     precoAproximado: row.preco_aproximado,
     areaAproximada: row.area_aproximada,
-    quartos: row.quartos ?? '—',
+    quartos: row.quartos ?? '-',
     fonte: row.fonte,
     observacao: row.observacao ?? '',
     leadId: row.id,
@@ -160,7 +160,7 @@ export async function addMarketLead(ref: MarketReference): Promise<MarketLead | 
       ref.tipoUnidade,
       ref.precoAproximado,
       ref.areaAproximada,
-      ref.quartos === '—' ? null : ref.quartos,
+      ref.quartos === '-' ? null : ref.quartos,
       ref.fonte,
       ref.observacao || null,
       staff.email

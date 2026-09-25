@@ -14,7 +14,7 @@ export default function TermosPage() {
       <Header />
       <main className="mx-auto w-full max-w-3xl px-5 py-10 text-[15px] leading-relaxed md:px-8">
         <h1 className="font-serif text-3xl font-semibold">Termos de uso e Política de privacidade</h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">Mais Novos Inteligência Imobiliária — CRECI C17586 · Goiânia, GO</p>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">Mais Novos Inteligência Imobiliária · CRECI C17586 · Goiânia, GO</p>
 
         <h2 className="mt-8 text-lg font-bold">1. Sobre o portal</h2>
         <p className="mt-2">

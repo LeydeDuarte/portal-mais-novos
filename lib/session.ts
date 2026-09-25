@@ -5,7 +5,7 @@ import crypto from 'crypto';
 // reserva: se faltar, nada de sessão é aceito nem emitido).
 function segredo(): string {
   const s = process.env.SESSION_SECRET;
-  if (!s) throw new Error('SESSION_SECRET ausente — configure na Vercel.');
+  if (!s) throw new Error('SESSION_SECRET ausente. Configure na Vercel.');
   return s;
 }
 const hmac = (dominio: string, base: string) => crypto.createHmac('sha256', segredo()).update(`${dominio}:${base}`).digest('base64url');

@@ -12,7 +12,8 @@ import ContatoLateral from '@/components/ContatoLateral';
 import ContarVisita from '@/components/ContarVisita';
 import CondominioTag from '@/components/CondominioTag';
 import Trilha from '@/components/Trilha';
-import { altFoto, trilhaDoImovel } from '@/lib/seo';
+import { altFoto, trilhaDoImovel, tituloSeoImovel } from '@/lib/seo';
+import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getAveragePricePerM2, formatPricePerM2, type PropertyDetail } from '@/lib/property-details';
 import { getDevelopmentById, getRelatedListings } from '@/lib/actions';
@@ -58,6 +59,9 @@ export default async function PropertyDetailView({
   const regiao = property.location.replace(' — ', ', ');
   const titulo = property.titulo || `${TIPO_UNIDADE_LABEL[property.tipoUnidade]} em ${property.location}`;
 
+  // WhatsApp da Leyde com o link deste anúncio (vale para todos os anúncios)
+  const whats = { titulo: tituloSeoImovel(property), caminho: `/imovel/${property.id}`, condominio: nomeCondominio, developmentId: property.empreendimentoId };
+
   const badges = (
               <div className="flex flex-wrap items-center gap-2">
                 <span
@@ -80,6 +84,7 @@ export default async function PropertyDetailView({
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
+      <BotaoWhatsapp ctx={whats} variante="flutuante" />
       <ContarVisita tipo="imovel" id={property.id} perfil={{ tipos: [property.tipoUnidade], bairros: property.bairro ? [property.bairro] : [], preco: property.finalidade === 'venda' ? property.priceValue : null }} />
 
       <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
@@ -92,11 +97,11 @@ export default async function PropertyDetailView({
               {avisoPrivado === 'link' ? (
                 <>
                   <strong>Anúncio exclusivo.</strong> Este link foi liberado só para você e só abre neste aparelho. Quer mostrar para outra pessoa? Peça ao
-                  nosso atendimento — enviamos um link para o telefone dela.
+                  nosso atendimento: enviamos um link para o telefone dela.
                 </>
               ) : (
                 <>
-                  <strong>Anúncio privado</strong> — só a equipe e quem recebe o link privado veem esta página completa. O público vê só o resumo.
+                  <strong>Anúncio privado:</strong> só a equipe e quem recebe o link privado veem esta página completa. O público vê só o resumo.
                 </>
               )}
             </span>
@@ -119,7 +124,7 @@ export default async function PropertyDetailView({
 
         {property.vendidoEm && (
           <p className="mb-4 rounded-xl p-3 text-sm font-semibold text-white" style={{ background: '#e62f2f' }}>
-            Este imóvel foi vendido. Veja abaixo opções parecidas na mesma região — ou fale conosco que encontramos outro para você.
+            Este imóvel foi vendido. Veja abaixo opções parecidas na mesma região ou fale conosco que encontramos outro para você.
           </p>
         )}
         {hasGallery && (
@@ -243,8 +248,9 @@ export default async function PropertyDetailView({
                 titulo="Falar com um corretor"
                 condominio={nomeCondominio || titulo}
                 developmentId={property.empreendimentoId}
-                referencia={`${titulo} — /imovel/${property.id}`}
+                referencia={`${titulo} · /imovel/${property.id}`}
                 mensagemInicial={`Olá! Tenho interesse neste imóvel: ${titulo}. Ainda está disponível?`}
+                whatsapp={whats}
               />
             </div>
           </aside>

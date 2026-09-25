@@ -38,7 +38,7 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
                     <ImagemCapa
                       mini={p.capaMini}
                       original={cover}
-                      alt={`${TIPO_UNIDADE_LABEL[p.tipoUnidade]}${p.condominio ? ` no ${formatTitulo(p.condominio)}` : ''} — ${p.bairro || p.location}`}
+                      alt={`${TIPO_UNIDADE_LABEL[p.tipoUnidade]}${p.condominio ? ` no ${formatTitulo(p.condominio)}` : ''}, ${p.bairro || p.location}`}
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     />
                   ) : (
@@ -70,7 +70,7 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
                     {p.bairro || p.location}
                   </div>
                   <div className="text-xs text-[var(--text-muted)]">
-                    {[p.beds !== '—' ? p.beds : null, p.parking !== '—' ? p.parking : null, p.area !== '—' ? p.area : null].filter(Boolean).join(' · ')}
+                    {[p.beds !== '-' ? p.beds : null, p.parking !== '-' ? p.parking : null, p.area !== '-' ? p.area : null].filter(Boolean).join(' · ')}
                   </div>
                 </div>
               </Link>
@@ -89,5 +89,5 @@ export function faixaDePreco(preco: number | null): string | undefined {
     n >= 1_000_000
       ? `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`
       : `R$ ${Math.round(n / 1000).toLocaleString('pt-BR')} mil`;
-  return `Parecidos com este — mesmo tipo, quartos e metragem próximos — entre ${fmt(preco * 0.65)} e ${fmt(preco * 1.35)}.`;
+  return `Parecidos com este (mesmo tipo, quartos e metragem próximos), entre ${fmt(preco * 0.65)} e ${fmt(preco * 1.35)}.`;
 }

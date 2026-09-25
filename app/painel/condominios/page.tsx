@@ -97,7 +97,7 @@ export default function CondominiosPage() {
           <p className="mt-8 text-sm text-[var(--text-muted)]">Nenhum condomínio encontrado.</p>
         ) : (
           <div className="mt-5 flex flex-col gap-3">
-            <p className="text-xs text-[var(--text-muted)]">{lista.length} condomínio(s){lista.length > limite ? ` — mostrando ${limite}; use a busca para achar um específico` : ''}</p>
+            <p className="text-xs text-[var(--text-muted)]">{lista.length} condomínio(s){lista.length > limite ? `, mostrando ${limite}; use a busca para achar um específico` : ''}</p>
             {lista.slice(0, limite).map((c) => (
               <div key={c.id} className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] p-4">
                 <div className="flex min-w-0 flex-col gap-0.5">

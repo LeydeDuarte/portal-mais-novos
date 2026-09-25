@@ -141,7 +141,7 @@ export default function ImportarCondominiosPage() {
       })
     );
     setCepConferido(true);
-    setStatus(`${cache.size} CEP(s) conferidos — ${corrigidos} bairro(s) corrigido(s).`);
+    setStatus(`${cache.size} CEP(s) conferidos, ${corrigidos} bairro(s) corrigido(s).`);
     setTimeout(() => setStatus(null), 4000);
   };
 
@@ -220,8 +220,8 @@ export default function ImportarCondominiosPage() {
         </Link>
         <h1 className="mt-3 font-serif text-2xl font-semibold">Importar condomínios por planilha</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Envie uma ou mais planilhas (.xlsx ou .csv). As colunas são reconhecidas pelo nome do cabeçalho. Condomínios repetidos — na mesma planilha, entre planilhas
-          ou já cadastrados — <strong>não são duplicados</strong>: mesmo nome + mesmo CEP (ou mesmo bairro) conta como o mesmo condomínio.{' '}
+          Envie uma ou mais planilhas (.xlsx ou .csv). As colunas são reconhecidas pelo nome do cabeçalho. Condomínios repetidos, na mesma planilha, entre planilhas
+          ou já cadastrados, <strong>não são duplicados</strong>: mesmo nome + mesmo CEP (ou mesmo bairro) conta como o mesmo condomínio.{' '}
           <button type="button" onClick={baixarModelo} className="font-semibold text-accent underline">
             Baixar planilha modelo
           </button>
@@ -237,7 +237,7 @@ export default function ImportarCondominiosPage() {
           className="mt-5 cursor-pointer rounded-2xl border-2 border-dashed border-[var(--border)] p-6 text-center text-sm hover:bg-[var(--pill-bg)]"
         >
           <strong>Clique ou arraste as planilhas aqui</strong>
-          <div className="mt-1 text-xs text-[var(--text-muted)]">.xlsx ou .csv — pode mandar várias</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">.xlsx ou .csv, pode mandar várias</div>
           <input
             ref={inputRef}
             type="file"
@@ -282,7 +282,7 @@ export default function ImportarCondominiosPage() {
                       setLinhas(null);
                     }}
                   >
-                    <option value="">— não tem —</option>
+                    <option value="">(não tem)</option>
                     {a.cabecalho.map((h, k) => (
                       <option key={k} value={k}>
                         {h || `Coluna ${k + 1}`}
@@ -334,7 +334,7 @@ export default function ImportarCondominiosPage() {
             </div>
             {semEntrega > 0 && (
               <p className="mt-3 text-xs text-amber-800">
-                {semEntrega} sem data de entrega — entram normalmente e no feed aparece <strong>----</strong> no lugar do ano. Dá para completar depois em Condomínios.
+                {semEntrega} sem data de entrega, entram normalmente e no feed aparece <strong>----</strong> no lugar do ano. Dá para completar depois em Condomínios.
               </p>
             )}
 
@@ -409,10 +409,10 @@ export default function ImportarCondominiosPage() {
                         </div>
                       </td>
                       <td className="px-2 py-1.5">
-                        {l.logradouro || '—'}
+                        {l.logradouro || '-'}
                         <div className="text-[var(--text-muted)]">{l.cep ? `${l.cep.slice(0, 5)}-${l.cep.slice(5)}` : 'sem CEP'}</div>
                       </td>
-                      <td className="px-2 py-1.5 tabular-nums">{l.entrega ? `${l.entrega.slice(5)}/${l.entrega.slice(0, 4)}` : '—'}</td>
+                      <td className="px-2 py-1.5 tabular-nums">{l.entrega ? `${l.entrega.slice(5)}/${l.entrega.slice(0, 4)}` : '-'}</td>
                       <td className="px-2 py-1.5">
                         {l.existe ? (
                           <span className="rounded bg-[var(--pill-bg)] px-1.5 py-0.5 font-bold">Já cadastrado</span>
@@ -429,14 +429,14 @@ export default function ImportarCondominiosPage() {
                   ))}
                 </tbody>
               </table>
-              {visiveis.length > 400 && <p className="p-3 text-center text-xs text-[var(--text-muted)]">Mostrando 400 de {visiveis.length} — todos entram na importação.</p>}
+              {visiveis.length > 400 && <p className="p-3 text-center text-xs text-[var(--text-muted)]">Mostrando 400 de {visiveis.length}, todos entram na importação.</p>}
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button type="button" disabled={!!status} onClick={importar} className="rounded-full bg-accent px-6 py-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">
                 Importar {novos} novo(s){opExist === 'completar' && existentes ? ` e completar ${existentes}` : ''}
               </button>
-              <span className="text-xs text-[var(--text-muted)]">Sem foto e sem imóvel anunciado, o condomínio não aparece no feed — só nas buscas e na própria página (bom para o Google).</span>
+              <span className="text-xs text-[var(--text-muted)]">Sem foto e sem imóvel anunciado, o condomínio não aparece no feed, só nas buscas e na própria página (bom para o Google).</span>
             </div>
           </section>
         )}

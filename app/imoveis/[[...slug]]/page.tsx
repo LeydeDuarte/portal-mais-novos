@@ -62,7 +62,7 @@ function textoIntro(r: Resolvido, est: Estatisticas, condos: number): string {
     est.min && est.max && est.min !== est.max ? `Os valores vão de ${brl(est.min)} a ${brl(est.max)}.` : est.min ? `Valores a partir de ${brl(est.min)}.` : '',
     est.m2 ? `O preço médio anunciado é de ${brl(est.m2)} por m².` : '',
     est.comVideo ? `${est.comVideo} ${est.comVideo === 1 ? 'anúncio tem' : 'anúncios têm'} vídeo.` : '',
-    'Todos com fotos, dados do condomínio e atendimento da Mais Novos Imóveis — inclusive para financiamento e crédito imobiliário.'
+    'Todos com fotos, dados do condomínio e atendimento da Mais Novos Imóveis, inclusive para financiamento e crédito imobiliário.'
   ];
   return partes.filter(Boolean).join(' ');
 }
@@ -99,7 +99,7 @@ export default async function RegiaoPage({ params }: Props) {
           <Trilha itens={[{ nome: 'Início', url: SITE_URL }, { nome: 'Imóveis por região', url: `${SITE_URL}/imoveis` }]} />
           <h1 className="font-serif text-3xl font-semibold">Imóveis à venda em Goiânia e região</h1>
           <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-[var(--text-muted)]">
-            Escolha a cidade e o bairro para ver apartamentos, casas em condomínio, coberturas e lançamentos à venda — com fotos, vídeos e as
+            Escolha a cidade e o bairro para ver apartamentos, casas em condomínio, coberturas e lançamentos à venda, com fotos, vídeos e as
             informações de cada condomínio.
           </p>
           {cidades.map((c) => (
@@ -216,7 +216,7 @@ export default async function RegiaoPage({ params }: Props) {
               {condos.map((c) => (
                 <Link key={c.id} href={`/empreendimento/${c.id}`} className="group flex items-center gap-3 rounded-xl border border-[var(--border)] p-2.5 hover:border-accent">
                   <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--card-img-bg)]">
-                    {c.capa && <ImagemCapa original={c.capa} alt={`${c.nome} — ${reg.bairro ?? reg.cidade} | ${SITE_NAME}`} className="h-full w-full object-cover" />}
+                    {c.capa && <ImagemCapa original={c.capa} alt={`${c.nome}, ${reg.bairro ?? reg.cidade} | ${SITE_NAME}`} className="h-full w-full object-cover" />}
                   </div>
                   <div className="min-w-0">
                     <div className="truncate text-sm font-bold group-hover:text-accent">{c.nome}</div>

@@ -25,7 +25,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} — Imóveis à venda em Goiânia`,
+    default: `${SITE_NAME} | Imóveis à venda em Goiânia`,
     template: `%s | ${SITE_NAME}`
   },
   description:

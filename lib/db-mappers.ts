@@ -122,6 +122,11 @@ export function heightFromId(id: string): number {
 }
 
 // Miniatura só vale se foi feita da capa ATUAL
+// Endereços antigos gravados como "Bairro, Cidade — GO" aparecem como "Bairro, Cidade/GO"
+export function semTravessao(t?: string | null): string {
+  return String(t ?? '').replace(/\s*—\s*/g, '/');
+}
+
 export function miniValida(row: { photos?: unknown; capa_mini?: string | null; capa_mini_de?: string | null }): string | undefined {
   const capa = toStringArray(row.photos)[0];
   return row.capa_mini && capa && row.capa_mini_de === capa ? row.capa_mini : undefined;
@@ -135,12 +140,12 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
     finalidade: row.finalidade,
     deliveryDate: formatDeliveryDate(row.delivery_date),
     price: formatPrice(row.price_value, row.price_period),
-    location: row.location,
-    beds: row.quartos != null ? `${row.quartos} qts` : '—',
-    parking: row.vagas != null ? `${row.vagas} vg` : '—',
+    location: semTravessao(row.location),
+    beds: row.quartos != null ? `${row.quartos} qts` : '-',
+    parking: row.vagas != null ? `${row.vagas} vg` : '-',
     banheiros: row.banheiros != null ? `${row.banheiros} banheiros` : undefined,
     escaninhos: row.escaninhos != null ? `${row.escaninhos} escaninho(s)` : undefined,
-    area: row.area != null ? `${Number(row.area).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m²` : '—',
+    area: row.area != null ? `${Number(row.area).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m²` : '-',
     areaValue: row.area != null ? Number(row.area) : undefined,
     priceValue: Number(row.price_value) || undefined,
     height: heightFromId(row.id),
@@ -173,7 +178,7 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
   return {
     id: row.id,
     name: formatTitulo(row.name),
-    location: row.location,
+    location: semTravessao(row.location),
     deliveryDate: deliveryDateFormatted,
     deliveryNote: deliveryDateFormatted
       ? `${new Date(`${deliveryDateFormatted}-01T00:00:00`) > new Date() ? 'Previsão de entrega' : row.tipo === 'horizontal' ? 'Condomínio entregue em' : 'Entregue em'}${

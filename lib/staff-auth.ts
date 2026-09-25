@@ -23,7 +23,7 @@ export const staffAtual = cache(async (): Promise<StaffSessionPayload | null> =>
   return s;
 });
 
-const SESSAO_EXPIRADA = 'Sessão da equipe expirada — faça login novamente no painel.';
+const SESSAO_EXPIRADA = 'Sessão da equipe expirada. Faça login novamente no painel.';
 
 export async function exigirEquipe(): Promise<StaffSessionPayload> {
   const s = await staffAtual();

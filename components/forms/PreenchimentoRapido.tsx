@@ -45,7 +45,7 @@ export default function PreenchimentoRapido({ onAplicar }: { onAplicar: (d: Prop
     for (const f of files) {
       try {
         setStatus(`Lendo ${f.name}…`);
-        const doc = await lerPdf(f, f.name, (p, t) => setStatus(`Lendo ${f.name} — página ${p} de ${t}`));
+        const doc = await lerPdf(f, f.name, (p, t) => setStatus(`Lendo ${f.name}, página ${p} de ${t}`));
         const txt = doc.paginas.map((pg) => pg.join('\n')).join('\n\n');
         if (txt.replace(/\s/g, '').length > 20) addTexto(txt);
         setStatus(`Separando as fotos de ${f.name}…`);
@@ -57,7 +57,7 @@ export default function PreenchimentoRapido({ onAplicar }: { onAplicar: (d: Prop
           origem = 'página do PDF';
         }
         setImgs((cur) => [...cur, ...fotos.map((blob) => ({ src: URL.createObjectURL(blob), blob, usar: origem === 'foto do PDF', origem }))]);
-        if (txt.replace(/\s/g, '').length <= 20) setErro(`"${f.name}" não tem texto selecionável — se for um print/scan, use "Ler print".`);
+        if (txt.replace(/\s/g, '').length <= 20) setErro(`"${f.name}" não tem texto selecionável, se for um print/scan, use "Ler print".`);
       } catch {
         setErro(`Não foi possível abrir "${f.name}".`);
       }
@@ -152,7 +152,7 @@ export default function PreenchimentoRapido({ onAplicar }: { onAplicar: (d: Prop
     <section className="mb-6 rounded-2xl border-2 border-dashed border-accent/50 bg-[#f5f8ff] p-4">
       <h2 className="text-base font-bold">Preenchimento rápido</h2>
       <p className="mt-1 text-xs text-[var(--text-muted)]">
-        Cole o texto do anúncio, envie o PDF (texto e fotos) ou um print da tela — o formulário abaixo já vem preenchido para você conferir. Use textos seus ou do
+        Cole o texto do anúncio, envie o PDF (texto e fotos) ou um print da tela, o formulário abaixo já vem preenchido para você conferir. Use textos seus ou do
         proprietário (nunca copie descrição de anúncio de outro corretor). Telefones, e-mails e links saem da descrição automaticamente.
       </p>
       <textarea
@@ -167,7 +167,7 @@ export default function PreenchimentoRapido({ onAplicar }: { onAplicar: (d: Prop
             lerPrints(prints);
           }
         }}
-        placeholder={'Cole aqui o anúncio completo (Ctrl+V). Ex.:\nApartamento à venda no Setor Bueno — 3 suítes, 142 m², 3 vagas\nValor: R$ 1.290.000\nCondomínio Porto Belo…\n\nColou um print? Ele é lido automaticamente.'}
+        placeholder={'Cole aqui o anúncio completo (Ctrl+V). Ex.:\nApartamento à venda no Setor Bueno, 3 suítes, 142 m², 3 vagas\nValor: R$ 1.290.000\nCondomínio Porto Belo…\n\nColou um print? Ele é lido automaticamente.'}
       />
       <div className="mt-2 flex flex-wrap gap-2">
         <button type="button" onClick={() => pdfRef.current?.click()} className="rounded-full bg-[var(--bg)] px-4 py-2 text-sm font-semibold ring-1 ring-[var(--border)] hover:ring-accent">
@@ -182,7 +182,7 @@ export default function PreenchimentoRapido({ onAplicar }: { onAplicar: (d: Prop
 
       {imgs.length > 0 && (
         <div className="mt-3">
-          <div className="mb-1.5 text-xs font-semibold text-[var(--text-muted)]">Imagens encontradas — marque as que vão para as fotos do anúncio ({imgs.filter((i) => i.usar).length})</div>
+          <div className="mb-1.5 text-xs font-semibold text-[var(--text-muted)]">Imagens encontradas, marque as que vão para as fotos do anúncio ({imgs.filter((i) => i.usar).length})</div>
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
             {imgs.map((im, i) => (
               <button

@@ -193,7 +193,7 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-semibold text-[var(--text-muted)]">Título do anúncio (opcional — se deixar em branco, gera um genérico)</label>
+        <label className="text-xs font-semibold text-[var(--text-muted)]">Título do anúncio (opcional, se deixar em branco, gera um genérico)</label>
         <input className={inputClass} value={v.titulo} onChange={(e) => set('titulo', e.target.value)} placeholder="Ex: Apartamento à venda no Setor Bueno, 3 quartos" />
       </div>
 
@@ -247,8 +247,8 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
       <div className="flex flex-col gap-1">
         <label className="text-xs font-semibold text-[var(--text-muted)]">
           {ehCasa(v.tipoUnidade)
-            ? 'Ano de entrega da casa (habite-se — é a idade da CASA, não a do condomínio; se não souber, deixe vazio)'
-            : 'Data de entrega (mês/ano — se já pronto, pode ser uma data passada; se não souber, deixe vazio)'}
+            ? 'Ano de entrega da casa (habite-se, é a idade da CASA, não a do condomínio; se não souber, deixe vazio)'
+            : 'Data de entrega (mês/ano, se já pronto, pode ser uma data passada; se não souber, deixe vazio)'}
         </label>
         <input type="month" className={inputClass} value={v.deliveryDate} onChange={(e) => set('deliveryDate', e.target.value)} />
       </div>
@@ -280,7 +280,7 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
       </div>
 
       <DescriptionEditor
-        label="Descrição (opcional — se deixar em branco, gera uma básica)"
+        label="Descrição (opcional, se deixar em branco, gera uma básica)"
         value={v.description}
         onChange={(x) => set('description', x)}
       />

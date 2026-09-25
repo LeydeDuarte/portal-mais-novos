@@ -1515,7 +1515,7 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
     const entrega = c.entrega && /^\d{4}-\d{2}$/.test(c.entrega) ? `${c.entrega}-01` : null;
     const reg = {
       name: nome,
-      location: [bairro, [cidade, uf].filter(Boolean).join(' — ')].filter(Boolean).join(', '),
+      location: [bairro, [cidade, uf].filter(Boolean).join('/')].filter(Boolean).join(', '),
       delivery_date: entrega,
       description: (c.descricao ?? '').slice(0, 5000),
       tipo: c.tipo === 'horizontal' ? 'horizontal' : 'vertical',
@@ -1691,4 +1691,37 @@ export async function condominiosDosBairros(bairros: { nome: string; cidade: str
 export async function otimizarFotosDoFeed(): Promise<{ feitas: number; restantes: number; erros: string[] }> {
   await exigirGestor();
   return processarMiniaturas(20000);
+}
+
+// Lead do botão "Falar pelo WhatsApp": antes de abrir o WhatsApp a pessoa informa
+// o nome (e, se quiser, o telefone) — fica em Painel → Interessados com o link do anúncio.
+export async function registrarLeadWhatsapp(input: {
+  nome: string;
+  telefone?: string;
+  titulo: string;
+  caminho: string;
+  condominio?: string;
+  developmentId?: string;
+}): Promise<{ ok: boolean; erro?: string }> {
+  const nome = String(input.nome ?? '').trim().slice(0, 120);
+  if (nome.length < 2) return { ok: false, erro: 'Digite seu nome.' };
+  const telefone = String(input.telefone ?? '').replace(/[^\d]/g, '').slice(0, 13);
+  const caminho = /^\/(imovel|empreendimento)\/[\w-]{1,80}$/.test(String(input.caminho)) ? String(input.caminho) : '';
+  const titulo = String(input.titulo ?? '').slice(0, 200);
+  const devId = input.developmentId && /^[\w-]{1,80}$/.test(input.developmentId) ? input.developmentId : null;
+  const ip = ipDoVisitante();
+  if (!(await dentroDoLimite(`lead:${ip}`, 15, 60))) return { ok: true }; // não trava a pessoa; só não grava de novo
+  await registrarUso(`lead:${ip}`);
+  await query(
+    `insert into interest_leads (development_id, condominio, nome, telefone, finalidade, mensagem, aceita_contato, status)
+     values ($1, $2, $3, $4, 'venda', $5, true, 'novo')`,
+    [
+      devId,
+      formatTitulo(String(input.condominio || titulo).slice(0, 160)),
+      nome,
+      telefone || null,
+      `Contato pelo WhatsApp: ${titulo}${caminho ? ` (${SITE_URL}${caminho})` : ''}`
+    ]
+  ).catch(() => {});
+  return { ok: true };
 }

@@ -48,7 +48,7 @@ export default function ClientesPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="font-serif text-2xl font-semibold">Clientes</h1>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">Quem entrou no site com o Google e aceitou os Termos de uso — cada e-mail aparece uma vez só.</p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">Quem entrou no site com o Google e aceitou os Termos de uso, cada e-mail aparece uma vez só.</p>
           </div>
           <button type="button" onClick={exportar} disabled={!lista.length} className="rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white disabled:opacity-40">
             Baixar planilha (CSV)
