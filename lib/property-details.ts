@@ -34,6 +34,7 @@ export type Development = {
   quartosOpcoes?: number[]; // opções de quartos conhecidas (ex: [2, 3, 4]), sem precisar de metragem/preço
   bairro?: string;
   cidade?: string;
+  uf?: string;
   cep?: string;
   status?: 'rascunho' | 'publicado';
   videoVertical?: boolean;

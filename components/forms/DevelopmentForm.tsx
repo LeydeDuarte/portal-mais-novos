@@ -317,7 +317,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
         <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
           Este condomínio já está cadastrado: <strong>{duplicado.name}</strong>
           {duplicado.bairro ? ` (${duplicado.bairro})` : ''}. Para não duplicar, complete o que já existe,{' '}
-          <a href={`/painel/condominios/${duplicado.id}/editar`} className="font-bold underline">
+          <a href={`/dashboard/condominios/${duplicado.id}/editar`} className="font-bold underline">
             abrir o cadastro existente
           </a>
           .

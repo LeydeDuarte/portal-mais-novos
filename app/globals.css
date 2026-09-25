@@ -58,3 +58,12 @@ img {
   -webkit-user-drag: none;
   user-select: none;
 }
+
+/* Proposta de compra: ao imprimir (ou "Salvar como PDF"), só o documento aparece */
+@media print {
+  body.imprimindo-proposta * { visibility: hidden !important; }
+  body.imprimindo-proposta .documento-proposta,
+  body.imprimindo-proposta .documento-proposta * { visibility: visible !important; }
+  body.imprimindo-proposta .documento-proposta { position: absolute; left: 0; top: 0; width: 100%; max-width: none; }
+  @page { margin: 16mm 14mm; }
+}

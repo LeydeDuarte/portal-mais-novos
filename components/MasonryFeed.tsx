@@ -10,12 +10,15 @@ import { useFavorites } from '@/lib/use-favorites';
 import { useSession } from '@/lib/use-session';
 import PropertyCard from './PropertyCard';
 import DevelopmentCard from './DevelopmentCard';
+import DepoimentoCard from './DepoimentoCard';
+import DestaqueCard from './DestaqueCard';
 import LoginModal from './LoginModal';
 import type { Cliente } from '@/lib/cliente-auth';
 
 export type FeedInicial = { items: FeedItem[]; hasMore: boolean; totalAVenda: number; modoEquipe: boolean; filtrosChave: string };
 
-const chaveItem = (i: FeedItem) => (i.kind === 'empreendimento' ? `d-${i.development.id}` : `p-${i.property.id}`);
+const chaveItem = (i: FeedItem) =>
+  i.kind === 'empreendimento' ? `d-${i.development.id}` : i.kind === 'imovel' ? `p-${i.property.id}` : i.chave;
 
 export default function MasonryFeed({ filters, inicial }: { filters: FilterState; inicial?: FeedInicial }) {
   // 1ª página já vem pronta do servidor (aparece na hora e o Google enxerga os links)
@@ -54,8 +57,10 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
       const myId = ++requestId.current;
       setLoading(true);
       try {
-        const { items: newItems, hasMore } = await getFeedPage(pageToLoad, filters);
+        const { items: newItems, hasMore, total } = await getFeedPage(pageToLoad, filters);
         if (myId !== requestId.current) return;
+        // a contagem do cabeçalho acompanha os filtros (vem junto da 1ª página)
+        if (pageToLoad === 0 && typeof total === 'number') setTotalAVenda(total);
         setItems((prev) => {
           if (reset) return newItems;
           const vistos = new Set(prev.map(chaveItem));
@@ -171,9 +176,11 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
     <>
       <div className="px-4 pb-1 pt-5 text-[15px] font-bold md:px-8 md:pt-6">
         {filters.modo === 'lancamentos' ? 'Lançamentos e empreendimentos' : 'Imóveis para você'}
-        {totalAVenda ? (
+        {totalAVenda != null && (totalAVenda > 0 || filtrando) ? (
           <span className="ml-2 inline-flex translate-y-[-1px] items-center rounded-full bg-accent/10 px-2.5 py-0.5 align-middle text-xs font-bold text-accent">
-            <span className="font-sans tabular-nums">{totalAVenda.toLocaleString('pt-BR')}</span>&nbsp;imóveis à venda
+            <span className="font-sans tabular-nums">{totalAVenda.toLocaleString('pt-BR')}</span>&nbsp;
+            {totalAVenda === 1 ? 'imóvel' : 'imóveis'} {filters.finalidade === 'aluguel' ? 'para alugar' : 'à venda'}
+            {filtrando ? ' nesta busca' : ''}
           </span>
         ) : null}
         {filters.locais.length ? (
@@ -193,7 +200,11 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
 
       <div className="columns-2 gap-2.5 px-2.5 pb-16 pt-2.5 sm:columns-3 sm:gap-3 sm:px-5 md:columns-4 md:gap-4 md:px-7 xl:columns-5 xl:gap-4.5 2xl:columns-6">
         {items.map((item, idx) =>
-          item.kind === 'empreendimento' ? (
+          item.kind === 'depoimento' ? (
+            <DepoimentoCard key={chaveItem(item)} d={item.depoimento} />
+          ) : item.kind === 'destaque' ? (
+            <DestaqueCard key={chaveItem(item)} d={item.destaque} />
+          ) : item.kind === 'empreendimento' ? (
             <DevelopmentCard key={chaveItem(item)} development={item.development} prioridade={idx < 4} />
           ) : (
             <PropertyCard

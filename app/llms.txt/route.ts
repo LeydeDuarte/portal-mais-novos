@@ -1,4 +1,4 @@
-import { EMPRESA, SITE_NAME, SITE_URL, slugify } from '@/lib/seo';
+import { EMPRESA, SITE_NAME, SITE_URL, urlRegiao } from '@/lib/seo';
 import { CATEGORIAS, listarRegioes } from '@/lib/landing';
 
 // /llms.txt — resumo do site em texto para assistentes de IA (ChatGPT, Perplexity,
@@ -22,16 +22,17 @@ export async function GET() {
     '## Principais páginas',
     `- [Feed de imóveis à venda](${SITE_URL}/): todos os anúncios públicos, com busca por bairro, condomínio, tipo e preço (${SITE_URL}/?q=termo)`,
     `- [Lançamentos e empreendimentos](${SITE_URL}/lancamentos)`,
-    `- [Imóveis por região](${SITE_URL}/imoveis): cidades e bairros com imóveis à venda`,
+    `- [Imóveis por região](${SITE_URL}/imoveis-a-venda): cidades e bairros com imóveis à venda`,
+    `- [Venda seu imóvel](${SITE_URL}/vender): proprietário cadastra o imóvel para a Mais Novos vender`,
     `- [Quem somos](${SITE_URL}/quem-somos)`,
     `- [Financiamento](${SITE_URL}/financiamento)`,
     '',
     '## Imóveis à venda por cidade',
-    ...cidades.map((c) => `- [Imóveis à venda em ${c.cidade}](${SITE_URL}/imoveis/${slugify(c.cidade)}): ${c.n} anúncios`),
+    ...cidades.map((c) => `- [Imóveis à venda em ${c.cidade}](${SITE_URL}${urlRegiao({ uf: c.uf, cidade: c.cidade })}): ${c.n} anúncios`),
     '',
     '## Imóveis à venda por bairro',
     ...bairros.map((b) => {
-      const base = `${SITE_URL}/imoveis/${slugify(b.cidade)}/${slugify(b.bairro!)}`;
+      const base = `${SITE_URL}${urlRegiao({ uf: b.uf, cidade: b.cidade, bairro: b.bairro })}`;
       const cats = Object.keys(b.categorias)
         .map((k) => `[${CATEGORIAS[k].nome.toLowerCase()}](${base}/${k})`)
         .join(', ');

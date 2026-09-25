@@ -2,7 +2,7 @@
   "name": "Mais Novos Imóveis — Equipe",
   "short_name": "Mais Novos",
   "description": "Portal Mais Novos Imóveis — app da equipe (admin, analistas e corretores).",
-  "start_url": "/?app=1",
+  "start_url": "/dashboard?app=1",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -15,8 +15,8 @@
     { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Painel", "url": "/painel", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Cadastrar imóvel", "url": "/painel/imoveis/novo", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Imóveis", "url": "/painel/imoveis", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+    { "name": "Painel", "url": "/dashboard", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Cadastrar imóvel", "url": "/dashboard/imoveis/novo", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Imóveis", "url": "/dashboard/imoveis", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

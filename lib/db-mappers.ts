@@ -166,6 +166,7 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
     condominio: row.condominio ? formatTitulo(row.condominio) : undefined,
     bairro: row.bairro ?? undefined,
     cidade: row.cidade ?? undefined,
+    uf: row.uf ?? undefined,
     isTipologia: !!row.is_tipologia,
     videoVertical: !!row.video_vertical
   };
@@ -198,6 +199,7 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     quartosOpcoes: toNumberArray(row.quartos_opcoes),
     bairro: row.bairro ?? undefined,
     cidade: row.cidade ?? undefined,
+    uf: row.uf ?? undefined,
     cep: row.cep ?? undefined,
     status: row.status === 'rascunho' ? 'rascunho' : 'publicado',
     videoVertical: !!row.video_vertical,

@@ -112,8 +112,8 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
             </div>
           )}
         </div>
-        <a href="/painel/imoveis/novo" className="hidden whitespace-nowrap rounded-full bg-ink px-4.5 py-2.5 text-[13px] font-bold text-white hover:opacity-90 md:inline-block">
-          Anunciar imóvel
+        <a href="/vender" className="hidden whitespace-nowrap rounded-full bg-ink px-4.5 py-2.5 text-[13px] font-bold text-white hover:opacity-90 md:inline-block">
+          Venda seu imóvel
         </a>
       </div>
 

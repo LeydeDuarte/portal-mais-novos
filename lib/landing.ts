@@ -1,5 +1,6 @@
-// Páginas de região (SEO): /imoveis/goiania, /imoveis/goiania/setor-bueno,
-// /imoveis/goiania/setor-bueno/apartamentos … Geradas a partir dos anúncios
+// Páginas de região (SEO), em silos com o estado na URL:
+//   /imoveis-a-venda/go/goiania, /imoveis-a-venda/go/goiania/setor-bueno,
+//   /imoveis-a-venda/go/goiania/setor-bueno/apartamentos … Geradas a partir dos anúncios
 // públicos — só existem onde há imóvel ou condomínio de verdade (sem página vazia).
 // Módulo só do servidor (não é "use server": nada aqui vira endpoint público).
 import { unstable_cache } from 'next/cache';
@@ -26,45 +27,51 @@ export const categoriaDoTipo = (t: string) => Object.entries(CATEGORIAS).find(([
 
 const PUBLICO = "p.visibilidade = 'publico' and p.is_tipologia = false and p.vendido_em is null and p.finalidade = 'venda'";
 
-export type Regiao = { cidade: string; bairro: string | null; n: number; categorias: Record<string, number>; condominios: number };
+export type Regiao = { uf: string; cidade: string; bairro: string | null; n: number; categorias: Record<string, number>; condominios: number };
+
+const UF_SQL = (col: string) => `coalesce(nullif(upper(trim(${col})), ''), 'GO')`;
 
 /** Todas as cidades/bairros com anúncio (ou condomínio lançamento/novo), com contagens por categoria */
 export const listarRegioes = unstable_cache(
   async (): Promise<Regiao[]> => {
-    const rows = await query<{ cidade: string; bairro: string | null; tipo: string; n: string }>(
-      `select p.cidade, p.bairro, p.tipo_unidade as tipo, count(*) as n from properties p
-        where ${PUBLICO} and coalesce(p.cidade, '') <> '' group by 1, 2, 3`
+    const rows = await query<{ uf: string; cidade: string; bairro: string | null; tipo: string; n: string }>(
+      `select ${UF_SQL('p.uf')} as uf, p.cidade, p.bairro, p.tipo_unidade as tipo, count(*) as n from properties p
+        where ${PUBLICO} and coalesce(p.cidade, '') <> '' group by 1, 2, 3, 4`
     );
-    const condos = await query<{ cidade: string; bairro: string | null; n: string }>(
-      `select d.cidade, d.bairro, count(*) as n from developments d
+    const condos = await query<{ uf: string; cidade: string; bairro: string | null; n: string }>(
+      `select ${UF_SQL('d.uf')} as uf, d.cidade, d.bairro, count(*) as n from developments d
         where d.status = 'publicado' and coalesce(d.cidade, '') <> ''
           and (d.delivery_date > now() - interval '3 years'
                or exists (select 1 from properties x where x.empreendimento_id = d.id and x.visibilidade = 'publico' and not x.is_tipologia))
-        group by 1, 2`
+        group by 1, 2, 3`
     );
     const mapa = new Map<string, Regiao>();
-    const pegar = (cidade: string, bairro: string | null) => {
-      const k = `${slugify(cidade)}|${bairro ? slugify(bairro) : ''}`;
-      if (!mapa.has(k)) mapa.set(k, { cidade, bairro, n: 0, categorias: {}, condominios: 0 });
+    const pegar = (uf: string, cidade: string, bairro: string | null) => {
+      const k = `${uf.toLowerCase()}|${slugify(cidade)}|${bairro ? slugify(bairro) : ''}`;
+      if (!mapa.has(k)) mapa.set(k, { uf: uf.toUpperCase(), cidade, bairro, n: 0, categorias: {}, condominios: 0 });
       return mapa.get(k)!;
     };
     for (const r of rows) {
       const cat = categoriaDoTipo(r.tipo);
-      for (const reg of [pegar(r.cidade, null), ...(r.bairro ? [pegar(r.cidade, r.bairro)] : [])]) {
+      for (const reg of [pegar(r.uf, r.cidade, null), ...(r.bairro ? [pegar(r.uf, r.cidade, r.bairro)] : [])]) {
         reg.n += Number(r.n);
         if (cat) reg.categorias[cat] = (reg.categorias[cat] ?? 0) + Number(r.n);
       }
     }
-    for (const c of condos) for (const reg of [pegar(c.cidade, null), ...(c.bairro ? [pegar(c.cidade, c.bairro)] : [])]) reg.condominios += Number(c.n);
+    for (const c of condos) for (const reg of [pegar(c.uf, c.cidade, null), ...(c.bairro ? [pegar(c.uf, c.cidade, c.bairro)] : [])]) reg.condominios += Number(c.n);
     return Array.from(mapa.values()).sort((a, b) => b.n - a.n);
   },
   ['landing-regioes'],
   { revalidate: 600 }
 );
 
-export async function acharRegiao(cidadeSlug: string, bairroSlug?: string): Promise<Regiao | null> {
+export async function acharRegiao(uf: string, cidadeSlug: string, bairroSlug?: string): Promise<Regiao | null> {
   const regs = await listarRegioes();
-  return regs.find((r) => slugify(r.cidade) === cidadeSlug && (bairroSlug ? r.bairro && slugify(r.bairro) === bairroSlug : !r.bairro)) ?? null;
+  return (
+    regs.find(
+      (r) => r.uf.toLowerCase() === uf.toLowerCase() && slugify(r.cidade) === cidadeSlug && (bairroSlug ? r.bairro && slugify(r.bairro) === bairroSlug : !r.bairro)
+    ) ?? null
+  );
 }
 
 export type Estatisticas = { n: number; min: number | null; max: number | null; m2: number | null; comVideo: number };

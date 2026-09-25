@@ -11,5 +11,6 @@ export async function montarFeedInicial(modo: FilterState['modo'], q: string): P
     contarImoveisAVenda().catch(() => 0),
     feedModoEquipe().catch(() => false)
   ]);
-  return { items: pagina.items, hasMore: pagina.hasMore, totalAVenda, modoEquipe, filtrosChave: JSON.stringify(filtros) };
+  const total = 'total' in pagina && typeof pagina.total === 'number' ? pagina.total : totalAVenda;
+  return { items: pagina.items, hasMore: pagina.hasMore, totalAVenda: total, modoEquipe, filtrosChave: JSON.stringify(filtros) };
 }

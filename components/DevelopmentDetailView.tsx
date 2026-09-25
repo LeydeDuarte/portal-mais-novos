@@ -18,6 +18,7 @@ import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import ContarVisita from '@/components/ContarVisita';
 import Trilha from '@/components/Trilha';
+import BarraEquipe from '@/components/BarraEquipe';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import { trilhaDoImovel } from '@/lib/seo';
 
@@ -74,14 +75,15 @@ export default async function DevelopmentDetailView({ development }: { developme
       <ContarVisita tipo="empreendimento" id={development.id} perfil={{ tipos: development.tiposUnidade ?? [], bairros: development.bairro ? [development.bairro] : [] }} />
 
       <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
-        <Trilha itens={trilhaDoImovel({ cidade: development.cidade, bairro: development.bairro })} />
+        <BarraEquipe tipo="condominio" id={development.id} />
+        <Trilha itens={trilhaDoImovel({ uf: development.uf, cidade: development.cidade, bairro: development.bairro })} />
 
         {development.status === 'rascunho' && (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <span>
               <strong>Rascunho: não aparece no site.</strong> Só a equipe logada vê esta página.
             </span>
-            <Link href={`/painel/condominios/${development.id}/editar`} className="rounded-full bg-ink px-4 py-2 text-xs font-bold text-white">
+            <Link href={`/dashboard/condominios/${development.id}/editar`} className="rounded-full bg-ink px-4 py-2 text-xs font-bold text-white">
               Finalizar e publicar
             </Link>
           </div>

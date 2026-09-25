@@ -115,7 +115,7 @@ export default function QuemSomosPage() {
           <Link href="/lancamentos" className="rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-bold hover:bg-[var(--pill-bg)]">
             Lançamentos
           </Link>
-          <Link href="/imoveis" className="rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-bold hover:bg-[var(--pill-bg)]">
+          <Link href="/imoveis-a-venda" className="rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-bold hover:bg-[var(--pill-bg)]">
             Imóveis por bairro
           </Link>
         </section>

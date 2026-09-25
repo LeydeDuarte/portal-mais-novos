@@ -1,6 +1,7 @@
 'use server';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { dominioDoCookie } from './dominios';
 import bcrypt from 'bcryptjs';
 import { query } from './db';
 import { mapPropertyRow, mapDevelopmentRow, heightFromId, toStringArray, miniValida, type PropertyRow, type DevelopmentRow } from './db-mappers';
@@ -17,6 +18,8 @@ import { formatTitulo } from './text';
 import { enviarEmail, emailConfigurado, emailLayout, escapeHtml } from './email';
 import { SITE_URL } from './seo';
 import { chaveNome, mesmoCondominio } from './planilha-condominios';
+import { depoimentosAtivos, destaquesAtivos, hashTexto } from './especiais';
+import type { DepoimentoCard, DestaqueCard } from './especiais-tipos';
 
 const PAGE_SIZE = 24;
 const STAFF_COOKIE = 'mn_staff';
@@ -49,7 +52,34 @@ export type DevelopmentCardData = {
   capaMini?: string;
 };
 
-export type FeedItem = { kind: 'imovel'; property: PropertyDetail } | { kind: 'empreendimento'; development: DevelopmentCardData };
+export type FeedItem =
+  | { kind: 'imovel'; property: PropertyDetail }
+  | { kind: 'empreendimento'; development: DevelopmentCardData }
+  | { kind: 'depoimento'; depoimento: DepoimentoCard; chave: string }
+  | { kind: 'destaque'; destaque: DestaqueCard; chave: string };
+
+// Depoimentos de clientes e destaques (propaganda própria) entram no meio do feed:
+// no máximo 1 de cada por página de 24. Cada depoimento aparece uma vez por visita;
+// os destaques se revezam. A ordem muda por visitante (semente da sessão).
+async function intercalarEspeciais(items: FeedItem[], page: number): Promise<FeedItem[]> {
+  if (items.length < 6) return items;
+  const [deps, dests] = await Promise.all([depoimentosAtivos(), destaquesAtivos()]);
+  if (!deps.length && !dests.length) return items;
+  const semente = hashTexto(lerPerfilFeed().seed || 'x');
+  const out = items.slice();
+  if (dests.length) {
+    const d = dests[(page + semente) % dests.length];
+    const pos = Math.min(out.length, page === 0 ? 3 : 11);
+    out.splice(pos, 0, { kind: 'destaque', destaque: d, chave: `x-${d.id}-${page}` });
+    query('update destaques set exibicoes = exibicoes + 1 where id = $1', [d.id]).catch(() => {});
+  }
+  if (deps.length && page < deps.length) {
+    const d = deps[(page + semente) % deps.length];
+    const pos = Math.min(out.length, page === 0 ? 9 : 18);
+    out.splice(pos, 0, { kind: 'depoimento', depoimento: d, chave: `t-${d.id}` });
+  }
+  return out;
+}
 
 // Busca sem acento e sem diferenciar maiúsculas ("goiania" acha "Goiânia")
 const ACCENTS_FROM = 'áàâãäéèêëíìîïóòôõöúùûüç';
@@ -77,13 +107,14 @@ const TIPOS_CTE = `tl(k, label) as (values ${Object.entries(TIPO_UNIDADE_LABEL)
   .join(', ')})`;
 
 // Ação pública: sempre o feed PÚBLICO (os privados nunca saem daqui).
-export async function getFeedPage(page: number, filters: FilterState): Promise<{ items: FeedItem[]; hasMore: boolean }> {
-  return feedInterno(page, filters, false);
+export async function getFeedPage(page: number, filters: FilterState): Promise<{ items: FeedItem[]; hasMore: boolean; total?: number }> {
+  const r = await feedInterno(page, filters, false);
+  return { ...r, items: await intercalarEspeciais(r.items, page) };
 }
 
 // Uso interno (não exportado → não vira endpoint): com ocultos=true devolve os
 // privados, que só saem daqui mascarados (getAnunciosOcultos).
-async function feedInterno(page: number, filters: FilterState, ocultos: boolean): Promise<{ items: FeedItem[]; hasMore: boolean }> {
+async function feedInterno(page: number, filters: FilterState, ocultos: boolean): Promise<{ items: FeedItem[]; hasMore: boolean; total?: number }> {
   page = Math.max(0, Math.min(500, Math.floor(Number(page) || 0)));
   // Os filtros vêm do navegador: limita tamanho de listas e textos
   const lista = <T,>(v: unknown, n: number): T[] => (Array.isArray(v) ? (v.slice(0, n) as T[]) : []);
@@ -147,8 +178,10 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
   // Google, pela página própria) — assim o feed não enche de condomínio vazio.
   // A equipe logada vê todos.
   const pesquisandoNome = (filters.termos ?? []).length > 0 || (filters.locais ?? []).some((l) => l.tipo === 'condominio');
+  // (fica separado das outras condições: a CONTAGEM "N imóveis à venda" não usa esta regra)
+  const soNoFeed: string[] = [];
   if (!pesquisandoNome && !await currentStaff())
-    devConds.push(
+    soNoFeed.push(
       "(d.delivery_date > now() - interval '3 years' or coalesce(u.avulsos, 0) > 0)"
     );
   propConds.push('p.is_tipologia = false');
@@ -233,6 +266,59 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
 
   const where = (conds: string[]) => (conds.length ? `where ${conds.join(' and ')}` : '');
 
+  // mesmas junções na lista e na contagem
+  const fromImovel = `from properties p
+         left join developments pd on pd.id = p.empreendimento_id
+         left join tl ptl on ptl.k = p.tipo_unidade
+         cross join lateral (
+           select ${norm(`concat_ws(' ', p.titulo, p.location, p.bairro, p.cidade, p.condominio, pd.name, ptl.label)`)} as txt
+         ) pt
+`;
+  const fromCondo = `from developments d
+         left join lateral (
+           select min(x.price_value) filter (where x.price_value > 0) as min_price,
+                  max(x.price_value) as max_price,
+                  min(x.area) as min_area,
+                  max(x.area) as max_area,
+                  max(x.quartos) as max_quartos,
+                  max(x.vagas) as max_vagas,
+                  jsonb_agg(distinct x.tipo_unidade) as tipos,
+                  count(x.id) as n,
+                  count(x.id) filter (where not x.is_tipologia and x.vendido_em is null) as avulsos,
+                  string_agg(distinct xtl.label, ' ') as tipos_texto
+             from properties x left join tl xtl on xtl.k = x.tipo_unidade
+            where x.empreendimento_id = d.id and x.visibilidade = 'publico'
+         ) u on true
+         left join lateral (
+           select max(v::int) as max_quartos from jsonb_array_elements_text(d.quartos_opcoes) v
+         ) dq on true
+         left join lateral (
+           select string_agg(ttl.label, ' ') as tipos_texto
+             from jsonb_array_elements_text(d.tipos_unidade) t left join tl ttl on ttl.k = t
+         ) dt on true
+         cross join lateral (
+           select ${norm(`concat_ws(' ', d.name, d.location, d.bairro, d.cidade, 'empreendimento condominio lancamento', u.tipos_texto, dt.tipos_texto)`)} as txt
+         ) dx
+`;
+
+  // Contagem do cabeçalho ("N imóveis à venda"), SEMPRE conforme os filtros:
+  // anúncios avulsos que atendem a busca (sem os vendidos) + condomínios que atendem
+  // a busca e são lançamento, novo ou seminovo (entregues há até 6 anos).
+  let total: number | undefined;
+  if (page === 0 && !ocultos) {
+    const soVenda = filters.finalidade === 'todas' ? " and p.finalidade = 'venda'" : '';
+    const paramsConta = params.slice(); // antes dos parâmetros da ordem (não usados aqui)
+    const condImovel = where([...propConds, `p.vendido_em is null${soVenda}`]);
+    const condCondo = where([...devConds, "d.delivery_date > now() - interval '6 years'"]);
+    const r = await query<{ n: string }>(
+      `with ${TIPOS_CTE}
+       select (select count(*) ${fromImovel} ${condImovel})
+            + (select count(*) ${fromCondo} ${condCondo}) as n`,
+      paramsConta
+    ).catch(() => []);
+    total = r[0] ? Number(r[0].n) || 0 : undefined;
+  }
+
   // ---- ORDEM DO FEED ----
   // Aleatória por visita (a "semente" muda a cada sessão do navegador e fica fixa
   // enquanto a pessoa rola a página — assim nada repete nem some entre páginas),
@@ -272,41 +358,12 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
     `with ${TIPOS_CTE}
      select kind, id from (
        select 'imovel' as kind, p.id, ${scoreImovel} as score
-         from properties p
-         left join developments pd on pd.id = p.empreendimento_id
-         left join tl ptl on ptl.k = p.tipo_unidade
-         cross join lateral (
-           select ${norm(`concat_ws(' ', p.titulo, p.location, p.bairro, p.cidade, p.condominio, pd.name, ptl.label)`)} as txt
-         ) pt
+         ${fromImovel}
          ${where(propConds)}
        union all
        select 'empreendimento' as kind, d.id, ${scoreCondo} as score
-         from developments d
-         left join lateral (
-           select min(x.price_value) filter (where x.price_value > 0) as min_price,
-                  max(x.price_value) as max_price,
-                  min(x.area) as min_area,
-                  max(x.area) as max_area,
-                  max(x.quartos) as max_quartos,
-                  max(x.vagas) as max_vagas,
-                  jsonb_agg(distinct x.tipo_unidade) as tipos,
-                  count(x.id) as n,
-                  count(x.id) filter (where not x.is_tipologia and x.vendido_em is null) as avulsos,
-                  string_agg(distinct xtl.label, ' ') as tipos_texto
-             from properties x left join tl xtl on xtl.k = x.tipo_unidade
-            where x.empreendimento_id = d.id and x.visibilidade = 'publico'
-         ) u on true
-         left join lateral (
-           select max(v::int) as max_quartos from jsonb_array_elements_text(d.quartos_opcoes) v
-         ) dq on true
-         left join lateral (
-           select string_agg(ttl.label, ' ') as tipos_texto
-             from jsonb_array_elements_text(d.tipos_unidade) t left join tl ttl on ttl.k = t
-         ) dt on true
-         cross join lateral (
-           select ${norm(`concat_ws(' ', d.name, d.location, d.bairro, d.cidade, 'empreendimento condominio lancamento', u.tipos_texto, dt.tipos_texto)`)} as txt
-         ) dx
-         ${where(devConds)}
+         ${fromCondo}
+         ${where([...devConds, ...soNoFeed])}
      ) feed
      order by score desc, id
      limit $${limitIdx} offset $${offsetIdx}`,
@@ -335,7 +392,7 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
       if (development) items.push({ kind: 'empreendimento', development });
     }
   }
-  return { items, hasMore };
+  return { items, hasMore, total };
 }
 
 async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]> {
@@ -1324,18 +1381,24 @@ export async function staffLogin(email: string, password: string): Promise<Staff
   }
 
   const payload: StaffSessionPayload = { email: user.email, name: user.name, role: user.role };
+  // O cookie vale em maisnovosimoveis.com e em app.maisnovosimoveis.com (domínio
+  // ".maisnovosimoveis.com"): a equipe logada no app também é reconhecida no site
+  // (vê rascunhos, anúncios privados e não conta visualização).
+  const dominio = dominioDoCookie(headers().get('host'));
   cookies().set(STAFF_COOKIE, signSession(payload), {
     httpOnly: true,
     secure: true,
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7
+    maxAge: 60 * 60 * 24 * 7,
+    ...(dominio ? { domain: dominio } : {})
   });
   return payload;
 }
 
 export async function staffLogout(): Promise<void> {
-  cookies().delete(STAFF_COOKIE);
+  const dominio = dominioDoCookie(headers().get('host'));
+  cookies().set(STAFF_COOKIE, '', { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 0, ...(dominio ? { domain: dominio } : {}) });
 }
 
 export async function getStaffSession(): Promise<StaffSessionPayload | null> {

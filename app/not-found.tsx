@@ -17,7 +17,7 @@ export default function NaoEncontrado() {
           <Link href="/" className="rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">
             Ver imóveis à venda
           </Link>
-          <Link href="/imoveis" className="rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-bold hover:bg-[var(--pill-bg)]">
+          <Link href="/imoveis-a-venda" className="rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-bold hover:bg-[var(--pill-bg)]">
             Buscar por bairro
           </Link>
           <Link href="/lancamentos" className="rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-bold hover:bg-[var(--pill-bg)]">

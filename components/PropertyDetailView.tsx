@@ -12,6 +12,7 @@ import ContatoLateral from '@/components/ContatoLateral';
 import ContarVisita from '@/components/ContarVisita';
 import CondominioTag from '@/components/CondominioTag';
 import Trilha from '@/components/Trilha';
+import BarraEquipe from '@/components/BarraEquipe';
 import { altFoto, trilhaDoImovel, tituloSeoImovel } from '@/lib/seo';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
@@ -88,7 +89,8 @@ export default async function PropertyDetailView({
       <ContarVisita tipo="imovel" id={property.id} perfil={{ tipos: [property.tipoUnidade], bairros: property.bairro ? [property.bairro] : [], preco: property.finalidade === 'venda' ? property.priceValue : null }} />
 
       <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
-        <Trilha itens={trilhaDoImovel({ cidade: property.cidade, bairro: property.bairro })} />
+        <BarraEquipe tipo="imovel" id={property.id} />
+        <Trilha itens={trilhaDoImovel({ uf: property.uf, cidade: property.cidade, bairro: property.bairro })} />
 
         {avisoPrivado && (
           <div className="mb-5 flex items-start gap-2 rounded-xl border border-[var(--border)] bg-[var(--pill-bg)] p-4 text-sm">

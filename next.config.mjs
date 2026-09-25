@@ -43,7 +43,7 @@ const nextConfig = {
     return [
       { source: '/:path*', headers: securityHeaders },
       // painel e APIs nunca em cache compartilhado nem no Google
-      { source: '/painel/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }, { key: 'Cache-Control', value: 'private, no-store' }] },
+      { source: '/dashboard/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }, { key: 'Cache-Control', value: 'private, no-store' }] },
       { source: '/api/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex' }] },
       { source: '/icons/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
       { source: '/pdfjs/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] }

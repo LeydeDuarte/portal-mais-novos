@@ -97,10 +97,23 @@ function trilha(itens: { nome: string; url: string }[]) {
 }
 
 /** Links "Início › Goiânia › Setor Bueno" (também usados na página) */
-export function trilhaDoImovel(p: { cidade?: string; bairro?: string }): { nome: string; url: string }[] {
+/**
+ * Endereço das páginas de região, em silos: /imoveis-a-venda/go/goiania/setor-bueno/apartamentos
+ * (o estado na URL deixa o portal pronto para outras cidades e estados).
+ */
+export function urlRegiao(r: { uf?: string | null; cidade?: string | null; bairro?: string | null; categoria?: string | null }): string {
+  if (!r.cidade) return r.uf ? `/imoveis-a-venda/${r.uf.toLowerCase()}` : '/imoveis-a-venda';
+  const uf = (r.uf || 'GO').toLowerCase();
+  let u = `/imoveis-a-venda/${uf}/${slugify(r.cidade)}`;
+  if (r.bairro) u += `/${slugify(r.bairro)}`;
+  if (r.categoria) u += `/${r.categoria}`;
+  return u;
+}
+
+export function trilhaDoImovel(p: { uf?: string; cidade?: string; bairro?: string }): { nome: string; url: string }[] {
   const t = [{ nome: 'Início', url: SITE_URL }];
-  if (p.cidade) t.push({ nome: `Imóveis em ${p.cidade}`, url: `${SITE_URL}/imoveis/${slugify(p.cidade)}` });
-  if (p.cidade && p.bairro) t.push({ nome: p.bairro, url: `${SITE_URL}/imoveis/${slugify(p.cidade)}/${slugify(p.bairro)}` });
+  if (p.cidade) t.push({ nome: `Imóveis em ${p.cidade}`, url: `${SITE_URL}${urlRegiao({ uf: p.uf, cidade: p.cidade })}` });
+  if (p.cidade && p.bairro) t.push({ nome: p.bairro, url: `${SITE_URL}${urlRegiao({ uf: p.uf, cidade: p.cidade, bairro: p.bairro })}` });
   return t;
 }
 
@@ -242,7 +255,7 @@ export function buildDevelopmentJsonLd(development: Development) {
         amenityFeature: development.amenities.map((a) => ({ '@type': 'LocationFeatureSpecification', name: a, value: true })),
         containsPlace: anuncios.slice(0, 20).map((u) => ({ '@type': TIPO_UNIDADE_SCHEMA_ORG[u.tipoUnidade], url: `${SITE_URL}/imovel/${u.id}`, name: tituloSeoImovel(u) }))
       },
-      trilha([...trilhaDoImovel({ cidade: development.cidade, bairro: development.bairro }), { nome: development.name, url }])
+      trilha([...trilhaDoImovel({ uf: development.uf, cidade: development.cidade, bairro: development.bairro }), { nome: development.name, url }])
     ]
   };
 }

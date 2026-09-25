@@ -1,4 +1,5 @@
 import { MAIS_VALOR_URL } from '@/lib/marca';
+import { DASHBOARD_URL } from '@/lib/dominios';
 
 export default function Footer() {
   return (
@@ -17,7 +18,8 @@ export default function Footer() {
             { label: 'Comprar', href: '/' },
             { label: 'Lançamentos', href: '/lancamentos' },
             { label: 'Financiamento', href: '/financiamento' },
-            { label: 'Imóveis por bairro', href: '/imoveis' },
+            { label: 'Imóveis por bairro', href: '/imoveis-a-venda' },
+            { label: 'Venda seu imóvel', href: '/vender' },
             { label: 'Quem somos', href: '/quem-somos' },
             { label: 'Mais Valor Capital (crédito)', href: MAIS_VALOR_URL }
           ].map(({ label, href }) => (
@@ -36,7 +38,13 @@ export default function Footer() {
       </div>
       <div className="flex flex-wrap justify-between gap-1.5 border-t border-[var(--border)] pt-4 text-[11px] text-[var(--text-faint)]">
         <span>© 2026 Mais Novos Inteligência Imobiliária · CNPJ 36.006.396/0001-21</span>
-        <span>CRECI C17586 · Correspondente bancário 185260817022749</span>
+        <span>
+          CRECI C17586 · Correspondente bancário 185260817022749
+          {/* acesso discreto da equipe */}
+          <a href={DASHBOARD_URL} rel="nofollow" className="ml-2 opacity-40 hover:opacity-100" aria-label="Acesso da equipe">
+            ·
+          </a>
+        </span>
       </div>
     </footer>
   );

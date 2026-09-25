@@ -32,6 +32,7 @@ export type Property = {
   visibilidade?: 'publico' | 'privado'; // privado = portfólio, fora do feed (só pelo link privado)
   condominio?: string; // nome do condomínio/edifício, quando o imóvel fica em um
   bairro?: string;
+  uf?: string;
   cidade?: string;
   isTipologia?: boolean; // linha da tabela de vendas de um empreendimento (não é um anúncio avulso)
   height: number;

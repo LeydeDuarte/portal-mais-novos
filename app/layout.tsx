@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { ehHostApp } from '@/lib/dominios';
 import { verifySession } from '@/lib/session';
 import RegistrarApp from '@/components/RegistrarApp';
 import { Playfair_Display, Inter } from 'next/font/google';
@@ -47,7 +48,8 @@ export const viewport: Viewport = { themeColor: '#257CFF' };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // App (PWA) só para a equipe: o manifesto e o service worker só vão para quem
   // está logado como admin, analista ou corretor — o público não vê "Instalar app".
-  const equipe = !!verifySession(cookies().get('mn_staff')?.value);
+  const noApp = ehHostApp(headers().get('host'));
+  const equipe = noApp || !!verifySession(cookies().get('mn_staff')?.value);
   return (
     <html lang="pt-BR" className={`${playfair.variable} ${inter.variable}`}>
       <head>

@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const FOLDERS = new Set(['imoveis', 'empreendimentos', 'plantas']);
+const FOLDERS = new Set(['imoveis', 'empreendimentos', 'plantas', 'site']);
 
 let client: S3Client | null = null;
 function getClient(): S3Client {
