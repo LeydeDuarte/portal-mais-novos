@@ -6,6 +6,7 @@ import { Playfair_Display, Inter } from 'next/font/google';
 import './globals.css';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
 import ProtecaoImagens from '@/components/ProtecaoImagens';
+import { GtmHead, GtmBody } from '@/components/GoogleTagManager';
 
 // Nunca reaproveitar respostas antigas do banco em nenhuma página
 export const fetchCache = 'default-no-store';
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" className={`${playfair.variable} ${inter.variable}`}>
       <head>
+        {!equipe && <GtmHead />}
         {equipe && (
           <>
             <link rel="manifest" href="/manifest.webmanifest" />
@@ -62,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
       </head>
       <body className="font-sans antialiased">
+        {!equipe && <GtmBody />}
         <ProtecaoImagens />
         {equipe && <RegistrarApp />}
         {children}
