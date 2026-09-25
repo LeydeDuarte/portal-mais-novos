@@ -21,6 +21,7 @@ import { getDevelopmentById, getRelatedListings } from '@/lib/actions';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
+import { urlImovel, urlCondominio } from '@/lib/urls';
 
 const BED_PATH = 'M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6 M3 18h18 M5 10V7a2 2 0 0 1 2-2h3v5';
 
@@ -61,7 +62,7 @@ export default async function PropertyDetailView({
   const titulo = property.titulo || `${TIPO_UNIDADE_LABEL[property.tipoUnidade]} em ${property.location}`;
 
   // WhatsApp da Leyde com o link deste anúncio (vale para todos os anúncios)
-  const whats = { titulo: tituloSeoImovel(property), caminho: `/imovel/${property.id}`, condominio: nomeCondominio, developmentId: property.empreendimentoId };
+  const whats = { titulo: tituloSeoImovel(property), caminho: urlImovel(property), condominio: nomeCondominio, developmentId: property.empreendimentoId };
 
   const badges = (
               <div className="flex flex-wrap items-center gap-2">
@@ -113,7 +114,7 @@ export default async function PropertyDetailView({
         {nomeCondominio && (
           <div className="mt-2">
             {development ? (
-              <Link href={`/empreendimento/${development.id}`} className="inline-flex items-center gap-1.5 hover:opacity-80" title="Ver o condomínio">
+              <Link href={urlCondominio(development)} className="inline-flex items-center gap-1.5 hover:opacity-80" title="Ver o condomínio">
                 <CondominioTag nome={nomeCondominio} grande />
                 <span className="text-sm font-semibold text-accent">Ver condomínio →</span>
               </Link>
@@ -191,7 +192,7 @@ export default async function PropertyDetailView({
               <div className="mt-6 rounded-xl border border-[var(--border)] p-4">
                 <h2 className="text-base font-bold">Fica no {development.name}</h2>
                 <p className="mt-0.5 text-sm text-[var(--text-muted)]">Veja lazer, tipologias e todos os imóveis disponíveis neste condomínio.</p>
-                <Link href={`/empreendimento/${development.id}`} className="mt-2 inline-block text-sm font-semibold text-accent hover:underline">
+                <Link href={urlCondominio(development)} className="mt-2 inline-block text-sm font-semibold text-accent hover:underline">
                   Ver o condomínio →
                 </Link>
               </div>
@@ -250,7 +251,7 @@ export default async function PropertyDetailView({
                 titulo="Falar com um corretor"
                 condominio={nomeCondominio || titulo}
                 developmentId={property.empreendimentoId}
-                referencia={`${titulo} · /imovel/${property.id}`}
+                referencia={`${titulo} · ${urlImovel(property)}`}
                 mensagemInicial={`Olá! Tenho interesse neste imóvel: ${titulo}. Ainda está disponível?`}
                 whatsapp={whats}
               />

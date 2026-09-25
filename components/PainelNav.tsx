@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useStaffSession } from '@/lib/use-staff-session';
-import { veTudo } from '@/lib/papeis';
+import { veTudo, ROLE_LABEL } from '@/lib/papeis';
 
 const LINKS = [
   { href: '/dashboard', label: 'Painel' },
@@ -36,23 +36,37 @@ export default function PainelNav() {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border)] bg-[var(--pill-bg)]/40 px-5 py-2.5 md:px-8">
-      {LINKS.filter((l) => (!('admin' in l) || staff?.role === 'admin') && (!('gestor' in l) || veTudo(staff?.role))).map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${
-            pathname === link.href ? 'bg-ink text-white' : 'hover:bg-[var(--pill-bg)]'
-          }`}
-        >
-          {link.href === '/dashboard/imoveis' && veTudo(staff?.role) ? 'Imóveis' : link.label}
-        </Link>
-      ))}
+    <div className="border-b border-[var(--border)] bg-[var(--pill-bg)]/40">
       {staff && (
-        <button type="button" onClick={handleLogout} className="ml-auto rounded-full px-3.5 py-1.5 text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--pill-bg)]">
-          Sair
-        </button>
+        <div className="flex items-center gap-3 border-b border-[var(--border)] px-5 py-2 md:px-8">
+          <span className="min-w-0 truncate text-xs text-[var(--text-muted)]">
+            Painel da equipe · <strong className="text-[var(--text)]">{staff.name}</strong> ({ROLE_LABEL[staff.role] ?? staff.role})
+          </span>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-red-200 px-3.5 py-1.5 text-sm font-bold text-red-600 hover:bg-red-50"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="m16 17 5-5-5-5" />
+              <path d="M21 12H9" />
+            </svg>
+            Sair
+          </button>
+        </div>
       )}
+      <div className="flex flex-wrap items-center gap-1.5 px-5 py-2.5 md:px-8">
+        {LINKS.filter((l) => (!('admin' in l) || staff?.role === 'admin') && (!('gestor' in l) || veTudo(staff?.role))).map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${pathname === link.href ? 'bg-ink text-white' : 'hover:bg-[var(--pill-bg)]'}`}
+          >
+            {link.href === '/dashboard/imoveis' && veTudo(staff?.role) ? 'Imóveis' : link.label}
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

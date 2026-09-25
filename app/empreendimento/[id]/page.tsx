@@ -5,7 +5,14 @@ import DevelopmentDetailView from '@/components/DevelopmentDetailView';
 import { cache } from 'react';
 import { getDevelopmentById as buscarCondominio } from '@/lib/actions';
 
-const getDevelopmentById = cache((id: string) => buscarCondominio(id));
+import { resolverCondominio } from '@/lib/slug-resolver';
+
+// o endereço pode ser o nome (slug) ou o código antigo
+const resolver = cache((param: string) => resolverCondominio(param));
+const getDevelopmentById = cache(async (param: string) => {
+  const r = await resolver(param);
+  return r ? buscarCondominio(r.id) : null;
+});
 import { buildDevelopmentMetadata, buildDevelopmentJsonLd } from '@/lib/seo';
 import JsonLd from '@/components/JsonLd';
 
@@ -27,6 +34,8 @@ export default async function EmpreendimentoPage({ params }: { params: { id: str
     if (novo) permanentRedirect(`/empreendimento/${novo}`);
     notFound();
   }
+  // aberto pelo código antigo → endereço com o nome do condomínio (301)
+  if (development.slug && development.slug !== decodeURIComponent(params.id)) permanentRedirect(`/empreendimento/${development.slug}`);
 
   const jsonLd = buildDevelopmentJsonLd(development);
   return (

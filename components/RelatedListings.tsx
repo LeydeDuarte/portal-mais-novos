@@ -6,6 +6,7 @@ import { formatTitulo } from '@/lib/text';
 import type { PropertyDetail } from '@/lib/property-details';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
+import { urlImovel, urlCondominio } from '@/lib/urls';
 
 type Props = {
   title: string;
@@ -31,7 +32,7 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
             const badge = getStatusBadge(p.deliveryDate);
             const cover = p.photos?.[0];
             return (
-              <Link key={p.id} href={`/imovel/${p.id}`} className="group w-[230px] shrink-0 snap-start">
+              <Link key={p.id} href={urlImovel(p)} className="group w-[230px] shrink-0 snap-start">
                 <div className="relative h-[160px] overflow-hidden rounded-2xl bg-[var(--card-img-bg)]">
                   {cover ? (
                     // eslint-disable-next-line @next/next/no-img-element

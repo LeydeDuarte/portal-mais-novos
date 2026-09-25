@@ -37,13 +37,14 @@ export default function Footer() {
         </div>
       </div>
       <div className="flex flex-wrap justify-between gap-1.5 border-t border-[var(--border)] pt-4 text-[11px] text-[var(--text-faint)]">
-        <span>© 2026 Mais Novos Inteligência Imobiliária · CNPJ 36.006.396/0001-21</span>
+        <span>
+          © 2026 Mais Novos Inteligência Imobiliária · CNPJ 36.006.396/0001-21 ·{' '}
+          <a href={DASHBOARD_URL} rel="nofollow" className="hover:text-[var(--text-muted)] hover:underline">
+            Área restrita
+          </a>
+        </span>
         <span>
           CRECI C17586 · Correspondente bancário 185260817022749
-          {/* acesso discreto da equipe */}
-          <a href={DASHBOARD_URL} rel="nofollow" className="ml-2 opacity-40 hover:opacity-100" aria-label="Acesso da equipe">
-            ·
-          </a>
         </span>
       </div>
     </footer>

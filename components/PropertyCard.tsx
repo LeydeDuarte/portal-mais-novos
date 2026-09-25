@@ -13,6 +13,7 @@ import { useVideoAutoplay } from '@/lib/video-rotation';
 import { getEmbedInfo } from '@/lib/video-embed';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
+import { urlImovel, urlCondominio } from '@/lib/urls';
 
 type Props = {
   property: Property;
@@ -93,7 +94,7 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
 
   return (
     <div className="mb-2.5 inline-block w-full break-inside-avoid md:mb-4">
-      <Link href={`/imovel/${property.id}`} className="block">
+      <Link href={urlImovel(property)} className="block">
         <div
           ref={setRefs}
           className={`group relative flex items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)] ${

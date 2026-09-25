@@ -33,6 +33,7 @@ export type Property = {
   condominio?: string; // nome do condomínio/edifício, quando o imóvel fica em um
   bairro?: string;
   uf?: string;
+  slug?: string;
   cidade?: string;
   isTipologia?: boolean; // linha da tabela de vendas de um empreendimento (não é um anúncio avulso)
   height: number;

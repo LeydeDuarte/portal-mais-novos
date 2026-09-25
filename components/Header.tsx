@@ -11,6 +11,14 @@ import type { Cliente } from '@/lib/cliente-auth';
 //   filtros e o campo esvazia para a próxima palavra (ex: "marista" Enter,
 //   "bueno" Enter → dois balões, mostra os dois bairros).
 // - Nas outras páginas: leva para o feed já com a busca (?q=).
+const NAV = [
+  { label: 'Comprar', href: '/' },
+  { label: 'Lançamentos', href: '/lancamentos' },
+  { label: 'Financiamento', href: '/financiamento' },
+  { label: 'News', href: '/news' },
+  { label: 'Quem somos', href: '/quem-somos' }
+];
+
 export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -18,6 +26,7 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
   const { session, signIn, signOut } = useSession();
   const [login, setLogin] = useState<null | 'favoritos' | 'entrar'>(null);
   const [menu, setMenu] = useState(false);
+  const [menuCel, setMenuCel] = useState(false);
   const abrirFavoritos = () => (session.loggedIn ? router.push('/favoritos') : setLogin('favoritos'));
 
   const submit = (e: React.FormEvent) => {
@@ -30,18 +39,28 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
 
   return (
     <header className="sticky top-0 z-30 flex items-center gap-4 border-b border-[var(--border)] bg-[var(--bg)] px-5 py-2.5 md:gap-6 md:px-8 md:py-3">
-      <a href="/" className="shrink-0 font-serif text-[19px] font-semibold whitespace-nowrap">
-        Mais Novos <span className="text-accent">Imóveis</span>
+      {/* celular: botão de menu + sigla MN; computador: nome completo */}
+      <button
+        type="button"
+        onClick={() => setMenuCel(true)}
+        aria-label="Abrir menu"
+        className="-ml-1.5 flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full hover:bg-[var(--pill-bg)] md:hidden"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
+      <a href="/" className="shrink-0 whitespace-nowrap font-serif text-[19px] font-semibold" aria-label="Mais Novos Imóveis, página inicial">
+        <span className="md:hidden">
+          M<span className="text-accent">N</span>
+        </span>
+        <span className="hidden md:inline">
+          Mais Novos <span className="text-accent">Imóveis</span>
+        </span>
       </a>
 
       <nav className="hidden items-center gap-1 md:flex">
-        {[
-          { label: 'Comprar', href: '/' },
-          { label: 'Lançamentos', href: '/lancamentos' },
-          { label: 'Financiamento', href: '/financiamento' },
-          { label: 'News', href: '/news' },
-          { label: 'Quem somos', href: '/quem-somos' }
-        ].map(({ label, href }) => (
+        {NAV.map(({ label, href }) => (
           <a
             key={label}
             href={href}
@@ -116,6 +135,49 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
           Venda seu imóvel
         </a>
       </div>
+
+      {menuCel && (
+        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <button type="button" aria-label="Fechar menu" onClick={() => setMenuCel(false)} className="absolute inset-0 bg-black/40" />
+          <nav className="absolute left-0 top-0 flex h-full w-[82%] max-w-[320px] flex-col bg-[var(--bg)] p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="font-serif text-lg font-semibold">
+                Mais Novos <span className="text-accent">Imóveis</span>
+              </span>
+              <button type="button" onClick={() => setMenuCel(false)} aria-label="Fechar menu" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[var(--pill-bg)]">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+            {NAV.map(({ label, href }) => (
+              <a
+                key={href}
+                href={href}
+                className={`rounded-xl px-3.5 py-3 text-[15px] font-semibold hover:bg-[var(--pill-bg)] ${pathname === href ? 'bg-[var(--pill-bg)]' : ''}`}
+              >
+                {label}
+              </a>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                setMenuCel(false);
+                abrirFavoritos();
+              }}
+              className="rounded-xl px-3.5 py-3 text-left text-[15px] font-semibold hover:bg-[var(--pill-bg)]"
+            >
+              Meus favoritos
+            </button>
+            <a href="/imoveis-a-venda" className="rounded-xl px-3.5 py-3 text-[15px] font-semibold hover:bg-[var(--pill-bg)]">
+              Imóveis por bairro
+            </a>
+            <a href="/vender" className="mt-4 rounded-full bg-ink px-4 py-3 text-center text-sm font-bold text-white">
+              Venda seu imóvel
+            </a>
+          </nav>
+        </div>
+      )}
 
       <LoginModal
         open={!!login}

@@ -35,6 +35,7 @@ export type Development = {
   bairro?: string;
   cidade?: string;
   uf?: string;
+  slug?: string;
   cep?: string;
   status?: 'rascunho' | 'publicado';
   videoVertical?: boolean;

@@ -9,6 +9,7 @@ import CardAnuncio from '@/components/CardAnuncio';
 import ImagemCapa from '@/components/ImagemCapa';
 import { CATEGORIAS, acharRegiao, anunciosDaRegiao, condominiosDaRegiao, listarRegioes, type Estatisticas, type Regiao } from '@/lib/landing';
 import { SITE_NAME, SITE_URL, trilhaDoImovel, urlRegiao } from '@/lib/seo';
+import { urlImovel, urlCondominio } from '@/lib/urls';
 
 // Páginas de região para o Google e para buscadores de IA, em silos (estado na URL):
 //   /imoveis-a-venda                                   → todas as cidades
@@ -162,7 +163,7 @@ export default async function RegiaoPage({ params }: Props) {
         mainEntity: {
           '@type': 'ItemList',
           numberOfItems: est.n,
-          itemListElement: itens.slice(0, 30).map((p, i) => ({ '@type': 'ListItem', position: i + 1, url: `${SITE_URL}/imovel/${p.id}` }))
+          itemListElement: itens.slice(0, 30).map((p, i) => ({ '@type': 'ListItem', position: i + 1, url: `${SITE_URL}${urlImovel(p)}` }))
         }
       },
       {
@@ -220,7 +221,7 @@ export default async function RegiaoPage({ params }: Props) {
             <h2 className="text-lg font-bold">Condomínios {reg.bairro ? `no ${reg.bairro}` : `em ${reg.cidade}`}</h2>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {condos.map((c) => (
-                <Link key={c.id} href={`/empreendimento/${c.id}`} className="group flex items-center gap-3 rounded-xl border border-[var(--border)] p-2.5 hover:border-accent">
+                <Link key={c.id} href={urlCondominio(c)} className="group flex items-center gap-3 rounded-xl border border-[var(--border)] p-2.5 hover:border-accent">
                   <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--card-img-bg)]">
                     {c.capa && <ImagemCapa original={c.capa} alt={`${c.nome}, ${reg.bairro ?? reg.cidade} | ${SITE_NAME}`} className="h-full w-full object-cover" />}
                   </div>

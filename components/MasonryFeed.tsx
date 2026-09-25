@@ -14,6 +14,7 @@ import DepoimentoCard from './DepoimentoCard';
 import DestaqueCard from './DestaqueCard';
 import LoginModal from './LoginModal';
 import type { Cliente } from '@/lib/cliente-auth';
+import { urlImovel, urlCondominio } from '@/lib/urls';
 
 export type FeedInicial = { items: FeedItem[]; hasMore: boolean; totalAVenda: number; modoEquipe: boolean; filtrosChave: string };
 
@@ -257,7 +258,7 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
             {(verTodosCondos ? condosBairro : condosBairro.slice(0, 40)).map((c) => (
               <Link
                 key={c.id}
-                href={`/empreendimento/${c.id}`}
+                href={urlCondominio(c)}
                 className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 py-1.5 text-sm font-semibold hover:border-accent hover:text-accent"
               >
                 {c.nome}

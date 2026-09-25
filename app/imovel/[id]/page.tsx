@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
+import { resolverImovel } from '@/lib/slug-resolver';
 import Header from '@/components/Header';
 import PropertyDetailView from '@/components/PropertyDetailView';
 import OcultoView from '@/components/OcultoView';
@@ -9,8 +10,16 @@ import { cache } from 'react';
 import { getPropertyById as buscarImovel, getResumoOculto as buscarResumo, getStaffSession } from '@/lib/actions';
 
 // Uma consulta só por página (os metadados e a página usam o mesmo resultado)
-const getPropertyById = cache((id: string) => buscarImovel(id));
-const getResumoOculto = cache((id: string) => buscarResumo(id));
+// o endereço pode ser o nome (slug) ou o código antigo: tudo vira o id aqui
+const resolver = cache((param: string) => resolverImovel(param));
+const getPropertyById = cache(async (param: string) => {
+  const r = await resolver(param);
+  return r ? buscarImovel(r.id) : null;
+});
+const getResumoOculto = cache(async (param: string) => {
+  const r = await resolver(param);
+  return r ? buscarResumo(r.id) : null;
+});
 import { verificarLinkPrivado } from '@/lib/links-privados';
 import { buildPropertyMetadata, buildPropertyJsonLd, SITE_URL } from '@/lib/seo';
 import { tituloOculto, brlCurto } from '@/lib/ocultos';
@@ -37,7 +46,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   return {
     title: `${t}, anúncio privado | Mais Novos Imóveis`,
     description: `${t}${a.preco ? `, ${brlCurto(a.preco)}` : ''}. Anúncio privado: solicite as fotos e o endereço com a Mais Novos Imóveis.`,
-    alternates: { canonical: `${SITE_URL}/imovel/${params.id}` },
+    alternates: { canonical: `${SITE_URL}/imovel/${(await resolver(params.id))?.id ?? params.id}` },
     ...(searchParams.l ? { robots: { index: false, follow: false } } : {})
   };
 }
@@ -46,11 +55,15 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 // então cada página é renderizada sob demanda (o HTML sai completo pro Google).
 export default async function ImovelPage({ params, searchParams }: Props) {
   const property = await getPropertyById(params.id);
+  // anúncio público aberto pelo código antigo → endereço com o nome (301)
+  if (property && property.visibilidade !== 'privado' && property.slug && property.slug !== decodeURIComponent(params.id) && !searchParams.l) {
+    permanentRedirect(`/imovel/${property.slug}`);
+  }
   if (!property) {
     const a = await getResumoOculto(params.id);
     if (!a) notFound();
     if (searchParams.l) {
-      const r = await verificarLinkPrivado(params.id, searchParams.l);
+      const r = await verificarLinkPrivado(a.id, searchParams.l);
       if (r.estado === 'ok') {
         return (
           <>
@@ -63,7 +76,7 @@ export default async function ImovelPage({ params, searchParams }: Props) {
         return (
           <div className="flex min-h-screen flex-col">
             <Header />
-            <AtivarLinkPrivado propertyId={params.id} linkId={searchParams.l} />
+            <AtivarLinkPrivado propertyId={a.id} linkId={searchParams.l} />
           </div>
         );
       }

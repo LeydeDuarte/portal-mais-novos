@@ -21,6 +21,7 @@ import Trilha from '@/components/Trilha';
 import BarraEquipe from '@/components/BarraEquipe';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import { trilhaDoImovel } from '@/lib/seo';
+import { urlImovel, urlCondominio } from '@/lib/urls';
 
 function formatBRL(v: number): string {
   if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mi`;
@@ -46,7 +47,7 @@ export default async function DevelopmentDetailView({ development }: { developme
   // WhatsApp da Leyde: condomínios lançamento, novo ou seminovo (entregues há até 6 anos)
   const recente = !!development.deliveryDate && new Date(`${development.deliveryDate}-01T00:00:00`).getTime() > Date.now() - 6 * 365.25 * 864e5;
   const whats = recente
-    ? { titulo: `${development.name}, ${[development.bairro, development.cidade].filter(Boolean).join(', ') || development.location}`, caminho: `/empreendimento/${development.id}`, condominio: development.name, developmentId: development.id }
+    ? { titulo: `${development.name}, ${[development.bairro, development.cidade].filter(Boolean).join(', ') || development.location}`, caminho: urlCondominio(development), condominio: development.name, developmentId: development.id }
     : null;
   const vendaDireta = futuro || (entregueHaMeses != null && entregueHaMeses <= 12);
 
@@ -218,7 +219,7 @@ export default async function DevelopmentDetailView({ development }: { developme
             <ContatoLateral
               condominio={development.name}
               developmentId={development.id}
-              referencia={`Condomínio ${development.name} · /empreendimento/${development.id}`}
+              referencia={`Condomínio ${development.name} · ${urlCondominio(development)}`}
               mensagemInicial={`Olá! Quero saber mais sobre o ${development.name}: valores e unidades disponíveis.`}
               whatsapp={whats ?? undefined}
             />
@@ -251,7 +252,7 @@ export default async function DevelopmentDetailView({ development }: { developme
                   </div>
                 )}
                 <Link
-                  href={`/imovel/${unit.id}`}
+                  href={urlImovel(unit)}
                   className="flex flex-1 flex-col gap-2 p-4 hover:bg-[var(--pill-bg)]"
                 >
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[unit.tipoUnidade]}</div>

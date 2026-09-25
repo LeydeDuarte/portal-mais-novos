@@ -4,6 +4,7 @@ import type { Property } from './mock-properties';
 import { getBadgeCondominio } from './classification';
 import { TIPO_UNIDADE_LABEL, TIPO_UNIDADE_SCHEMA_ORG } from './tipologias';
 import { descricaoTextoPuro } from './text';
+import { urlImovel, urlCondominio } from './urls';
 
 // Domínio: variável NEXT_PUBLIC_SITE_URL (na troca para o domínio definitivo,
 // basta mudar a variável na Vercel — canonical, sitemap, OG e schema acompanham).
@@ -70,7 +71,7 @@ export function altFoto(p: Property, i?: number): string {
 export function buildPropertyMetadata(property: PropertyDetail): Metadata {
   const title = property.titulo ? `${property.titulo}, ${onde(property)}`.slice(0, 95) : tituloSeoImovel(property);
   const description = descricaoSeoImovel(property);
-  const url = `${SITE_URL}/imovel/${property.id}`;
+  const url = `${SITE_URL}${urlImovel(property)}`;
   const imagem = property.photos?.[0];
   return {
     title,
@@ -118,7 +119,7 @@ export function trilhaDoImovel(p: { uf?: string; cidade?: string; bairro?: strin
 }
 
 export function buildPropertyJsonLd(property: PropertyDetail) {
-  const url = `${SITE_URL}/imovel/${property.id}`;
+  const url = `${SITE_URL}${urlImovel(property)}`;
   const nome = property.titulo || tituloSeoImovel(property);
   const quartos = num(property.beds);
   return {
@@ -212,7 +213,7 @@ export function buildDevelopmentMetadata(development: Development): Metadata {
     descricaoTextoPuro(development.description) ||
     `${development.name}, ${tipoTxt.toLowerCase()} em ${onde}. Veja imóveis à venda, fotos, lazer, plantas e valores na Mais Novos Imóveis.`;
   const description = desc.length > 158 ? `${desc.slice(0, 155).replace(/\s+\S*$/, '')}…` : desc;
-  const url = `${SITE_URL}/empreendimento/${development.id}`;
+  const url = `${SITE_URL}${urlCondominio(development)}`;
   const imagem = development.photos?.[0];
   return {
     title,
@@ -232,7 +233,7 @@ export function buildDevelopmentMetadata(development: Development): Metadata {
 }
 
 export function buildDevelopmentJsonLd(development: Development) {
-  const url = `${SITE_URL}/empreendimento/${development.id}`;
+  const url = `${SITE_URL}${urlCondominio(development)}`;
   const anuncios = development.units.filter((u) => !u.isTipologia);
   return {
     '@context': 'https://schema.org',
@@ -253,7 +254,7 @@ export function buildDevelopmentJsonLd(development: Development) {
           streetAddress: development.bairro || undefined
         },
         amenityFeature: development.amenities.map((a) => ({ '@type': 'LocationFeatureSpecification', name: a, value: true })),
-        containsPlace: anuncios.slice(0, 20).map((u) => ({ '@type': TIPO_UNIDADE_SCHEMA_ORG[u.tipoUnidade], url: `${SITE_URL}/imovel/${u.id}`, name: tituloSeoImovel(u) }))
+        containsPlace: anuncios.slice(0, 20).map((u) => ({ '@type': TIPO_UNIDADE_SCHEMA_ORG[u.tipoUnidade], url: `${SITE_URL}${urlImovel(u)}`, name: tituloSeoImovel(u) }))
       },
       trilha([...trilhaDoImovel({ uf: development.uf, cidade: development.cidade, bairro: development.bairro }), { nome: development.name, url }])
     ]

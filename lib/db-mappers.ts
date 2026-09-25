@@ -43,6 +43,7 @@ export type PropertyRow = {
   bairro?: string | null;
   cidade?: string | null;
   uf?: string | null;
+  slug?: string | null;
   condominio?: string | null;
   is_tipologia?: boolean;
   video_vertical?: boolean;
@@ -68,6 +69,7 @@ export type DevelopmentRow = {
   bairro?: string | null;
   cidade?: string | null;
   uf?: string | null;
+  slug?: string | null;
   tipos_unidade?: unknown;
   quartos_opcoes?: unknown;
   status?: string;
@@ -167,6 +169,7 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
     bairro: row.bairro ?? undefined,
     cidade: row.cidade ?? undefined,
     uf: row.uf ?? undefined,
+    slug: row.slug ?? undefined,
     isTipologia: !!row.is_tipologia,
     videoVertical: !!row.video_vertical
   };
@@ -200,6 +203,7 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     bairro: row.bairro ?? undefined,
     cidade: row.cidade ?? undefined,
     uf: row.uf ?? undefined,
+    slug: row.slug ?? undefined,
     cep: row.cep ?? undefined,
     status: row.status === 'rascunho' ? 'rascunho' : 'publicado',
     videoVertical: !!row.video_vertical,

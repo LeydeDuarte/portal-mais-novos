@@ -6,6 +6,7 @@ import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import { altFoto } from '@/lib/seo';
 import type { PropertyDetail } from '@/lib/property-details';
+import { urlImovel, urlCondominio } from '@/lib/urls';
 
 // Card simples (renderizado no servidor) para as páginas de região — leve e
 // 100% legível pelo Google e pelos buscadores de IA.
@@ -13,7 +14,7 @@ export default function CardAnuncio({ p, prioridade = false }: { p: PropertyDeta
   const badge = getStatusBadge(p.deliveryDate);
   const capa = p.photos?.[0];
   return (
-    <Link href={`/imovel/${p.id}`} className="group block">
+    <Link href={urlImovel(p)} className="group block">
       <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-[var(--card-img-bg)]">
         {capa ? (
           <ImagemCapa mini={p.capaMini} original={capa} alt={altFoto(p)} prioridade={prioridade} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" />

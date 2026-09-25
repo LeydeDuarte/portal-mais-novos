@@ -20,6 +20,7 @@ import { SITE_URL } from './seo';
 import { chaveNome, mesmoCondominio } from './planilha-condominios';
 import { depoimentosAtivos, destaquesAtivos, hashTexto } from './especiais';
 import type { DepoimentoCard, DestaqueCard } from './especiais-tipos';
+import { urlImovel } from './urls';
 
 const PAGE_SIZE = 24;
 const STAFF_COOKIE = 'mn_staff';
@@ -32,6 +33,7 @@ const STAFF_COOKIE = 'mn_staff';
 // antes do catálogo chegar a dezenas de milhares de linhas.
 export type DevelopmentCardData = {
   id: string;
+  slug?: string;
   name: string;
   location: string;
   deliveryDate: string; // "AAAA-MM"
@@ -427,6 +429,7 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
     const quartos = [...(base.quartosOpcoes ?? []), ...[row.q_min, row.q_max].filter((n): n is number => n != null)];
     return {
       id: base.id,
+      slug: base.slug,
       name: base.name,
       location: base.location,
       deliveryDate: base.deliveryDate,
@@ -1341,7 +1344,7 @@ async function avisarInteressados(propertyId: string): Promise<void> {
   if (!leads.length) return;
   const imovel = mapPropertyRow(p);
   const titulo = imovel.titulo || `${TIPO_UNIDADE_LABEL[imovel.tipoUnidade]} em ${imovel.location}`;
-  const link = `${SITE_URL}/imovel/${p.id}`;
+  const link = `${SITE_URL}${urlImovel(p)}`;
   for (const l of leads) {
     const preco = Number(p.price_value);
     if (l.valor_max && preco > Number(l.valor_max) * 1.35) continue; // bem acima do que a pessoa quer investir
@@ -1728,7 +1731,7 @@ export async function feedModoEquipe(): Promise<boolean> {
 // "Condomínios neste bairro" (fim do feed quando a pessoa filtra por bairro):
 // todos os condomínios publicados do bairro, só com o nome — inclusive os que
 // não entram no feed — para quem quer explorar sem pesar a lista.
-export type CondoDoBairro = { id: string; nome: string; bairro: string; anuncios: number };
+export type CondoDoBairro = { id: string; slug?: string; nome: string; bairro: string; anuncios: number };
 export async function condominiosDosBairros(bairros: { nome: string; cidade: string }[]): Promise<CondoDoBairro[]> {
   const lista = bairros.slice(0, 5);
   if (!lista.length) return [];
@@ -1739,15 +1742,15 @@ export async function condominiosDosBairros(bairros: { nome: string; cidade: str
     const n = params.length;
     conds.push(`(${norm("coalesce(d.bairro, '')")} = ${norm(`$${n - 1}::text`)} and ${norm("coalesce(d.cidade, '')")} = ${norm(`$${n}::text`)})`);
   }
-  const rows = await query<{ id: string; name: string; bairro: string; anuncios: string }>(
-    `select d.id, d.name, d.bairro,
+  const rows = await query<{ id: string; slug: string | null; name: string; bairro: string; anuncios: string }>(
+    `select d.id, d.slug, d.name, d.bairro,
         (select count(*) from properties x where x.empreendimento_id = d.id and x.visibilidade = 'publico' and not x.is_tipologia and x.vendido_em is null) as anuncios
        from developments d
       where d.status = 'publicado' and (${conds.join(' or ')})
       order by anuncios desc, d.name limit 600`,
     params
   );
-  return rows.map((r) => ({ id: r.id, nome: formatTitulo(r.name), bairro: r.bairro, anuncios: Number(r.anuncios) || 0 }));
+  return rows.map((r) => ({ id: r.id, slug: r.slug ?? undefined, nome: formatTitulo(r.name), bairro: r.bairro, anuncios: Number(r.anuncios) || 0 }));
 }
 
 /** Painel: gera as miniaturas das capas que faltam (feed leve). Rode até "restantes" = 0. */

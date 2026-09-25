@@ -118,7 +118,7 @@ export const anunciosDaRegiao = unstable_cache(
   { revalidate: 600 }
 );
 
-export type CondoLanding = { id: string; nome: string; capa: string | null; anuncios: number; entrega: string | null; tipo: string };
+export type CondoLanding = { id: string; slug: string | null; nome: string; capa: string | null; anuncios: number; entrega: string | null; tipo: string };
 
 export const condominiosDaRegiao = unstable_cache(
   async (cidade: string, bairro: string | null): Promise<CondoLanding[]> => {
@@ -128,8 +128,8 @@ export const condominiosDaRegiao = unstable_cache(
       params.push(bairro);
       cond += ` and lower(coalesce(d.bairro, '')) = lower($${params.length})`;
     }
-    const rows = await query<{ id: string; name: string; capa: string | null; mini: string | null; de: string | null; anuncios: string; entrega: Date | null; tipo: string }>(
-      `select d.id, d.name, d.photos->>0 as capa, d.capa_mini as mini, d.capa_mini_de as de, d.delivery_date as entrega, d.tipo,
+    const rows = await query<{ id: string; slug: string | null; name: string; capa: string | null; mini: string | null; de: string | null; anuncios: string; entrega: Date | null; tipo: string }>(
+      `select d.id, d.slug, d.name, d.photos->>0 as capa, d.capa_mini as mini, d.capa_mini_de as de, d.delivery_date as entrega, d.tipo,
               (select count(*) from properties x where x.empreendimento_id = d.id and x.visibilidade = 'publico' and not x.is_tipologia and x.vendido_em is null) as anuncios
          from developments d where ${cond}
         order by anuncios desc, (d.delivery_date > now() - interval '3 years') desc nulls last, d.name
@@ -140,6 +140,7 @@ export const condominiosDaRegiao = unstable_cache(
       .filter((r) => Number(r.anuncios) > 0 || (r.entrega && new Date(r.entrega).getTime() > Date.now() - 3 * 365.25 * 864e5))
       .map((r) => ({
         id: r.id,
+        slug: r.slug,
         nome: r.name,
         capa: r.mini && r.de === r.capa ? r.mini : r.capa,
         anuncios: Number(r.anuncios) || 0,
@@ -152,15 +153,15 @@ export const condominiosDaRegiao = unstable_cache(
 );
 
 /** Para o sitemap: anúncios e condomínios públicos com data */
-export async function urlsParaSitemap(): Promise<{ imoveis: { id: string; em: Date }[]; condominios: { id: string; em: Date }[] }> {
+export async function urlsParaSitemap(): Promise<{ imoveis: { id: string; slug: string | null; em: Date }[]; condominios: { id: string; slug: string | null; em: Date }[] }> {
   const [imoveis, condominios] = await Promise.all([
-    query<{ id: string; em: Date }>(
-      `select id, coalesce(jetimob_atualizado_em, created_at) as em from properties
+    query<{ id: string; slug: string | null; em: Date }>(
+      `select id, slug, coalesce(jetimob_atualizado_em, created_at) as em from properties
         where visibilidade = 'publico' and is_tipologia = false and vendido_em is null`
     ),
     // condomínio sem anúncio e sem ser lançamento/novo fica de fora do feed, mas a página
     // dele existe e é útil no Google (quem pesquisa pelo nome) — entra no sitemap
-    query<{ id: string; em: Date }>(`select id, coalesce(jetimob_atualizado_em, created_at) as em from developments where status = 'publicado'`)
+    query<{ id: string; slug: string | null; em: Date }>(`select id, slug, coalesce(jetimob_atualizado_em, created_at) as em from developments where status = 'publicado'`)
   ]);
   return { imoveis, condominios };
 }

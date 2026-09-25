@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { SITE_URL, urlRegiao } from '@/lib/seo';
 import { listarRegioes, urlsParaSitemap } from '@/lib/landing';
+import { urlImovel, urlCondominio } from '@/lib/urls';
 
 // Mapa do site para o Google: páginas fixas, regiões (cidade/bairro/categoria),
 // anúncios públicos e condomínios publicados. Privados, vendidos e rascunhos ficam fora.
@@ -30,7 +31,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...fixas,
     ...paginasRegiao,
-    ...imoveis.map((i) => ({ url: `${SITE_URL}/imovel/${i.id}`, lastModified: new Date(i.em), changeFrequency: 'weekly' as const, priority: 0.8 })),
-    ...condominios.map((c) => ({ url: `${SITE_URL}/empreendimento/${c.id}`, lastModified: new Date(c.em), changeFrequency: 'weekly' as const, priority: 0.6 }))
+    ...imoveis.map((i) => ({ url: `${SITE_URL}${urlImovel(i)}`, lastModified: new Date(i.em), changeFrequency: 'weekly' as const, priority: 0.8 })),
+    ...condominios.map((c) => ({ url: `${SITE_URL}${urlCondominio(c)}`, lastModified: new Date(c.em), changeFrequency: 'weekly' as const, priority: 0.6 }))
   ];
 }

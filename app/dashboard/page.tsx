@@ -38,7 +38,14 @@ export default function PainelPage() {
               {ROLE_LABEL[staff.role] ?? 'Corretor'} · {staff.email}
             </span>
           </div>
-          <button type="button" onClick={logout} className="text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text)]">
+          <button
+            type="button"
+            onClick={async () => {
+              await logout();
+              window.location.href = '/dashboard/login';
+            }}
+            className="rounded-full border border-red-200 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50"
+          >
             Sair
           </button>
         </div>
