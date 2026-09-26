@@ -24,7 +24,7 @@ export function middleware(req: NextRequest) {
   }
 
   // Arquivos e APIs: passam direto (no app também — upload de fotos, PDF.js, ícones do app)
-  const tecnico = /^\/(api|pdfjs|icons)\//.test(pathname) || /^\/(favicon|manifest|sw\.js|robots|sitemap|llms)/.test(pathname);
+  const tecnico = /^\/(api|pdfjs|icons|marca)\//.test(pathname) || /^\/(favicon|manifest|sw\.js|robots|sitemap|llms)/.test(pathname);
   if (tecnico) return NextResponse.next();
 
   if (ehHostApp(host)) {

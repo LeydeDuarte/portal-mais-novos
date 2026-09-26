@@ -1,4 +1,5 @@
 import { MAIS_VALOR_URL } from '@/lib/marca';
+import Logo from './Logo';
 import { DASHBOARD_URL } from '@/lib/dominios';
 
 export default function Footer() {
@@ -6,7 +7,7 @@ export default function Footer() {
     <footer className="flex flex-col gap-5 border-t border-[var(--border)] px-5 pb-6 pt-8 md:px-8 md:pt-11 md:pb-7">
       <div className="flex flex-wrap justify-between gap-7">
         <div className="flex max-w-[320px] flex-col gap-2">
-          <div className="font-serif text-[19px] font-semibold">Mais Novos Imóveis</div>
+          <Logo tipo="completo" altura={44} />
           <p className="text-[13px] leading-relaxed text-[var(--text-muted)]">
             Imóveis à venda em Goiânia com vídeo (lançamentos, imóveis novos e casas em condomínio) e estruturação de ativos imobiliários:
             compra, venda, financiamento e home equity, também para brasileiros no exterior.

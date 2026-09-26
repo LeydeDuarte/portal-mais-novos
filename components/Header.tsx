@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import Logo from './Logo';
 import LoginModal from './LoginModal';
 import { useSession } from '@/lib/use-session';
 import type { Cliente } from '@/lib/cliente-auth';
@@ -50,13 +51,9 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
           <path d="M4 7h16M4 12h16M4 17h16" />
         </svg>
       </button>
-      <a href="/" className="shrink-0 whitespace-nowrap font-serif text-[19px] font-semibold" aria-label="Mais Novos Imóveis, página inicial">
-        <span className="md:hidden">
-          M<span className="text-accent">N</span>
-        </span>
-        <span className="hidden md:inline">
-          Mais Novos <span className="text-accent">Imóveis</span>
-        </span>
+      <a href="/" className="shrink-0" aria-label="Mais Novos Imóveis, página inicial">
+        <Logo tipo="simbolo" altura={30} className="md:hidden" />
+        <Logo tipo="completo" altura={40} className="hidden md:block" />
       </a>
 
       <nav className="hidden items-center gap-1 md:flex">
@@ -141,9 +138,7 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
           <button type="button" aria-label="Fechar menu" onClick={() => setMenuCel(false)} className="absolute inset-0 bg-black/40" />
           <nav className="absolute left-0 top-0 flex h-full w-[82%] max-w-[320px] flex-col bg-[var(--bg)] p-5 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-              <span className="font-serif text-lg font-semibold">
-                Mais Novos <span className="text-accent">Imóveis</span>
-              </span>
+              <Logo tipo="completo" altura={38} />
               <button type="button" onClick={() => setMenuCel(false)} aria-label="Fechar menu" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[var(--pill-bg)]">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                   <path d="M6 6l12 12M18 6 6 18" />

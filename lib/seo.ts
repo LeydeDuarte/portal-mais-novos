@@ -173,7 +173,7 @@ export function buildAgentJsonLd() {
         taxID: EMPRESA.cnpj,
         identifier: EMPRESA.creci,
         url: SITE_URL,
-        logo: `${SITE_URL}/icons/icon-512.png`,
+        logo: `${SITE_URL}/marca/logotipo-preto.png`,
         image: `${SITE_URL}/icons/icon-512.png`,
         description:
           'Portal de imóveis à venda em Goiânia: apartamentos, casas em condomínio, lançamentos e imóveis novos, com vídeos e atendimento especializado em crédito imobiliário.',
