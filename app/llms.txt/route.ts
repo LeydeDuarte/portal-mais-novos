@@ -17,7 +17,7 @@ export async function GET() {
     '',
     `Empresa: ${EMPRESA.razao}, CNPJ ${EMPRESA.cnpj}, ${EMPRESA.creci}, ${EMPRESA.cidade}/${EMPRESA.uf}.`,
     'Cada anúncio tem página própria com preço, metragem, quartos, vagas, fotos, condomínio, bairro e, quando existe, vídeo.',
-    'Classificação: Lançamento (entrega futura), Novo (até 3 anos da entrega), Seminovo (3 a 6 anos), Usado (mais de 6 anos).',
+    'Fase pela data de entrega: Breve lançamento (mais de 47 meses para entregar), Lançamento (47 a 41 meses), Obras (40 meses até a entrega), Pronto novo (até 5 anos de entregue), Seminovo (5 a 15 anos), Usado (15 a 25 anos), Antigo (mais de 25 anos).',
     '',
     '## Principais páginas',
     `- [Feed de imóveis à venda](${SITE_URL}/): todos os anúncios públicos, com busca por bairro, condomínio, tipo e preço (${SITE_URL}/?q=termo)`,

@@ -41,7 +41,7 @@ export const listarRegioes = unstable_cache(
     const condos = await query<{ uf: string; cidade: string; bairro: string | null; n: string }>(
       `select ${UF_SQL('d.uf')} as uf, d.cidade, d.bairro, count(*) as n from developments d
         where d.status = 'publicado' and coalesce(d.cidade, '') <> ''
-          and (d.delivery_date > now() - interval '3 years'
+          and (d.delivery_date >= now() - interval '60 months'
                or exists (select 1 from properties x where x.empreendimento_id = d.id and x.visibilidade = 'publico' and not x.is_tipologia))
         group by 1, 2, 3`
     );
@@ -132,7 +132,7 @@ export const condominiosDaRegiao = unstable_cache(
       `select d.id, d.slug, d.name, d.photos->>0 as capa, d.capa_mini as mini, d.capa_mini_de as de, d.delivery_date as entrega, d.tipo,
               (select count(*) from properties x where x.empreendimento_id = d.id and x.visibilidade = 'publico' and not x.is_tipologia and x.vendido_em is null) as anuncios
          from developments d where ${cond}
-        order by anuncios desc, (d.delivery_date > now() - interval '3 years') desc nulls last, d.name
+        order by anuncios desc, (d.delivery_date >= now() - interval '60 months') desc nulls last, d.name
         limit 80`,
       params
     );

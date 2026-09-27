@@ -20,6 +20,7 @@ export default function Footer() {
             { label: 'Lançamentos', href: '/lancamentos' },
             { label: 'Financiamento', href: '/financiamento' },
             { label: 'Imóveis por bairro', href: '/imoveis-a-venda' },
+            { label: 'Construtoras e incorporadoras', href: '/empresas' },
             { label: 'Venda seu imóvel', href: '/vender' },
             { label: 'Quem somos', href: '/quem-somos' },
             { label: 'Mais Valor Capital (crédito)', href: MAIS_VALOR_URL }

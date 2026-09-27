@@ -15,6 +15,7 @@ const LINKS = [
   { href: '/dashboard/condominios', label: 'Condomínios' },
   { href: '/dashboard/interessados', label: 'Interessados' },
   { href: '/dashboard/propostas', label: 'Propostas' },
+  { href: '/dashboard/empresas', label: 'Construtoras' },
   { href: '/dashboard/vender', label: 'Quero vender' },
   { href: '/dashboard/feed-especiais', label: 'Depoimentos e destaques', gestor: true },
   { href: '/dashboard/clientes', label: 'Clientes' },

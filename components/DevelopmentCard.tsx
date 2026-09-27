@@ -59,6 +59,7 @@ export default function DevelopmentCard({ development, prioridade = false }: { d
           </div>
           <div className="mt-2.5 font-serif text-base font-semibold leading-tight md:text-lg">{development.name}</div>
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">{development.location}</div>
+          {development.concepcao && <div className="mt-0.5 line-clamp-1 text-[11px] text-[var(--text-faint)]">Concepção: {development.concepcao}</div>}
           {tipos.length > 0 && <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-accent">{tipos.slice(0, 4).join(' · ')}</div>}
           <div className="mt-1 text-xs text-[var(--text-muted)]">
             {development.unitsCount > 0
@@ -113,6 +114,7 @@ export default function DevelopmentCard({ development, prioridade = false }: { d
             {development.minPrice ? `A partir de ${formatBRL(development.minPrice)}` : 'Preço sob consulta'}
           </div>
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">{development.location}</div>
+          {development.concepcao && <div className="mt-0.5 line-clamp-1 text-[11px] text-[var(--text-faint)]">Concepção: {development.concepcao}</div>}
           {(quartos || area || development.unitsCount > 0) && (
             <div className="mt-0.5 text-[11px] text-[var(--text-muted)] md:text-xs">
               {[quartos, area, development.unitsCount > 0 ? `${development.unitsCount} tipologia(s)` : null].filter(Boolean).join(' · ')}

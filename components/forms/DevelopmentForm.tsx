@@ -1,6 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import ConcepcaoPicker from './ConcepcaoPicker';
+import { lerConcepcao } from '@/lib/actions-empresas';
+import type { ConcepcaoItem } from '@/lib/empresas-tipos';
+import { FASES_EXIGEM_CONCEPCAO, getStatusBucket } from '@/lib/classification';
+import { useStaffSession } from '@/lib/use-staff-session';
 import ChipSelect from '@/components/ChipSelect';
 import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
 import PhotoUploadField from '@/components/PhotoUploadField';
@@ -66,6 +71,13 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
   const [erro, setErro] = useState<string | null>(null);
   const [faltando, setFaltando] = useState<string[]>([]);
   const [duplicado, setDuplicado] = useState<{ id: string; name: string; bairro: string | null } | null>(null);
+  const [concepcao, setConcepcao] = useState<ConcepcaoItem[]>([]);
+  const { staff } = useStaffSession();
+  useEffect(() => {
+    if (initial?.id) lerConcepcao(initial.id).then(setConcepcao).catch(() => {});
+  }, [initial?.id]);
+  const concepcaoObrigatoria =
+    staff?.role !== 'admin' && /^\d{4}-\d{2}$/.test(f.deliveryDate ?? '') && FASES_EXIGEM_CONCEPCAO.includes(getStatusBucket(f.deliveryDate));
 
   const set = <K extends keyof typeof f>(key: K, value: (typeof f)[K]) => setF((prev) => ({ ...prev, [key]: value }));
   const updTip = <K extends keyof Tip>(key: string, k: K, value: Tip[K]) => setTips((prev) => prev.map((t) => (t.key === key ? { ...t, [k]: value } : t)));
@@ -106,7 +118,8 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
           tiposUnidade,
           quartosOpcoes: f.quartosOpcoes.map(Number),
           status,
-          ...f.endereco
+          ...f.endereco,
+          empresas: concepcao.map((c) => ({ empresaId: c.empresa.id, papel: c.papel }))
         },
         tipologiasValidas.map((t) => ({
           id: t.id,
@@ -171,6 +184,8 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
           <input type="number" className={inputClass} value={f.areaTerreno} onChange={(e) => set('areaTerreno', e.target.value)} placeholder="48000" />
         </div>
       )}
+
+      <ConcepcaoPicker value={concepcao} onChange={setConcepcao} obrigatorio={concepcaoObrigatoria} />
 
       <div className="flex flex-col gap-4 rounded-xl border border-[var(--border)] p-4">
         <MultiChipSelect

@@ -8,6 +8,8 @@ import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
 import DescriptionEditor from '@/components/forms/DescriptionEditor';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { createDevelopment, saveTipologias, listCondominios, getDevelopmentForEdit, type CondominioResumo } from '@/lib/actions';
+import { cadastrarPorNome } from '@/lib/actions-empresas';
+import { PAPEL_LABEL, type PapelEmpresa } from '@/lib/empresas-tipos';
 import { lerPdf, renderizarPaginas, type PdfDoc } from '@/lib/pdf-import/extract';
 import { uploadOne } from '@/components/PhotoUploadField';
 import { analisarDocs, classificarDoc, gerarDescricao, paginasDePlanta, semAcento, type ImportResult, type TipoDoc } from '@/lib/pdf-import/parse';
@@ -37,7 +39,7 @@ export default function ImportarPdfPage() {
   const [progresso, setProgresso] = useState<string>('');
   const [gerandoPlantas, setGerandoPlantas] = useState<string | null>(null);
   const [res, setRes] = useState<ImportResult | null>(null);
-  const [f, setF] = useState({ nome: '', cep: '', logradouro: '', bairro: '', cidade: '', uf: '', entrega: '', pavimentos: '', tipo: 'vertical' as 'vertical' | 'horizontal' });
+  const [f, setF] = useState({ nome: '', cep: '', logradouro: '', bairro: '', cidade: '', uf: '', entrega: '', pavimentos: '', tipo: 'vertical' as 'vertical' | 'horizontal', construtora: '', papel: 'construtora_incorporadora' as PapelEmpresa });
   const [amenities, setAmenities] = useState<string[]>([]);
   const [tips, setTips] = useState<LinhaTip[]>([]);
   const [descricao, setDescricao] = useState('');
@@ -90,7 +92,9 @@ export default function ImportarPdfPage() {
       uf: r.endereco.uf,
       entrega: r.entrega ?? '',
       pavimentos: r.pavimentos ? String(r.pavimentos) : '',
-      tipo: r.tipo
+      tipo: r.tipo,
+      construtora: r.construtora ?? '',
+      papel: 'construtora_incorporadora'
     });
     setAmenities(r.amenities);
     setDescricao(r.descricao);
@@ -221,8 +225,16 @@ export default function ImportarPdfPage() {
       const id = `condo-${Date.now()}`;
       const tiposUnidade = Array.from(new Set(tipsFinais().map((t) => t.tipoUnidade)));
       const quartosOpcoes = Array.from(new Set(tipsFinais().map((t) => t.quartos).filter(Boolean) as number[])).sort((a, b) => a - b);
+      // Construtora/incorporadora lida no PDF: acha pelo nome ou cadastra sem CNPJ
+      // (o CNPJ é completado depois, no empreendimento ou em Painel → Construtoras)
+      let empresas: { empresaId: string; papel: PapelEmpresa }[] | undefined;
+      if (f.construtora.trim()) {
+        const emp = await cadastrarPorNome(f.construtora).catch(() => null);
+        if (emp?.ok) empresas = [{ empresaId: emp.empresa.id, papel: f.papel }];
+      }
       const r = await createDevelopment({
         id,
+        empresas,
         name: f.nome.trim(),
         location: formatLocation({ cep: f.cep, logradouro: f.logradouro, bairro: f.bairro, cidade: f.cidade, uf: f.uf }),
         deliveryDate: f.entrega || undefined,
@@ -365,6 +377,20 @@ export default function ImportarPdfPage() {
                 <label className="text-xs font-semibold text-[var(--text-muted)] md:col-span-2">
                   Nome
                   <input className={inputClass} value={f.nome} onChange={(e) => set('nome', e.target.value)} />
+                </label>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">
+                  Concepção: construtora / incorporadora
+                  <input className={inputClass} value={f.construtora} onChange={(e) => set('construtora', e.target.value)} placeholder="Nome da empresa (o CNPJ pode ser completado depois)" />
+                </label>
+                <label className="text-xs font-semibold text-[var(--text-muted)]">
+                  Papel
+                  <select className={inputClass} value={f.papel} onChange={(e) => set('papel', e.target.value as PapelEmpresa)}>
+                    {Object.entries(PAPEL_LABEL).map(([k, l]) => (
+                      <option key={k} value={k}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <div className="md:col-span-2">
                   <CepField

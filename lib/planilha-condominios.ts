@@ -19,6 +19,9 @@ export type CampoPlanilha =
   | 'pavimentos'
   | 'lazer'
   | 'construtora'
+  | 'incorporadora'
+  | 'cnpjConstrutora'
+  | 'cnpjIncorporadora'
   | 'tipos'
   | 'numero'
   | 'quadra'
@@ -30,6 +33,9 @@ export type CampoPlanilha =
   | 'video';
 
 export const CAMPOS: { campo: CampoPlanilha; rotulo: string; obrigatorio?: boolean; re: RegExp }[] = [
+  // CNPJ antes dos nomes: "CNPJ Construtora" / "Construtora CNPJ" é o CNPJ, não o nome
+  { campo: 'cnpjIncorporadora', rotulo: 'CNPJ da incorporadora', re: /cnpj.*incorpor|incorpor.*cnpj/ },
+  { campo: 'cnpjConstrutora', rotulo: 'CNPJ da construtora', re: /cnpj.*construt|construt.*cnpj/ },
   { campo: 'nome', rotulo: 'Nome do condomínio', obrigatorio: true, re: /^(nome|condom|empreend|edif|residencial)/ },
   { campo: 'tipo', rotulo: 'Tipo (vertical/horizontal)', re: /^tipo ?(de )?(condom|empreend)|^tipo$|vertical|horizontal/ },
   { campo: 'tipos', rotulo: 'Tipos de imóvel / uso', re: /tipos? de imov|tipologia|tipo de unidade|^tipo ?(de )?uso/ },
@@ -50,7 +56,8 @@ export const CAMPOS: { campo: CampoPlanilha; rotulo: string; obrigatorio?: boole
   { campo: 'video', rotulo: 'Vídeo (YouTube)', re: /youtube|^video/ },
   { campo: 'pavimentos', rotulo: 'Pavimentos', re: /pavim|andares/ },
   { campo: 'lazer', rotulo: 'Lazer / comodidades', re: /lazer|comodid|amenid|diferenc/ },
-  { campo: 'construtora', rotulo: 'Construtora', re: /construt|incorpor/ }
+  { campo: 'construtora', rotulo: 'Construtora', re: /construt/ },
+  { campo: 'incorporadora', rotulo: 'Incorporadora', re: /incorpor/ }
 ];
 
 const sa = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -175,6 +182,9 @@ export type CondoPlanilha = {
   pavimentos?: number;
   amenities: string[];
   construtora?: string;
+  incorporadora?: string;
+  cnpjConstrutora?: string;
+  cnpjIncorporadora?: string;
   problemas: string[];
   duplicadaNaPlanilha?: boolean;
   rascunho?: boolean; // planilha marcou como não publicado
@@ -252,6 +262,10 @@ export function mesclarCondominios(todas: CondoPlanilha[]): { lista: CondoPlanil
       alvo.lng = c.lng;
     }
     if (!alvo.videoUrl) alvo.videoUrl = c.videoUrl;
+    if (!alvo.construtora) alvo.construtora = c.construtora;
+    if (!alvo.incorporadora) alvo.incorporadora = c.incorporadora;
+    if (!alvo.cnpjConstrutora) alvo.cnpjConstrutora = c.cnpjConstrutora;
+    if (!alvo.cnpjIncorporadora) alvo.cnpjIncorporadora = c.cnpjIncorporadora;
     alvo.amenities = Array.from(new Set([...alvo.amenities, ...c.amenities]));
     alvo.tiposUnidade = Array.from(new Set([...alvo.tiposUnidade, ...c.tiposUnidade]));
     if (alvo.rascunho && !c.rascunho) alvo.rascunho = false;
@@ -365,7 +379,10 @@ export function linhasParaCondominios(linhas: unknown[][], mapa: Partial<Record<
       descricao,
       pavimentos: pav,
       amenities,
-      construtora: txt(get(row, 'construtora')) ? padronizarNome(txt(get(row, 'construtora'))) : undefined,
+      construtora: txt(get(row, 'construtora')) || undefined,
+      incorporadora: txt(get(row, 'incorporadora')) || undefined,
+      cnpjConstrutora: txt(get(row, 'cnpjConstrutora')) || undefined,
+      cnpjIncorporadora: txt(get(row, 'cnpjIncorporadora')) || undefined,
       problemas,
       duplicadaNaPlanilha: dup,
       rascunho: pub === '0' || pub === 'nao' || pub === 'false' || pub === 'rascunho',
@@ -410,4 +427,33 @@ export function lerCsv(texto: string): string[][] {
     linhas.push(linha);
   }
   return linhas.filter((l) => l.some((c) => c.trim()));
+}
+
+/**
+ * Empresas da Concepção de uma linha da planilha. Aceita várias na mesma célula,
+ * separadas por ";", "|" ou " / " (os CNPJs na mesma ordem). A mesma empresa como
+ * construtora e incorporadora vira "construtora e incorporadora".
+ */
+export type EmpresaPlanilha = { nome?: string; cnpj?: string; papel: 'construtora' | 'incorporadora' | 'construtora_incorporadora' };
+export function empresasDaLinha(c: { construtora?: string; incorporadora?: string; cnpjConstrutora?: string; cnpjIncorporadora?: string }): EmpresaPlanilha[] {
+  const partes = (v?: string) => (v ?? '').split(/\s*(?:;|\||\s\/\s)\s*/).map((x) => x.trim()).filter(Boolean);
+  const cnpjs = (v?: string) => partes(v).map((x) => x.replace(/\D/g, '')).filter((x) => x.length === 14 || x.length === 13 || x.length === 12).map((x) => x.padStart(14, '0'));
+  const montar = (nomes: string[], docs: string[], papel: EmpresaPlanilha['papel']) =>
+    Array.from({ length: Math.max(nomes.length, docs.length) }, (_, i) => ({ nome: nomes[i], cnpj: docs[i], papel }));
+  const lista = [
+    ...montar(partes(c.construtora), cnpjs(c.cnpjConstrutora), 'construtora'),
+    ...montar(partes(c.incorporadora), cnpjs(c.cnpjIncorporadora), 'incorporadora')
+  ].filter((e) => e.nome || e.cnpj);
+  const out: EmpresaPlanilha[] = [];
+  for (const e of lista) {
+    const igual = out.find(
+      (o) => (e.cnpj && o.cnpj === e.cnpj) || (e.nome && o.nome && sa(e.nome) === sa(o.nome) && (!e.cnpj || !o.cnpj || e.cnpj === o.cnpj))
+    );
+    if (igual) {
+      if (igual.papel !== e.papel) igual.papel = 'construtora_incorporadora';
+      igual.nome = igual.nome ?? e.nome;
+      igual.cnpj = igual.cnpj ?? e.cnpj;
+    } else out.push({ ...e });
+  }
+  return out;
 }

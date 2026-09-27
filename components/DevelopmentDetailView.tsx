@@ -13,12 +13,14 @@ import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getRelatedListings, getOcultosDoCondominio } from '@/lib/actions';
 import OcultoCard from '@/components/OcultoCard';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
-import { getBadgeCondominio } from '@/lib/classification';
+import { FASES_EXIGEM_CONCEPCAO, ehFutura, getBadgeCondominio, getStatusBucket } from '@/lib/classification';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import ContarVisita from '@/components/ContarVisita';
 import Trilha from '@/components/Trilha';
 import BarraEquipe from '@/components/BarraEquipe';
+import ConcepcaoBloco from '@/components/ConcepcaoBloco';
+import { concepcaoDe } from '@/lib/empresas';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import { trilhaDoImovel } from '@/lib/seo';
 import { urlImovel, urlCondominio } from '@/lib/urls';
@@ -32,7 +34,8 @@ export default async function DevelopmentDetailView({ development }: { developme
   const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
   const tipologias = development.units.filter((u) => u.isTipologia);
   const related = await getRelatedListings({ developmentId: development.id }).catch(() => ({ mesmoCondominio: [], regiao: [], precoReferencia: null }));
-  const futuro = !!development.deliveryDate && badge.bucket === 'lancamento';
+  const futuro = !!development.deliveryDate && ehFutura(badge.bucket);
+  const concepcao = await concepcaoDe(development.id);
   const reservados = await getOcultosDoCondominio(development.id, development.name, development.cidade).catch(() => []);
   const embed = development.videoUrl ? getEmbedInfo(development.videoUrl) : null;
   // Preço médio do m² vem só da tabela de vendas (tipologias), não dos imóveis de revenda
@@ -44,8 +47,9 @@ export default async function DevelopmentDetailView({ development }: { developme
   const entregueHaMeses = development.deliveryDate
     ? (Date.now() - new Date(`${development.deliveryDate}-01T00:00:00`).getTime()) / (1000 * 60 * 60 * 24 * 30.4)
     : null;
-  // WhatsApp da Leyde: condomínios lançamento, novo ou seminovo (entregues há até 6 anos)
-  const recente = !!development.deliveryDate && new Date(`${development.deliveryDate}-01T00:00:00`).getTime() > Date.now() - 6 * 365.25 * 864e5;
+  // WhatsApp da Leyde: condomínios antes da entrega, pronto novo ou seminovo
+  const faseAtual = development.deliveryDate ? getStatusBucket(development.deliveryDate) : null;
+  const recente = !!faseAtual && FASES_EXIGEM_CONCEPCAO.includes(faseAtual);
   const whats = recente
     ? { titulo: `${development.name}, ${[development.bairro, development.cidade].filter(Boolean).join(', ') || development.location}`, caminho: urlCondominio(development), condominio: development.name, developmentId: development.id }
     : null;
@@ -149,6 +153,8 @@ export default async function DevelopmentDetailView({ development }: { developme
             <span className="text-[var(--text-muted)]">Terreno de {development.areaTerreno}</span>
           )}
         </div>
+
+        <ConcepcaoBloco itens={concepcao} />
 
         {(tipos.length > 0 || quartosConhecidos.length > 0) && (
           <div className="mt-4 flex flex-col gap-2">

@@ -19,6 +19,10 @@ import { enviarEmail, emailConfigurado, emailLayout, escapeHtml } from './email'
 import { SITE_URL } from './seo';
 import { chaveNome, mesmoCondominio } from './planilha-condominios';
 import { depoimentosAtivos, destaquesAtivos, hashTexto } from './especiais';
+import { MESES, FASES_EXIGEM_CONCEPCAO, getStatusBucket } from './classification';
+import { gravarConcepcao, resolverEmpresaImport, acrescentarConcepcao } from './empresas';
+import type { EmpresaPlanilha } from './planilha-condominios';
+import type { EmpresaNaConcepcao } from './empresas-tipos';
 import type { DepoimentoCard, DestaqueCard } from './especiais-tipos';
 import { urlImovel } from './urls';
 
@@ -34,6 +38,7 @@ const STAFF_COOKIE = 'mn_staff';
 export type DevelopmentCardData = {
   id: string;
   slug?: string;
+  concepcao?: string | null; // construtoras/incorporadoras, ex.: "Consciente · EBM"
   name: string;
   location: string;
   deliveryDate: string; // "AAAA-MM"
@@ -59,6 +64,32 @@ export type FeedItem =
   | { kind: 'empreendimento'; development: DevelopmentCardData }
   | { kind: 'depoimento'; depoimento: DepoimentoCard; chave: string }
   | { kind: 'destaque'; destaque: DestaqueCard; chave: string };
+
+// Fase pela data de entrega, em SQL (mesmas faixas de lib/classification.ts, em meses)
+const MES_ATUAL = "date_trunc('month', now())";
+function faseSql(col: string, fase: string): string | null {
+  const m = (n: number) => `${MES_ATUAL} + interval '${n} months'`;
+  switch (fase) {
+    case 'breve_lancamento':
+      return `${col} > ${m(MESES.breveLancamento)}`;
+    case 'lancamento':
+      return `${col} >= ${m(MESES.lancamento)} and ${col} <= ${m(MESES.breveLancamento)}`;
+    case 'obras':
+      return `${col} > now() and ${col} < ${m(MESES.lancamento)}`;
+    case 'futuro': // qualquer fase antes da entrega
+      return `${col} > now()`;
+    case 'novo':
+      return `${col} <= now() and ${col} >= ${m(-MESES.novo)}`;
+    case 'seminovo':
+      return `${col} < ${m(-MESES.novo)} and ${col} >= ${m(-MESES.seminovo)}`;
+    case 'usado':
+      return `${col} < ${m(-MESES.seminovo)} and ${col} >= ${m(-MESES.usado)}`;
+    case 'antigo':
+      return `${col} < ${m(-MESES.usado)}`;
+    default:
+      return null;
+  }
+}
 
 // Depoimentos de clientes e destaques (propaganda própria) entram no meio do feed:
 // no máximo 1 de cada por página de 24. Cada depoimento aparece uma vez por visita;
@@ -184,7 +215,7 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
   const soNoFeed: string[] = [];
   if (!pesquisandoNome && !await currentStaff())
     soNoFeed.push(
-      "(d.delivery_date > now() - interval '3 years' or coalesce(u.avulsos, 0) > 0)"
+      "(d.delivery_date >= date_trunc('month', now()) - interval '60 months' or coalesce(u.avulsos, 0) > 0)"
     );
   propConds.push('p.is_tipologia = false');
   // Anúncios PRIVADOS (portfólio, sem autorização do proprietário para publicar)
@@ -193,14 +224,7 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
   if (ocultos) devConds.push('false');
 
   // ---- Condições que valem para os dois ----
-  const situacaoSql = (col: string) => {
-    if (filters.situacao === 'lancamento') return `${col} > now()`;
-    // mesmas faixas de lib/classification.ts: novo até 36 meses, seminovo até 6 anos
-    if (filters.situacao === 'novo') return `${col} <= now() and ${col} > now() - interval '3 years'`;
-    if (filters.situacao === 'seminovo') return `${col} <= now() - interval '3 years' and ${col} > now() - interval '6 years'`;
-    if (filters.situacao === 'usado') return `${col} <= now() - interval '6 years'`;
-    return null;
-  };
+  const situacaoSql = (col: string) => faseSql(col, filters.situacao);
   const sitP = situacaoSql('p.delivery_date');
   const sitD = situacaoSql('d.delivery_date');
   if (sitP) propConds.push(sitP);
@@ -273,7 +297,7 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
          left join developments pd on pd.id = p.empreendimento_id
          left join tl ptl on ptl.k = p.tipo_unidade
          cross join lateral (
-           select ${norm(`concat_ws(' ', p.titulo, p.location, p.bairro, p.cidade, p.condominio, pd.name, ptl.label)`)} as txt
+           select ${norm(`concat_ws(' ', p.titulo, p.location, p.bairro, p.cidade, p.condominio, pd.name, ptl.label, (select string_agg(concat_ws(' ', e.nome_fantasia, e.razao_social), ' ') from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = pd.id))`)} as txt
          ) pt
 `;
   const fromCondo = `from developments d
@@ -299,7 +323,7 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
              from jsonb_array_elements_text(d.tipos_unidade) t left join tl ttl on ttl.k = t
          ) dt on true
          cross join lateral (
-           select ${norm(`concat_ws(' ', d.name, d.location, d.bairro, d.cidade, 'empreendimento condominio lancamento', u.tipos_texto, dt.tipos_texto)`)} as txt
+           select ${norm(`concat_ws(' ', d.name, d.location, d.bairro, d.cidade, 'empreendimento condominio lancamento', u.tipos_texto, dt.tipos_texto, (select string_agg(concat_ws(' ', e.nome_fantasia, e.razao_social), ' ') from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = d.id))`)} as txt
          ) dx
 `;
 
@@ -311,7 +335,7 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
     const soVenda = filters.finalidade === 'todas' ? " and p.finalidade = 'venda'" : '';
     const paramsConta = params.slice(); // antes dos parâmetros da ordem (não usados aqui)
     const condImovel = where([...propConds, `p.vendido_em is null${soVenda}`]);
-    const condCondo = where([...devConds, "d.delivery_date > now() - interval '6 years'"]);
+    const condCondo = where([...devConds, "d.delivery_date >= date_trunc('month', now()) - interval '60 months'"]);
     const r = await query<{ n: string }>(
       `with ${TIPOS_CTE}
        select (select count(*) ${fromImovel} ${condImovel})
@@ -340,7 +364,7 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
       + case when p.video_url is not null and p.video_url <> '' then 0.45 else 0 end
       + case when jsonb_array_length(coalesce(p.photos, '[]'::jsonb)) = 0 then -0.6 else 0 end
       + case when p.created_at > now() - interval '10 days' then 0.25 else 0 end
-      + case when p.delivery_date > now() - interval '3 years' then 0.1 else 0 end
+      + case when p.delivery_date >= now() - interval '60 months' then 0.1 else 0 end
       + case when p.vendido_em is not null then -0.3 else 0 end
       + case when p.tipo_unidade = any(${pTipos}::text[]) then 0.35 else 0 end
       + case when ${bairroNorm('p.bairro')} = any(${pBairros}::text[]) then 0.35 else 0 end
@@ -348,7 +372,7 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
   const scoreCondo = `(${rnd('d.id')}
       + case when d.video_url is not null and d.video_url <> '' then 0.45 else 0 end
       + case when jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) = 0 then -0.35 else 0 end
-      + case when d.delivery_date > now() - interval '3 years' then 0.2 else 0 end
+      + case when d.delivery_date >= now() - interval '60 months' then 0.2 else 0 end
       + case when coalesce(d.tipos_unidade, '[]'::jsonb) ?| ${pTipos}::text[] or coalesce(u.tipos, '[]'::jsonb) ?| ${pTipos}::text[] then 0.25 else 0 end
       + case when ${bairroNorm('d.bairro')} = any(${pBairros}::text[]) then 0.35 else 0 end)`;
 
@@ -408,9 +432,12 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       n: string;
       unit_tipos: unknown;
       anuncios: string;
+      concepcao: string | null;
     }
   >(
-    `select d.*, u.min_price, u.q_min, u.q_max, u.a_min, u.a_max, u.n, u.unit_tipos, u.anuncios
+    `select d.*, u.min_price, u.q_min, u.q_max, u.a_min, u.a_max, u.n, u.unit_tipos, u.anuncios,
+            (select string_agg(coalesce(nullif(e.nome_fantasia, ''), e.razao_social), ' · ' order by de.ordem)
+               from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = d.id) as concepcao
        from developments d
        left join lateral (
          select min(x.price_value) filter (where x.price_value > 0) as min_price,
@@ -447,7 +474,8 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       visualizacoes: Number(row.visualizacoes) || 0,
       tipo: base.tipo,
       anuncios: Number(row.anuncios) || 0,
-      capaMini: miniValida(row)
+      capaMini: miniValida(row),
+      concepcao: row.concepcao ?? null
     };
   });
 }
@@ -977,14 +1005,20 @@ export type DevelopmentFields = {
   cidade?: string;
   uf?: string;
   status?: DevelopmentStatus;
+  // Concepção (construtoras/incorporadoras). undefined = não mexe (importações)
+  empresas?: EmpresaNaConcepcao[];
 };
 export type CreateDevelopmentInput = DevelopmentFields & { id: string; corretorEmail?: string };
 
 // O que falta para um condomínio poder ser publicado (vazio = pode publicar)
-export async function pendenciasParaPublicar(f: DevelopmentFields): Promise<string[]> {
+export async function pendenciasParaPublicar(f: DevelopmentFields, papel?: string): Promise<string[]> {
   const faltando: string[] = [];
   if (!f.name?.trim()) faltando.push('nome');
   if (!f.bairro?.trim() || !f.cidade?.trim()) faltando.push('endereço (bairro e cidade)');
+  // Breve lançamento, lançamento, obras, pronto novo e seminovo: quem não é
+  // administrador precisa informar a Concepção (construtora/incorporadora).
+  if (f.empresas && !f.empresas.length && papel && papel !== 'admin' && f.deliveryDate && FASES_EXIGEM_CONCEPCAO.includes(getStatusBucket(f.deliveryDate)))
+    faltando.push('Concepção (construtora e/ou incorporadora)');
   // Narrativa, tipos, fotos e lazer são opcionais — dá para publicar e completar depois
   return faltando;
 }
@@ -1032,12 +1066,13 @@ export async function createDevelopment(
   );
   if (dup) return { ok: false, faltando: [], duplicado: { id: dup.id, name: dup.name, bairro: dup.bairro } };
   if (input.status !== 'rascunho') {
-    const faltando = await pendenciasParaPublicar(input);
+    const faltando = await pendenciasParaPublicar(input, staff.role);
     if (faltando.length) return { ok: false, faltando };
   }
   const values = developmentValues(input);
   const placeholders = values.map((_, i) => `$${i + 3}${DEV_CASTS[i]}`).join(',');
   await query(`insert into developments (id, corretor_email, ${DEV_COLS}) values ($1, $2, ${placeholders})`, [input.id, staff.email, ...values]);
+  if (input.empresas) await gravarConcepcao(input.id, input.empresas);
   await miniaturaDe('developments', input.id).catch(() => {});
   return { ok: true };
 }
@@ -1046,9 +1081,10 @@ export async function updateDevelopment(id: string, input: DevelopmentFields): P
   const staff = await requireStaff();
   await assertCanEdit('developments', id, staff);
   if (input.status !== 'rascunho') {
-    const faltando = await pendenciasParaPublicar(input);
+    const faltando = await pendenciasParaPublicar(input, staff.role);
     if (faltando.length) return { ok: false, faltando };
   }
+  if (input.empresas) await gravarConcepcao(id, input.empresas);
   const values = developmentValues(input);
   const sets = DEV_COLS.split(', ')
     .map((col, i) => `${col} = $${i + 2}${DEV_CASTS[i]}`)
@@ -1532,8 +1568,10 @@ export type CondoImport = {
   lat?: number;
   lng?: number;
   videoUrl?: string;
+  // Concepção: nome e/ou CNPJ da construtora e da incorporadora
+  empresas?: EmpresaPlanilha[];
 };
-export type ResultadoImport = { criados: number; atualizados: number; pulados: number; erros: string[] };
+export type ResultadoImport = { criados: number; atualizados: number; pulados: number; erros: string[]; empresasLigadas?: number };
 
 type Existente = { id: string; name: string; cep: string | null; bairro: string | null; cidade: string | null };
 async function carregarExistentes(): Promise<Map<string, Existente[]>> {
@@ -1570,6 +1608,7 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
   const idx = await carregarExistentes();
   const novos: Record<string, unknown>[] = [];
   const atualizar: Record<string, unknown>[] = [];
+  const ligar: { id: string; empresas: EmpresaPlanilha[] }[] = [];
   const agora = Date.now().toString(36);
   const num = (v: unknown, max: number) => (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= max && v !== 0 ? v : null);
   linhas.forEach((c, i) => {
@@ -1601,12 +1640,15 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
     };
     const existente = acharExistente(idx, { nome, cep: cep ?? '', bairro: bairro ?? '', cidade: cidade ?? '' });
     if (existente) {
-      if (opcoes.existentes === 'completar') atualizar.push({ id: existente.id, ...reg });
-      else res.pulados++;
+      if (opcoes.existentes === 'completar') {
+        atualizar.push({ id: existente.id, ...reg });
+        if (c.empresas?.length) ligar.push({ id: existente.id, empresas: c.empresas });
+      } else res.pulados++;
       return;
     }
     const id = `condo-p${agora}${i.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     novos.push({ id, ...reg });
+    if (c.empresas?.length) ligar.push({ id, empresas: c.empresas });
     // evita duplicar dentro do próprio lote
     const k = chaveNome(nome);
     idx.set(k, [...(idx.get(k) ?? []), { id, name: nome, cep, bairro, cidade }]);
@@ -1653,6 +1695,21 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
       );
       res.atualizados = atualizar.length;
     }
+    // Concepção vinda da planilha (acrescenta, não tira as que já existiam)
+    const cache = new Map<string, string | null>();
+    const vinculos: { developmentId: string; empresaId: string; papel: EmpresaPlanilha['papel'] }[] = [];
+    for (const l of ligar) {
+      const desta = new Map<string, EmpresaPlanilha['papel']>();
+      for (const e of l.empresas.slice(0, 6)) {
+        const empresaId = await resolverEmpresaImport({ nome: typeof e.nome === 'string' ? e.nome : undefined, cnpj: typeof e.cnpj === 'string' ? e.cnpj : undefined }, staff.email, cache);
+        if (!empresaId) continue;
+        const antes = desta.get(empresaId);
+        desta.set(empresaId, antes && antes !== e.papel ? 'construtora_incorporadora' : e.papel);
+      }
+      for (const [empresaId, papel] of desta) vinculos.push({ developmentId: l.id, empresaId, papel });
+    }
+    await acrescentarConcepcao(vinculos);
+    res.empresasLigadas = vinculos.length;
   } catch (e) {
     res.erros.push(e instanceof Error ? e.message.slice(0, 200) : 'Falha ao gravar o lote.');
   }
@@ -1718,7 +1775,7 @@ export async function removerMembro(email: string, transferirPara?: string): Pro
 export async function contarImoveisAVenda(): Promise<number> {
   const r = await query<{ n: string }>(
     `select (select count(*) from properties where is_tipologia = false and visibilidade = 'publico' and finalidade = 'venda' and vendido_em is null)
-          + (select count(*) from developments where status = 'publicado' and delivery_date > now() - interval '6 years') as n`
+          + (select count(*) from developments where status = 'publicado' and delivery_date >= date_trunc('month', now()) - interval '60 months') as n`
   );
   return Number(r[0]?.n) || 0;
 }
@@ -1790,4 +1847,48 @@ export async function registrarLeadWhatsapp(input: {
     ]
   ).catch(() => {});
   return { ok: true };
+}
+
+// ---- Perfil informativo da empresa (construtora/incorporadora) ----
+// Empreendimentos da Concepção da empresa, do mais novo para o mais antigo (pela
+// entrega; breve lançamento primeiro). Paginado (sem rolagem infinita) e com filtros.
+export type FiltrosEmpresa = { cidade?: string; bairro?: string; fase?: string; tipo?: string; q?: string };
+export async function empreendimentosDaEmpresa(
+  empresaId: string,
+  filtros: FiltrosEmpresa,
+  pagina: number,
+  porPagina = 24
+): Promise<{ cards: DevelopmentCardData[]; total: number; cidades: string[]; bairros: string[] }> {
+  if (!/^[0-9a-f-]{36}$/i.test(empresaId)) return { cards: [], total: 0, cidades: [], bairros: [] };
+  const params: unknown[] = [empresaId];
+  const conds = ["d.status = 'publicado'", 'de.empresa_id = $1::uuid'];
+  const p = (v: unknown) => {
+    params.push(v);
+    return `$${params.length}`;
+  };
+  const base = [...conds];
+  if (filtros.cidade) conds.push(`lower(d.cidade) = lower(${p(filtros.cidade)})`);
+  if (filtros.bairro) conds.push(`lower(d.bairro) = lower(${p(filtros.bairro)})`);
+  if (filtros.tipo === 'vertical' || filtros.tipo === 'horizontal') conds.push(`d.tipo = ${p(filtros.tipo)}`);
+  const fase = filtros.fase ? faseSql('d.delivery_date', filtros.fase) : null;
+  if (fase) conds.push(fase);
+  if (filtros.q?.trim()) conds.push(`translate(lower(d.name), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc') like ${p(`%${filtros.q.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}%`)}`);
+  const w = conds.join(' and ');
+  const [lista, total, locais] = await Promise.all([
+    query<{ id: string }>(
+      `select d.id from developments d join development_empresas de on de.development_id = d.id where ${w}
+        order by d.delivery_date desc nulls last, d.name limit ${Math.min(60, porPagina)} offset ${Math.max(0, pagina) * porPagina}`,
+      params
+    ),
+    query<{ n: string }>(`select count(*) as n from developments d join development_empresas de on de.development_id = d.id where ${w}`, params),
+    query<{ cidade: string | null; bairro: string | null }>(
+      `select distinct d.cidade, d.bairro from developments d join development_empresas de on de.development_id = d.id where ${base.join(' and ')}`,
+      [empresaId]
+    )
+  ]);
+  const cardsDesordenados = await getDevelopmentCards(lista.map((r) => r.id));
+  const ordem = new Map(lista.map((r, i) => [r.id, i]));
+  const cards = cardsDesordenados.sort((a, b) => (ordem.get(a.id) ?? 0) - (ordem.get(b.id) ?? 0));
+  const uniq = (v: (string | null)[]) => Array.from(new Set(v.filter((x): x is string => !!x))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  return { cards, total: Number(total[0]?.n) || 0, cidades: uniq(locais.map((l) => l.cidade)), bairros: uniq(locais.map((l) => l.bairro)) };
 }

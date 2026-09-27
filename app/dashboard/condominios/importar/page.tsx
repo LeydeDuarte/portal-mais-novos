@@ -16,7 +16,8 @@ import {
   mesclarCondominios,
   padronizarBairro,
   type CampoPlanilha,
-  type CondoPlanilha
+  type CondoPlanilha,
+  empresasDaLinha
 } from '@/lib/planilha-condominios';
 
 type Arquivo = { nome: string; cabecalho: string[]; linhas: unknown[][]; mapa: Partial<Record<CampoPlanilha, number>> };
@@ -150,7 +151,7 @@ export default function ImportarCondominiosPage() {
     const escolhidas = linhas.filter((l) => l.incluir && (opExist === 'completar' || !l.existe));
     if (!escolhidas.length) return setErro('Nada para importar.');
     setErro(null);
-    const total: ResultadoImport = { criados: 0, atualizados: 0, pulados: 0, erros: [] };
+    const total: ResultadoImport = { criados: 0, atualizados: 0, pulados: 0, erros: [], empresasLigadas: 0 };
     for (let i = 0; i < escolhidas.length; i += LOTE) {
       setStatus(`Gravando ${Math.min(i + LOTE, escolhidas.length)} de ${escolhidas.length}…`);
       const lote = escolhidas.slice(i, i + LOTE).map((l) => ({
@@ -169,12 +170,14 @@ export default function ImportarCondominiosPage() {
         rascunho: l.rascunho,
         lat: l.lat,
         lng: l.lng,
-        videoUrl: l.videoUrl
+        videoUrl: l.videoUrl,
+        empresas: empresasDaLinha(l)
       }));
       try {
         const r = await importarCondominios(lote, { status: opStatus, existentes: opExist });
         total.criados += r.criados;
         total.atualizados += r.atualizados;
+        total.empresasLigadas = (total.empresasLigadas ?? 0) + (r.empresasLigadas ?? 0);
         total.pulados += r.pulados;
         total.erros.push(...r.erros);
       } catch {
@@ -309,6 +312,7 @@ export default function ImportarCondominiosPage() {
             <h2 className="text-base font-bold">Importação concluída</h2>
             <p className="mt-1">
               {resultado.criados} condomínio(s) novo(s) · {resultado.atualizados} já existente(s) completado(s) · {resultado.pulados} pulado(s)
+              {resultado.empresasLigadas ? ` · ${resultado.empresasLigadas} vínculo(s) de construtora/incorporadora (as sem dados da Receita ficam em Painel → Construtoras)` : ''}
             </p>
             {resultado.erros.length > 0 && <p className="mt-1 text-red-700">Erros: {resultado.erros.join(' · ')}</p>}
             <Link href="/dashboard/condominios" className="mt-3 inline-block font-bold underline">
