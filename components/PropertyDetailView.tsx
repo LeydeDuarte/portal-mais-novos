@@ -9,6 +9,7 @@ import RichText from '@/components/RichText';
 import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
+import { Caracteristica, IconeCama, IconeCarro, IconeChuveiro, IconeMetragem, numeroDe } from '@/components/IconesImovel';
 import ContarVisita from '@/components/ContarVisita';
 import CondominioTag from '@/components/CondominioTag';
 import Trilha from '@/components/Trilha';
@@ -206,39 +207,13 @@ export default async function PropertyDetailView({
               {precoM2 && <div className="text-sm text-[var(--text-muted)]">{formatPricePerM2(precoM2)}</div>}
               <div className="mt-1 text-sm text-[var(--text-muted)]">{property.location}</div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-[var(--border)] pt-4">
-                <span className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d={BED_PATH} />
-                  </svg>
-                  {property.beds}
-                </span>
-                <span className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="7" height="7" rx="1" />
-                    <rect x="14" y="3" width="7" height="7" rx="1" />
-                    <rect x="3" y="14" width="7" height="7" rx="1" />
-                    <rect x="14" y="14" width="7" height="7" rx="1" />
-                  </svg>
-                  {property.parking}
-                </span>
-                <span className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 3h7v7H3z" />
-                    <path d="M14 14h7v7h-7z" />
-                    <path d="M10 6.5h4" />
-                    <path d="M17.5 10v4" />
-                  </svg>
-                  {property.area}
-                </span>
-                {property.banheiros && (
-                  <span className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4 12h16 M6 12V6a2 2 0 0 1 2-2h1 M6 20v-2 M18 20v-2" />
-                    </svg>
-                    {property.banheiros}
-                  </span>
-                )}
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <Caracteristica icone={<IconeCama size={19} />} valor={numeroDe(property.beds) != null ? `${numeroDe(property.beds)} quartos` : null} titulo="Quartos" />
+                <Caracteristica icone={<IconeChuveiro size={19} />} valor={numeroDe(property.banheiros) != null ? `${numeroDe(property.banheiros)} banheiros` : null} titulo="Banheiros" />
+                <Caracteristica icone={<IconeCarro size={19} />} valor={numeroDe(property.parking) != null ? `${numeroDe(property.parking)} vagas` : null} titulo="Vagas" />
+                <Caracteristica icone={<IconeMetragem size={19} />} valor={property.area !== '-' ? `${property.area} privativos` : null} titulo="Área privativa" />
+                {property.areaTotal ? <Caracteristica icone={<IconeMetragem size={19} />} valor={`${property.areaTotal.toLocaleString('pt-BR')} m² total`} titulo="Área total" /> : null}
+                {property.areaLote ? <Caracteristica icone={<IconeMetragem size={19} />} valor={`Lote ${property.areaLote.toLocaleString('pt-BR')} m²`} titulo="Área do lote" /> : null}
               </div>
 
               <div className="mt-5">

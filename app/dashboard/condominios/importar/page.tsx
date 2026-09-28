@@ -171,7 +171,9 @@ export default function ImportarCondominiosPage() {
         lat: l.lat,
         lng: l.lng,
         videoUrl: l.videoUrl,
-        empresas: empresasDaLinha(l)
+        empresas: empresasDaLinha(l),
+        quartosOpcoes: l.quartosOpcoes,
+        metragens: l.metragens
       }));
       try {
         const r = await importarCondominios(lote, { status: opStatus, existentes: opExist });
@@ -190,8 +192,8 @@ export default function ImportarCondominiosPage() {
   };
 
   const baixarModelo = () => {
-    const cab = 'Nome do condomínio;Tipo (vertical/horizontal);CEP;UF;Cidade;Bairro;Logradouro;Número;Ano de entrega;Pavimentos;Lazer;Descrição';
-    const ex = 'Residencial Exemplo;Vertical;74215170;GO;Goiânia;Setor Bueno;Rua T-55;120;2019;18;Piscina, academia, salão de festas;Condomínio com lazer completo no Setor Bueno.';
+    const cab = 'Nome do condomínio;Tipo (vertical/horizontal);CEP;UF;Cidade;Bairro;Logradouro;Número;Ano de entrega;Pavimentos;Lazer;Descrição;Concepção (construtoras/incorporadoras);CNPJ Construtora;Tipologias (quartos: 1Q, 2Q, 3Q);Metragem privativa (m²)';
+    const ex = 'Residencial Exemplo;Vertical;74215170;GO;Goiânia;Setor Bueno;Rua T-55;120;2019;18;Piscina, academia, salão de festas;Condomínio com lazer completo no Setor Bueno.;EBM | Consciente;;1Q, 2Q, 3Q;50 | 78 | 140';
     const blob = new Blob(['﻿' + cab + '\n' + ex + '\n'], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

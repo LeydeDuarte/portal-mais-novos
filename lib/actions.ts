@@ -746,6 +746,7 @@ export type CreatePropertyInput = {
   isTipologia?: boolean;
   // novos (set/2026): área do lote (casa), valores mensais e campos só da equipe
   areaLote?: number;
+  areaTotal?: number;
   valorCondominio?: number;
   iptuMensal?: number;
   complemento?: string; // nº da unidade/apto: nunca aparece no site
@@ -800,12 +801,13 @@ function propertyValues(input: PropertyFields) {
     input.valorCondominio && input.valorCondominio > 0 ? input.valorCondominio : null,
     input.iptuMensal && input.iptuMensal > 0 ? input.iptuMensal : null,
     clean(input.complemento?.slice(0, 120)),
-    clean(input.obsInterna?.slice(0, 4000))
+    clean(input.obsInterna?.slice(0, 4000)),
+    input.areaTotal && input.areaTotal > 0 ? input.areaTotal : null
   ];
 }
 const PROPERTY_COLS =
-  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical, plantas, visibilidade, area_lote, valor_condominio, iptu_mensal, complemento, obs_interna';
-const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', '', '::jsonb', '', '', '', '', '', ''];
+  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical, plantas, visibilidade, area_lote, valor_condominio, iptu_mensal, complemento, obs_interna, area_total';
+const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', '', '::jsonb', '', '', '', '', '', '', ''];
 
 export async function createProperty(input: CreatePropertyInput): Promise<void> {
   const staff = await requireStaff();
@@ -903,6 +905,7 @@ export type AnuncioOculto = {
   preco: number | null;
   precoM2: number | null;
   condominio?: string | null;
+  descricao?: string | null; // só na página do anúncio (vai para o Google)
 };
 
 function mascarar(r: PropertyRow, comCondominio = false): AnuncioOculto {
@@ -948,7 +951,14 @@ export async function getOcultosDoCondominio(developmentId: string, nome: string
 /** Resumo para a página de um anúncio privado (sem título, fotos ou descrição) */
 export async function getResumoOculto(id: string): Promise<AnuncioOculto | null> {
   const rows = await query<PropertyRow>("select * from properties where id = $1 and visibilidade = 'privado'", [id]);
-  return rows[0] ? mascarar(rows[0], true) : null;
+  if (!rows[0]) return null;
+  // descrição vai junto (aparece no Google), sem telefones, e-mails e links
+  const descricao = String(rows[0].description ?? '')
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/\S+@\S+\.\S+/g, '')
+    .replace(/(\(?\d{2}\)?\s?)?9?\d{4}[-\s.]?\d{4}/g, '')
+    .trim();
+  return { ...mascarar(rows[0], true), descricao: descricao || null };
 }
 
 // Dados crus para preencher o formulário de edição
@@ -996,7 +1006,8 @@ export async function getPropertyForEdit(id: string): Promise<PropertyEditData |
     valorCondominio: r.valor_condominio != null ? Number(r.valor_condominio) : undefined,
     iptuMensal: r.iptu_mensal != null ? Number(r.iptu_mensal) : undefined,
     complemento: r.complemento ?? undefined,
-    obsInterna: r.obs_interna ?? undefined
+    obsInterna: r.obs_interna ?? undefined,
+    areaTotal: r.area_total != null ? Number(r.area_total) : undefined
   };
 }
 
@@ -1590,6 +1601,8 @@ export type CondoImport = {
   videoUrl?: string;
   // Concepção: nome e/ou CNPJ da construtora e da incorporadora
   empresas?: EmpresaPlanilha[];
+  quartosOpcoes?: number[];
+  metragens?: number[];
 };
 export type ResultadoImport = { criados: number; atualizados: number; pulados: number; erros: string[]; empresasLigadas?: number };
 
@@ -1629,6 +1642,7 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
   const novos: Record<string, unknown>[] = [];
   const atualizar: Record<string, unknown>[] = [];
   const ligar: { id: string; empresas: EmpresaPlanilha[] }[] = [];
+  const metragens: { id: string; areas: number[]; quartos: number[]; tipo: string; tipos: string[]; location: string }[] = [];
   const agora = Date.now().toString(36);
   const num = (v: unknown, max: number) => (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= max && v !== 0 ? v : null);
   linhas.forEach((c, i) => {
@@ -1647,6 +1661,7 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
       pavimentos: c.pavimentos && c.pavimentos > 0 && c.pavimentos < 200 ? Math.round(c.pavimentos) : null,
       amenities: (c.amenities ?? []).filter((a) => typeof a === 'string').slice(0, 30),
       tipos_unidade: Array.from(new Set((c.tiposUnidade ?? []).filter((t) => t in TIPO_UNIDADE_LABEL))),
+      quartos_opcoes: (c.quartosOpcoes ?? []).filter((n) => Number.isInteger(n) && n > 0 && n < 20).slice(0, 10),
       cep,
       logradouro: clean(c.logradouro)?.slice(0, 200) ?? null,
       bairro,
@@ -1663,19 +1678,21 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
       if (opcoes.existentes === 'completar') {
         atualizar.push({ id: existente.id, ...reg });
         if (c.empresas?.length) ligar.push({ id: existente.id, empresas: c.empresas });
+        if (c.metragens?.length) metragens.push({ id: existente.id, areas: c.metragens, quartos: c.quartosOpcoes ?? [], tipo: reg.tipo, tipos: reg.tipos_unidade, location: reg.location });
       } else res.pulados++;
       return;
     }
     const id = `condo-p${agora}${i.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     novos.push({ id, ...reg });
     if (c.empresas?.length) ligar.push({ id, empresas: c.empresas });
+    if (c.metragens?.length) metragens.push({ id, areas: c.metragens, quartos: c.quartosOpcoes ?? [], tipo: reg.tipo, tipos: reg.tipos_unidade, location: reg.location });
     // evita duplicar dentro do próprio lote
     const k = chaveNome(nome);
     idx.set(k, [...(idx.get(k) ?? []), { id, name: nome, cep, bairro, cidade }]);
   });
 
   const COLS = `id text, name text, location text, delivery_date date, description text, tipo text, pavimentos int, amenities jsonb,
-                tipos_unidade jsonb, cep text, logradouro text, bairro text, cidade text, uf text, lat double precision, lng double precision,
+                tipos_unidade jsonb, quartos_opcoes jsonb, cep text, logradouro text, bairro text, cidade text, uf text, lat double precision, lng double precision,
                 video_url text, status text`;
   try {
     if (novos.length) {
@@ -1684,7 +1701,7 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
             aceita_temporada, hero_height, video_url, photos, tipos_unidade, quartos_opcoes, cep, logradouro, bairro, cidade, uf, status, video_vertical,
             lat, lng, origem)
          select r.id, $2, r.name, r.location, r.delivery_date, r.description, r.tipo, r.pavimentos, null, coalesce(r.amenities, '[]'::jsonb),
-            false, 300, r.video_url, '[]'::jsonb, coalesce(r.tipos_unidade, '[]'::jsonb), '[]'::jsonb, r.cep, r.logradouro, r.bairro, r.cidade, r.uf,
+            false, 300, r.video_url, '[]'::jsonb, coalesce(r.tipos_unidade, '[]'::jsonb), coalesce(r.quartos_opcoes, '[]'::jsonb), r.cep, r.logradouro, r.bairro, r.cidade, r.uf,
             r.status, false, r.lat, r.lng, 'planilha'
            from jsonb_to_recordset($1::jsonb) as r(${COLS})`,
         [JSON.stringify(novos), staff.email]
@@ -1700,6 +1717,7 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
             pavimentos = coalesce(d.pavimentos, r.pavimentos),
             amenities = case when jsonb_array_length(coalesce(d.amenities, '[]'::jsonb)) = 0 then coalesce(r.amenities, '[]'::jsonb) else d.amenities end,
             tipos_unidade = case when jsonb_array_length(coalesce(d.tipos_unidade, '[]'::jsonb)) = 0 then coalesce(r.tipos_unidade, '[]'::jsonb) else d.tipos_unidade end,
+            quartos_opcoes = case when jsonb_array_length(coalesce(d.quartos_opcoes, '[]'::jsonb)) = 0 then coalesce(r.quartos_opcoes, '[]'::jsonb) else d.quartos_opcoes end,
             cep = coalesce(nullif(d.cep, ''), r.cep),
             logradouro = coalesce(nullif(d.logradouro, ''), r.logradouro),
             bairro = coalesce(nullif(d.bairro, ''), r.bairro),
@@ -1714,6 +1732,42 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
         [JSON.stringify(atualizar)]
       );
       res.atualizados = atualizar.length;
+    }
+    // Metragens da planilha viram tipologias (sem preço) — só em condomínio que ainda não tem tipologia.
+    // Com a mesma quantidade de quartos e metragens, cada metragem ganha o seu nº de quartos.
+    const linhasTip: Record<string, unknown>[] = [];
+    const semTip = metragens.length
+      ? new Set(
+          (await query<{ id: string }>(
+            'select d.id from developments d where d.id = any($1::text[]) and not exists (select 1 from properties p where p.empreendimento_id = d.id and p.is_tipologia)',
+            [metragens.map((m) => m.id)]
+          )).map((r) => r.id)
+        )
+      : new Set<string>();
+    for (const m of metragens) {
+      if (!semTip.has(m.id)) continue;
+      const tipoUn = m.tipos.find((t) => t in TIPO_UNIDADE_LABEL) ?? (m.tipo === 'horizontal' ? 'casa_condominio' : 'apartamento');
+      m.areas.slice(0, 12).forEach((area, k) =>
+        linhasTip.push({
+          id: `tip-${m.id.slice(-12)}-${k}${Math.random().toString(36).slice(2, 6)}`,
+          empreendimento_id: m.id,
+          area,
+          quartos: m.quartos.length === m.areas.length ? m.quartos[k] : null,
+          tipo_unidade: tipoUn,
+          location: m.location
+        })
+      );
+    }
+    if (linhasTip.length) {
+      await query(
+        `insert into properties (id, corretor_email, is_tipologia, match_score, tipo_unidade, finalidade, price_value, price_period, location, quartos, area,
+            video, aceita_temporada, description, amenities, empreendimento_id, photos, plantas, visibilidade)
+         select r.id, $2, true, 50, r.tipo_unidade, 'venda', 0, 'unico', r.location, r.quartos, r.area, false, false, '', '[]'::jsonb, r.empreendimento_id,
+                '[]'::jsonb, '[]'::jsonb, 'publico'
+           from jsonb_to_recordset($1::jsonb) as r(id text, empreendimento_id text, area numeric, quartos int, tipo_unidade text, location text)
+         on conflict (id) do nothing`,
+        [JSON.stringify(linhasTip), staff.email]
+      );
     }
     // Concepção vinda da planilha (acrescenta, não tira as que já existiam)
     const cache = new Map<string, string | null>();

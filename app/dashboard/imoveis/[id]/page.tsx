@@ -91,6 +91,7 @@ export default function FichaImovel({ params }: { params: { id: string } }) {
                 <Info l="Condomínio (mês)" v={brlPainel(i.valorCondominio)} />
                 <Info l="IPTU (mês)" v={brlPainel(i.iptuMensal)} />
                 <Info l="Área privativa" v={i.area ? `${i.area} m²` : null} />
+                <Info l="Área total" v={i.areaTotal ? `${i.areaTotal} m²` : null} />
                 <Info l="Área do lote" v={i.areaLote ? `${i.areaLote} m²` : null} />
                 <Info l="Quartos" v={i.quartos} />
                 <Info l="Banheiros" v={i.banheiros} />
@@ -100,6 +101,12 @@ export default function FichaImovel({ params }: { params: { id: string } }) {
                 <Info l="Salvamentos" v={String(i.salvamentos)} />
                 <Info l="Compartilhamentos" v={String(i.compartilhamentos)} />
               </div>
+              {i.descricao && (
+                <>
+                  <h2 className="mt-6 text-sm font-bold">Descrição do anúncio</h2>
+                  <div className="mt-2 max-w-3xl whitespace-pre-line rounded-xl border border-[var(--border)] p-4 text-sm leading-relaxed">{i.descricao}</div>
+                </>
+              )}
               {i.obsInterna && (
                 <div className="mt-3 whitespace-pre-line rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
                   <strong>OBS:</strong> {i.obsInterna}

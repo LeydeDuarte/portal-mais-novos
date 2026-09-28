@@ -13,9 +13,9 @@ import type { Cliente } from '@/lib/cliente-auth';
 //   "bueno" Enter → dois balões, mostra os dois bairros).
 // - Nas outras páginas: leva para o feed já com a busca (?q=).
 const NAV = [
-  { label: 'Comprar', href: '/' },
   { label: 'Lançamentos', href: '/lancamentos' },
   { label: 'Financiamento', href: '/financiamento' },
+  { label: 'Venda seu imóvel', href: '/vender' },
   { label: 'News', href: '/news' },
   { label: 'Quem somos', href: '/quem-somos' }
 ];
@@ -131,9 +131,6 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
             </div>
           )}
         </div>
-        <a href="/vender" className="hidden whitespace-nowrap rounded-full bg-ink px-4.5 py-2.5 text-[13px] font-bold text-white hover:opacity-90 md:inline-block">
-          Venda seu imóvel
-        </a>
       </div>
 
       {menuCel && (
@@ -148,7 +145,7 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
                 </svg>
               </button>
             </div>
-            {NAV.map(({ label, href }) => (
+            {NAV.filter((n) => n.href !== '/vender').map(({ label, href }) => (
               <a
                 key={href}
                 href={href}

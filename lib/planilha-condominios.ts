@@ -20,6 +20,9 @@ export type CampoPlanilha =
   | 'lazer'
   | 'construtora'
   | 'incorporadora'
+  | 'concepcao'
+  | 'quartos'
+  | 'metragens'
   | 'cnpjConstrutora'
   | 'cnpjIncorporadora'
   | 'tipos'
@@ -36,6 +39,10 @@ export const CAMPOS: { campo: CampoPlanilha; rotulo: string; obrigatorio?: boole
   // CNPJ antes dos nomes: "CNPJ Construtora" / "Construtora CNPJ" é o CNPJ, não o nome
   { campo: 'cnpjIncorporadora', rotulo: 'CNPJ da incorporadora', re: /cnpj.*incorpor|incorpor.*cnpj/ },
   { campo: 'cnpjConstrutora', rotulo: 'CNPJ da construtora', re: /cnpj.*construt|construt.*cnpj/ },
+  // antes de 'tipos': "Tipologias (quartos: 1Q, 2Q)" são os quartos, não o tipo de imóvel
+  { campo: 'quartos', rotulo: 'Tipologias (quartos: 1Q, 2Q, 3Q)', re: /quarto|dormit|suite/ },
+  { campo: 'metragens', rotulo: 'Metragem privativa (50, 78, 140)', re: /metrag|privativ|area priv|m2|m²/ },
+  { campo: 'concepcao', rotulo: 'Concepção (construtoras/incorporadoras)', re: /concep/ },
   { campo: 'nome', rotulo: 'Nome do condomínio', obrigatorio: true, re: /^(nome|condom|empreend|edif|residencial)/ },
   { campo: 'tipo', rotulo: 'Tipo (vertical/horizontal)', re: /^tipo ?(de )?(condom|empreend)|^tipo$|vertical|horizontal/ },
   { campo: 'tipos', rotulo: 'Tipos de imóvel / uso', re: /tipos? de imov|tipologia|tipo de unidade|^tipo ?(de )?uso/ },
@@ -183,6 +190,9 @@ export type CondoPlanilha = {
   amenities: string[];
   construtora?: string;
   incorporadora?: string;
+  concepcao?: string;
+  quartosOpcoes?: number[];
+  metragens?: number[];
   cnpjConstrutora?: string;
   cnpjIncorporadora?: string;
   problemas: string[];
@@ -264,6 +274,9 @@ export function mesclarCondominios(todas: CondoPlanilha[]): { lista: CondoPlanil
     if (!alvo.videoUrl) alvo.videoUrl = c.videoUrl;
     if (!alvo.construtora) alvo.construtora = c.construtora;
     if (!alvo.incorporadora) alvo.incorporadora = c.incorporadora;
+    if (!alvo.concepcao) alvo.concepcao = c.concepcao;
+    if (!alvo.quartosOpcoes?.length) alvo.quartosOpcoes = c.quartosOpcoes;
+    if (!alvo.metragens?.length) alvo.metragens = c.metragens;
     if (!alvo.cnpjConstrutora) alvo.cnpjConstrutora = c.cnpjConstrutora;
     if (!alvo.cnpjIncorporadora) alvo.cnpjIncorporadora = c.cnpjIncorporadora;
     alvo.amenities = Array.from(new Set([...alvo.amenities, ...c.amenities]));
@@ -381,6 +394,18 @@ export function linhasParaCondominios(linhas: unknown[][], mapa: Partial<Record<
       amenities,
       construtora: txt(get(row, 'construtora')) || undefined,
       incorporadora: txt(get(row, 'incorporadora')) || undefined,
+      concepcao: txt(get(row, 'concepcao')) || undefined,
+      // "1Q, 2Q, 3Q" ou "2 e 3" → [1, 2, 3]
+      quartosOpcoes: Array.from(new Set((txt(get(row, 'quartos')).match(/\d+/g) ?? []).map(Number).filter((n) => n > 0 && n < 20))).sort((a, b) => a - b),
+      // "50, 78, 140, 239" ou "78,5; 120" → [50, 78, 140, 239]
+      metragens: Array.from(
+        new Set(
+          txt(get(row, 'metragens'))
+            .split(/;|\||\/|,\s+|\s+e\s+|\s{2,}/)
+            .map((x) => Number(x.replace(/[^\d,.]/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.')))
+            .filter((n) => n >= 15 && n < 100000)
+        )
+      ).sort((a, b) => a - b),
       cnpjConstrutora: txt(get(row, 'cnpjConstrutora')) || undefined,
       cnpjIncorporadora: txt(get(row, 'cnpjIncorporadora')) || undefined,
       problemas,
@@ -435,14 +460,15 @@ export function lerCsv(texto: string): string[][] {
  * construtora e incorporadora vira "construtora e incorporadora".
  */
 export type EmpresaPlanilha = { nome?: string; cnpj?: string; papel: 'construtora' | 'incorporadora' | 'construtora_incorporadora' };
-export function empresasDaLinha(c: { construtora?: string; incorporadora?: string; cnpjConstrutora?: string; cnpjIncorporadora?: string }): EmpresaPlanilha[] {
+export function empresasDaLinha(c: { construtora?: string; incorporadora?: string; concepcao?: string; cnpjConstrutora?: string; cnpjIncorporadora?: string }): EmpresaPlanilha[] {
   const partes = (v?: string) => (v ?? '').split(/\s*(?:;|\||\s\/\s)\s*/).map((x) => x.trim()).filter(Boolean);
   const cnpjs = (v?: string) => partes(v).map((x) => x.replace(/\D/g, '')).filter((x) => x.length === 14 || x.length === 13 || x.length === 12).map((x) => x.padStart(14, '0'));
   const montar = (nomes: string[], docs: string[], papel: EmpresaPlanilha['papel']) =>
     Array.from({ length: Math.max(nomes.length, docs.length) }, (_, i) => ({ nome: nomes[i], cnpj: docs[i], papel }));
   const lista = [
     ...montar(partes(c.construtora), cnpjs(c.cnpjConstrutora), 'construtora'),
-    ...montar(partes(c.incorporadora), cnpjs(c.cnpjIncorporadora), 'incorporadora')
+    ...montar(partes(c.incorporadora), cnpjs(c.cnpjIncorporadora), 'incorporadora'),
+    ...montar(partes(c.concepcao), [], 'construtora_incorporadora')
   ].filter((e) => e.nome || e.cnpj);
   const out: EmpresaPlanilha[] = [];
   for (const e of lista) {

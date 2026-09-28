@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ContatoLateral from '@/components/ContatoLateral';
+import { semTravessoes } from '@/lib/text';
 import type { AnuncioOculto } from '@/lib/actions';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import IconeOlhoCortado from '@/components/IconeOlhoCortado';
@@ -61,6 +62,13 @@ export default function OcultoView({ a, bloqueado = false }: { a: AnuncioOculto;
                 detalhes.
               </p>
             </div>
+
+            {a.descricao && (
+              <>
+                <h2 className="mt-8 mb-3 text-lg font-bold">Sobre o imóvel</h2>
+                <div className="whitespace-pre-line text-[15px] leading-relaxed">{semTravessoes(a.descricao)}</div>
+              </>
+            )}
 
             <h2 className="mt-8 mb-3 text-lg font-bold">Características</h2>
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">

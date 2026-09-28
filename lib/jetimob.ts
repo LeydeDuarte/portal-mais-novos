@@ -658,6 +658,21 @@ function lerDonos(bruto: Record<string, unknown>): Dono[] {
 
 async function completarDonoEComplemento(propertyId: string, imovel: unknown): Promise<void> {
   const b = (imovel ?? {}) as Record<string, unknown>;
+  // Áreas: total (apartamento) e terreno/lote (casa) — completa só se estiver vazio
+  const num = (v: unknown) => {
+    const n = Number(typeof v === 'string' ? v.replace(',', '.') : v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const fator = String(b.medida ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === 'ha' ? 10000 : 1;
+  const privativa = num(b.area_privativa) ?? num(b.area_util);
+  const total = num(b.area_total);
+  const terreno = num(b.area_terreno) ?? num(b.area_lote) ?? num(b.terreno) ?? num(b.area_terreno_total);
+  const tipo = String(b.tipo ?? b.subtipo ?? '').toLowerCase();
+  const ehCasaOuLote = /casa|sobrado|lote|terreno|ch[aá]cara|s[ií]tio|fazenda/.test(tipo);
+  const lote = terreno ?? (ehCasaOuLote && total && (!privativa || total > privativa) ? total : null);
+  const areaTotal = !ehCasaOuLote && total && (!privativa || total >= privativa) ? total : null;
+  if (lote) await query('update properties set area_lote = $2 where id = $1 and area_lote is null', [propertyId, Math.round(lote * fator * 100) / 100]);
+  if (areaTotal) await query('update properties set area_total = $2 where id = $1 and area_total is null', [propertyId, Math.round(areaTotal * fator * 100) / 100]);
   const comp = [b.endereco_complemento, b.complemento, b.unidade, b.endereco_unidade].find((v) => typeof v === 'string' && v.trim()) as string | undefined;
   if (comp) await query("update properties set complemento = $2 where id = $1 and coalesce(complemento, '') = ''", [propertyId, comp.trim().slice(0, 120)]);
   const donos = lerDonos(b);

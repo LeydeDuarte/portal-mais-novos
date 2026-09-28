@@ -104,7 +104,7 @@ export async function salvarDestaque(d: DestaqueInput): Promise<{ ok: boolean; e
   if (!titulo) return { ok: false, erro: 'Informe o título.' };
   if (d.link && !urlOk(d.link)) return { ok: false, erro: 'Link inválido. Use um endereço começando com https:// ou uma página do site (ex.: /financiamento).' };
   const vals = [
-    txt(d.selo, 24) ?? 'Destaque',
+    txt(d.selo, 24) ?? 'Publi',
     titulo,
     txt(d.texto, 300),
     urlOk(d.imagem),

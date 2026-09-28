@@ -25,6 +25,8 @@ export type ImovelPainel = {
   uf: string | null;
   area: number | null;
   areaLote: number | null;
+  areaTotal: number | null;
+  descricao: string;
   quartos: number | null;
   banheiros: number | null;
   vagas: number | null;
@@ -67,6 +69,8 @@ function mapear(r: Row): ImovelPainel {
     uf: (r.uf as string) ?? null,
     area: n(r.area),
     areaLote: n(r.area_lote),
+    areaTotal: n(r.area_total),
+    descricao: String(r.description ?? ''),
     quartos: n(r.quartos),
     banheiros: n(r.banheiros),
     vagas: n(r.vagas),

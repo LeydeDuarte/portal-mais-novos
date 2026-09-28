@@ -89,6 +89,7 @@ export default function ImovelCardPainel({
         </Link>
       </div>
 
+      {i.descricao && <p className="mx-3 -mt-1 mb-2 line-clamp-2 text-[12px] leading-snug text-[var(--text-muted)]">{i.descricao.replace(/[#*_>-]+/g, ' ')}</p>}
       {i.obsInterna && (
         <div className="mx-3 -mt-1 mb-2 line-clamp-2 rounded-xl bg-amber-50 px-2.5 py-1.5 text-[11.5px] text-amber-900 dark:bg-amber-950 dark:text-amber-200">
           <strong>OBS:</strong> {i.obsInterna}

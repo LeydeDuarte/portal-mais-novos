@@ -45,7 +45,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const t = tituloOculto(a);
   return {
     title: `${t}, anúncio privado | Mais Novos Imóveis`,
-    description: `${t}${a.preco ? `, ${brlCurto(a.preco)}` : ''}. Anúncio privado: solicite as fotos e o endereço com a Mais Novos Imóveis.`,
+    description: (a.descricao ? `${t}. ${a.descricao.replace(/\s+/g, ' ')}` : `${t}${a.preco ? `, ${brlCurto(a.preco)}` : ''}. Anúncio privado: solicite as fotos e o endereço com a Mais Novos Imóveis.`).slice(0, 160),
     alternates: { canonical: `${SITE_URL}/imovel/${(await resolver(params.id))?.id ?? params.id}` },
     ...(searchParams.l ? { robots: { index: false, follow: false } } : {})
   };

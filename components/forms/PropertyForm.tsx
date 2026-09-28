@@ -45,6 +45,7 @@ type Values = {
   photos: string[];
   plantas: string[];
   areaLote: string;
+  areaTotal: string;
   valorCondominio: string;
   iptuMensal: string;
   complemento: string;
@@ -75,6 +76,7 @@ const EMPTY: Values = {
   endereco: ENDERECO_VAZIO,
   photos: [],
   areaLote: '',
+  areaTotal: '',
   valorCondominio: '',
   iptuMensal: '',
   complemento: '',
@@ -109,6 +111,7 @@ function fromEditData(d: PropertyEditData): Values {
     endereco: { cep: d.cep ?? '', logradouro: d.logradouro ?? '', bairro: d.bairro ?? '', cidade: d.cidade ?? '', uf: d.uf ?? '' },
     photos: d.photos ?? [],
     areaLote: d.areaLote ? String(d.areaLote) : '',
+    areaTotal: d.areaTotal ? String(d.areaTotal) : '',
     valorCondominio: d.valorCondominio ? String(Math.round(d.valorCondominio)) : '',
     iptuMensal: d.iptuMensal ? String(Math.round(d.iptuMensal)) : '',
     complemento: d.complemento ?? '',
@@ -203,6 +206,7 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         condominio: v.condominio || undefined,
         ...v.endereco,
         areaLote: v.areaLote ? Number(v.areaLote.replace(',', '.')) : undefined,
+        areaTotal: v.areaTotal ? Number(v.areaTotal.replace(',', '.')) : undefined,
         valorCondominio: Number(v.valorCondominio.replace(/\D/g, '')) || undefined,
         iptuMensal: Number(v.iptuMensal.replace(/\D/g, '')) || undefined,
         complemento: v.complemento || undefined,
@@ -306,6 +310,10 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-[var(--text-muted)]">Área privativa (m²)</label>
           <input required type="number" className={inputClass} value={v.area} onChange={(e) => set('area', e.target.value)} placeholder="98" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Área total (m²)</label>
+          <input type="number" className={inputClass} value={v.areaTotal} onChange={(e) => set('areaTotal', e.target.value)} placeholder="Só aparece no site se preencher" />
         </div>
         {['casa', 'sobrado', 'casa_condominio', 'terreno_lote', 'chacara_sitio_fazenda'].includes(v.tipoUnidade) && (
           <div className="flex flex-col gap-1">

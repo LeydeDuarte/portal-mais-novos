@@ -8,6 +8,7 @@ import ImagemCapa from '@/components/ImagemCapa';
 import { altFoto } from '@/lib/seo';
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { Caracteristica, IconeCama, IconeCarro, IconeChuveiro, IconeMetragem, numeroDe } from './IconesImovel';
 import type { Property } from '@/lib/mock-properties';
 import { useVideoAutoplay } from '@/lib/video-rotation';
 import { getEmbedInfo } from '@/lib/video-embed';
@@ -93,7 +94,7 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
   const badge = getStatusBadge(property.deliveryDate);
 
   return (
-    <div className="mb-2.5 inline-block w-full break-inside-avoid md:mb-4">
+    <div className="mb-5 inline-block w-full break-inside-avoid md:mb-7">
       <Link href={urlImovel(property)} className="block">
         <div
           ref={setRefs}
@@ -180,11 +181,11 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">
             {property.location}
           </div>
-          <div className="mt-0.5 flex flex-wrap items-center gap-2.5">
-            <Spec icon={<path d={BED_PATH} />}>{property.beds}</Spec>
-            <Spec icon={CAR_ICON}>{property.parking}</Spec>
-            {property.banheiros && <Spec icon={<path d={BATH_PATH} />}>{property.banheiros}</Spec>}
-            <Spec icon={AREA_ICON}>{property.area}</Spec>
+          <div className="mt-1 flex flex-wrap items-center gap-3">
+            <Caracteristica icone={<IconeCama />} valor={numeroDe(property.beds)} titulo="Quartos" />
+            <Caracteristica icone={<IconeChuveiro />} valor={numeroDe(property.banheiros)} titulo="Banheiros" />
+            <Caracteristica icone={<IconeCarro />} valor={numeroDe(property.parking)} titulo="Vagas" />
+            <Caracteristica icone={<IconeMetragem />} valor={property.areaValue ? `${property.areaValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} m²` : null} titulo="Área privativa" />
           </div>
         </div>
       </Link>

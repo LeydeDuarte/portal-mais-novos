@@ -34,6 +34,10 @@ export type Property = {
   bairro?: string;
   uf?: string;
   slug?: string;
+  areaTotal?: number;
+  areaLote?: number;
+  valorCondominio?: number;
+  iptuMensal?: number;
   cidade?: string;
   isTipologia?: boolean; // linha da tabela de vendas de um empreendimento (não é um anúncio avulso)
   height: number;

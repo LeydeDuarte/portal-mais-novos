@@ -10,7 +10,7 @@ export type DepoimentoCard = {
 
 export type DestaqueCard = {
   id: string;
-  selo: string; // texto da barrinha (padrão "Destaque")
+  selo: string; // etiqueta pequena (padrão "Publi")
   titulo: string;
   texto: string | null;
   imagem: string | null;

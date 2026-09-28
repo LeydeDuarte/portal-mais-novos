@@ -45,7 +45,7 @@ export default function DevelopmentCard({ development, prioridade = false }: { d
   // Sem foto: card compacto, só com as informações (não mostra espaço de foto vazio)
   if (!cover) {
     return (
-      <div className="mb-2.5 inline-block w-full break-inside-avoid md:mb-4">
+      <div className="mb-5 inline-block w-full break-inside-avoid md:mb-7">
         <Link href={urlCondominio(development)} className="block rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4 transition-colors hover:bg-[var(--pill-bg)] md:border-[#E7EAEE] md:bg-[#F6F7F9] md:hover:bg-[#EEF1F4]">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
@@ -73,7 +73,7 @@ export default function DevelopmentCard({ development, prioridade = false }: { d
   }
 
   return (
-    <div className="mb-2.5 inline-block w-full break-inside-avoid md:mb-4">
+    <div className="mb-5 inline-block w-full break-inside-avoid md:mb-7">
       <Link href={urlCondominio(development)} className="block">
         <div
           className="group relative flex items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)]"
