@@ -10,23 +10,45 @@ import JsonLd from '@/components/JsonLd';
 import { query } from '@/lib/db';
 import { mapEmpresa, type EmpresaRow } from '@/lib/empresas';
 import { empreendimentosDaEmpresa } from '@/lib/actions';
-import { empresaAtiva, formatarCnpj, idadeEmpresa, nomeEmpresa, textoSituacao } from '@/lib/empresas-tipos';
+import { dataBRCompleta, empresaAtiva, idadeEmpresa, nomeEmpresa, situacaoPublica, type Empresa } from '@/lib/empresas-tipos';
 import { BUCKET_LABEL, FASES } from '@/lib/classification';
 import { SITE_NAME, SITE_URL } from '@/lib/seo';
 
-// Perfil INFORMATIVO da construtora/incorporadora: dados públicos do CNPJ (situação,
+// Perfil INFORMATIVO da construtora/incorporadora: dados públicos da Receita (situação,
 // idade), breve histórico e todos os empreendimentos em que ela participou da
 // Concepção, do mais novo para o mais antigo. Não é personalizável pela empresa
 // (o "perfil de comunicação" delas virá depois, em domínio próprio).
 const POR_PAGINA = 24;
 
 const buscar = cache(async (slug: string) => {
-  const r = await query<EmpresaRow>(
-    'select e.*, (select count(*) from development_empresas de join developments d on d.id = de.development_id where de.empresa_id = e.id and d.status = \'publicado\') as total from empresas e where e.slug = $1',
-    [decodeURIComponent(slug)]
+  const r = await query<EmpresaRow>('select e.* from empresas e where e.slug = $1', [decodeURIComponent(slug)]).catch(() => []);
+  if (!r[0]) return null;
+  const e = mapEmpresa(r[0]);
+  // grupo: a principal reúne as empresas ligadas a ela
+  const membros = e.grupoPrincipalId
+    ? []
+    : (await query<EmpresaRow>('select * from empresas where grupo_principal_id = $1::uuid order by coalesce(nome_perfil, nome_fantasia, razao_social)', [e.id]).catch(() => [])).map(mapEmpresa);
+  const principal = e.grupoPrincipalId
+    ? ((await query<EmpresaRow>('select * from empresas where id = $1::uuid', [e.grupoPrincipalId]).catch(() => [])).map(mapEmpresa)[0] ?? null)
+    : null;
+  const ids = [e.id, ...membros.map((m) => m.id)];
+  const t = await query<{ n: string }>(
+    `select count(distinct d.id) as n from development_empresas de join developments d on d.id = de.development_id where de.empresa_id = any($1::uuid[]) and d.status = 'publicado'`,
+    [ids]
   ).catch(() => []);
-  return r[0] ? mapEmpresa(r[0]) : null;
+  return { ...e, totalEmpreendimentos: Number(t[0]?.n) || 0, membros, principal, ids };
 });
+
+/** Texto do perfil: a história escrita pela equipe ou um resumo automático só com fatos */
+function historia(e: Empresa & { membros: Empresa[] }, idade: { anos: number } | null): string {
+  if (e.historico?.trim()) return e.historico.trim();
+  const nome = nomeEmpresa(e);
+  const ano = e.anoFundacao ?? (e.dataInicio ? Number(e.dataInicio.slice(0, 4)) : null);
+  const partes = [nome];
+  if (e.municipio) partes.push(`, com sede em ${e.municipio}/${e.uf}`);
+  if (ano) partes.push(`, atua no mercado imobiliário desde ${ano}${idade && idade.anos > 1 ? ` (${idade.anos} anos)` : ''}`);
+  return `${partes.join('')}.`;
+}
 
 type Props = { params: { slug: string }; searchParams: { cidade?: string; bairro?: string; fase?: string; tipo?: string; q?: string; pagina?: string } };
 
@@ -34,10 +56,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const e = await buscar(params.slug);
   if (!e) return { title: 'Empresa não encontrada' };
   const nome = nomeEmpresa(e);
-  const idade = idadeEmpresa(e.dataInicio);
-  const desc = `${nome}: ${e.totalEmpreendimentos ?? 0} empreendimento(s)${e.municipio ? ` em ${e.municipio}/${e.uf}` : ''}. ${
-    idade ? `Empresa com ${idade.texto} de CNPJ` : 'Construtora e incorporadora'
-  }${textoSituacao(e) ? `, ${textoSituacao(e)?.toLowerCase()}` : ''}. Veja lançamentos, obras e prontos.`;
+  const idade = idadeEmpresa(e.dataInicio, undefined, e.anoFundacao);
+  const desc = `${nome}: ${e.totalEmpreendimentos ?? 0} empreendimento(s)${e.municipio ? `, sede em ${e.municipio}/${e.uf}` : ''}. ${
+    idade ? `Empresa com ${idade.texto} de mercado` : 'Construtora e incorporadora'
+  }. Veja lançamentos, obras e prontos do portfólio.`;
   return {
     title: `${nome}: empreendimentos e condomínios`,
     description: desc.slice(0, 160),
@@ -51,11 +73,12 @@ export default async function EmpresaPage({ params, searchParams }: Props) {
   if (!e) notFound();
   const pagina = Math.max(1, Number(searchParams.pagina) || 1);
   const filtros = { cidade: searchParams.cidade, bairro: searchParams.bairro, fase: searchParams.fase, tipo: searchParams.tipo, q: searchParams.q };
-  const { cards, total, cidades, bairros } = await empreendimentosDaEmpresa(e.id, filtros, pagina - 1, POR_PAGINA);
+  const { cards, total, cidades, bairros } = await empreendimentosDaEmpresa(e.ids, filtros, pagina - 1, POR_PAGINA);
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const nome = nomeEmpresa(e);
   const ativa = empresaAtiva(e);
-  const idade = idadeEmpresa(e.dataInicio);
+  const idade = idadeEmpresa(e.dataInicio, undefined, e.anoFundacao);
+  const situacao = situacaoPublica(e);
   const filtrando = !!(filtros.cidade || filtros.bairro || filtros.fase || filtros.tipo || filtros.q);
   const link = (pg: number) => {
     const sp = new URLSearchParams();
@@ -74,9 +97,7 @@ export default async function EmpresaPage({ params, searchParams }: Props) {
           '@context': 'https://schema.org',
           '@type': 'Organization',
           name: nome,
-          legalName: e.razaoSocial,
-          ...(e.cnpj ? { taxID: formatarCnpj(e.cnpj) } : {}),
-          ...(e.dataInicio ? { foundingDate: e.dataInicio } : {}),
+          ...(e.anoFundacao ? { foundingDate: String(e.anoFundacao) } : e.dataInicio ? { foundingDate: e.dataInicio } : {}),
           ...(e.municipio ? { address: { '@type': 'PostalAddress', addressLocality: e.municipio, addressRegion: e.uf, addressCountry: 'BR' } } : {}),
           url: `${SITE_URL}/empresa/${e.slug}`
         }}
@@ -86,14 +107,23 @@ export default async function EmpresaPage({ params, searchParams }: Props) {
 
         <section className="mt-4 rounded-2xl border border-[var(--border)] p-6">
           <h1 className={`font-serif text-3xl font-semibold ${ativa ? '' : 'text-[var(--text-faint)]'}`}>{nome}</h1>
-          <div className="mt-1 text-sm text-[var(--text-muted)]">
-            {[e.razaoSocial !== nome ? e.razaoSocial : null, e.cnpj ? `CNPJ ${formatarCnpj(e.cnpj)}` : null].filter(Boolean).join(' · ')}
-          </div>
           <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            {textoSituacao(e) && (
-              <span className={`rounded-full px-3 py-1 font-bold ${ativa ? 'bg-green-100 text-green-800' : 'bg-[var(--pill-bg)] text-[var(--text-muted)]'}`}>{textoSituacao(e)}</span>
+            {situacao && (
+              <span className={`rounded-full px-3 py-1 font-bold ${ativa ? 'bg-green-100 text-green-800' : situacao === 'Em recuperação judicial' ? 'bg-amber-100 text-amber-900' : 'bg-[var(--pill-bg)] text-[var(--text-muted)]'}`}>
+                {situacao}
+              </span>
             )}
-            {idade && <span className="rounded-full bg-[var(--pill-bg)] px-3 py-1 font-semibold">{idade.texto} de empresa (desde {e.dataInicio!.slice(0, 4)})</span>}
+            {e.anoFundacao ? (
+              <span className="rounded-full bg-[var(--pill-bg)] px-3 py-1 font-semibold">
+                Fundada em {e.anoFundacao}
+                {idade ? ` · ${idade.texto}` : ''}
+              </span>
+            ) : e.dataInicio ? (
+              <span className="rounded-full bg-[var(--pill-bg)] px-3 py-1 font-semibold">
+                Aberta em {dataBRCompleta(e.dataInicio)}
+                {idade ? ` · ${idade.texto}` : ''}
+              </span>
+            ) : null}
             {e.municipio && (
               <span className="rounded-full bg-[var(--pill-bg)] px-3 py-1 font-semibold">
                 Sede: {e.municipio}/{e.uf}
@@ -101,15 +131,29 @@ export default async function EmpresaPage({ params, searchParams }: Props) {
             )}
             <span className="rounded-full bg-accent/10 px-3 py-1 font-bold text-accent">{e.totalEmpreendimentos ?? 0} empreendimento(s)</span>
           </div>
-          {e.historico ? (
-            <p className="mt-4 max-w-3xl whitespace-pre-line text-[15px] leading-relaxed">{e.historico}</p>
-          ) : e.atividade ? (
-            <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-[var(--text-muted)]">Atividade principal registrada na Receita Federal: {e.atividade}.</p>
-          ) : null}
-          <p className="mt-4 text-xs text-[var(--text-faint)]">
-            {e.cnpj ? `Dados cadastrais públicos da Receita Federal${e.receitaAtualizadaEm ? `, consultados em ${new Date(e.receitaAtualizadaEm).toLocaleDateString('pt-BR')}` : ''}. ` : ''}Perfil
-            informativo: reúne os empreendimentos de que a empresa participou para quem vai comprar saber quem fez.
+          <p className="mt-4 max-w-3xl whitespace-pre-line text-[15px] leading-relaxed">{historia(e, idade)}</p>
+          <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-[var(--text-muted)]">
+            Aqui você vê os empreendimentos que fazem parte do portfólio {e.membros.length ? 'desta empresa e das empresas do grupo' : 'desta empresa'}.
           </p>
+          {e.membros.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-faint)]">Empresas do grupo</span>
+              {e.membros.map((m) => (
+                <Link key={m.id} href={`/empresa/${m.slug}`} className={`rounded-full border border-[var(--border)] px-3 py-1 font-semibold hover:border-accent ${empresaAtiva(m) ? '' : 'text-[var(--text-faint)]'}`}>
+                  {nomeEmpresa(m)}
+                </Link>
+              ))}
+            </div>
+          )}
+          {e.principal && (
+            <p className="mt-4 text-sm">
+              Faz parte do grupo{' '}
+              <Link href={`/empresa/${e.principal.slug}`} className="font-bold text-accent hover:underline">
+                {nomeEmpresa(e.principal)}
+              </Link>
+              .
+            </p>
+          )}
         </section>
 
         <h2 className="mt-10 font-serif text-2xl font-semibold">Empreendimentos e condomínios</h2>

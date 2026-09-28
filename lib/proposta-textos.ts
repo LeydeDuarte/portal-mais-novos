@@ -21,6 +21,7 @@ export const STATUS_PROPOSTA: Record<string, string> = {
   enviada_proprietario: 'Enviada ao proprietário',
   aceita: 'Aceita',
   recusada: 'Recusada',
+  cancelada: 'Cancelada',
   arquivada: 'Arquivada'
 };
 export const brl = (n: number | null | undefined) => (n ? n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : '');

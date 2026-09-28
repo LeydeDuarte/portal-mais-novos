@@ -4,7 +4,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { query } from '@/lib/db';
 import { mapEmpresa, type EmpresaRow } from '@/lib/empresas';
-import { empresaAtiva, idadeEmpresa, nomeEmpresa, textoSituacao } from '@/lib/empresas-tipos';
+import { empresaAtiva, idadeEmpresa, nomeEmpresa, situacaoPublica } from '@/lib/empresas-tipos';
 import { SITE_NAME, SITE_URL } from '@/lib/seo';
 
 export const metadata: Metadata = {
@@ -20,8 +20,8 @@ export default async function EmpresasPage({ searchParams }: { searchParams: { q
   const rows = await query<EmpresaRow>(
     `select e.*, (select count(*) from development_empresas de join developments d on d.id = de.development_id where de.empresa_id = e.id and d.status = 'publicado') as total
        from empresas e
-      where $1 = '' or translate(lower(coalesce(e.nome_fantasia, '') || ' ' || e.razao_social), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc') like $2
-      order by total desc, coalesce(e.nome_fantasia, e.razao_social) limit 300`,
+      where $1 = '' or translate(lower(coalesce(e.nome_perfil, '') || ' ' || coalesce(e.nome_fantasia, '') || ' ' || e.razao_social), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc') like $2
+      order by total desc, coalesce(e.nome_perfil, e.nome_fantasia, e.razao_social) limit 300`,
     [q, like]
   ).catch(() => []);
   const empresas = rows.map(mapEmpresa).filter((e) => (e.totalEmpreendimentos ?? 0) > 0 || q);
@@ -42,12 +42,12 @@ export default async function EmpresasPage({ searchParams }: { searchParams: { q
         ) : (
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             {empresas.map((e) => {
-              const idade = idadeEmpresa(e.dataInicio);
+              const idade = idadeEmpresa(e.dataInicio, undefined, e.anoFundacao);
               return (
                 <Link key={e.id} href={`/empresa/${e.slug}`} className="rounded-2xl border border-[var(--border)] p-4 hover:border-accent">
                   <div className={`font-serif text-lg font-semibold ${empresaAtiva(e) ? '' : 'text-[var(--text-faint)]'}`}>{nomeEmpresa(e)}</div>
                   <div className="mt-1 text-xs text-[var(--text-muted)]">
-                    {[textoSituacao(e), idade ? `${idade.texto} de empresa` : null, e.municipio ? `${e.municipio}/${e.uf}` : null].filter(Boolean).join(' · ')}
+                    {[situacaoPublica(e), idade ? `${idade.texto} de mercado` : null, e.municipio ? `${e.municipio}/${e.uf}` : null].filter(Boolean).join(' · ')}
                   </div>
                   <div className="mt-2 text-sm font-bold text-accent">{e.totalEmpreendimentos ?? 0} empreendimento(s)</div>
                 </Link>

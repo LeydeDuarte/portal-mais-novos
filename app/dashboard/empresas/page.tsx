@@ -7,7 +7,7 @@ import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { atualizarPelaReceita, buscarEmpresas, cadastrarPorCnpj, completarPendentesReceita, contarPendentesReceita, definirCnpj, excluirEmpresa, salvarEmpresa } from '@/lib/actions-empresas';
-import { empresaAtiva, formatarCnpj, idadeEmpresa, nomeEmpresa, textoSituacao, type Empresa } from '@/lib/empresas-tipos';
+import { empresaAtiva, formatarCnpj, idadeEmpresa, nomeEmpresa, situacaoPublica, type Empresa } from '@/lib/empresas-tipos';
 import { SITE_URL } from '@/lib/seo';
 
 const input = 'w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 text-sm outline-none focus:border-accent';
@@ -22,7 +22,7 @@ export default function EmpresasPainel() {
   const [cnpj, setCnpj] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
   const [editando, setEditando] = useState<Empresa | null>(null);
-  const [form, setForm] = useState({ nomeFantasia: '', historico: '' });
+  const [form, setForm] = useState({ nomePerfil: '', historico: '', anoFundacao: '', grupoPrincipalId: '' });
   const [ocupado, setOcupado] = useState(false);
   const [soSemCnpj, setSoSemCnpj] = useState(false);
   const [pendentes, setPendentes] = useState(0);
@@ -128,7 +128,7 @@ export default function EmpresasPainel() {
             <p className="text-sm text-[var(--text-muted)]">Nenhuma empresa{q ? ' com essa busca' : ' cadastrada ainda'}.</p>
           ) : (
             lista.filter((e) => !soSemCnpj || !e.cnpj).map((e) => {
-              const idade = idadeEmpresa(e.dataInicio);
+              const idade = idadeEmpresa(e.dataInicio, undefined, e.anoFundacao);
               const aberto = editando?.id === e.id;
               return (
                 <div key={e.id} className="rounded-xl border border-[var(--border)] p-4">
@@ -144,7 +144,7 @@ export default function EmpresasPainel() {
                           <span className="font-bold text-amber-700">Sem CNPJ (cadastrada pelo nome)</span>
                         )}
                         <br />
-                        {[textoSituacao(e), idade ? `${idade.texto} de empresa` : null, e.municipio ? `${e.municipio}/${e.uf}` : null, `${e.totalEmpreendimentos ?? 0} empreendimento(s)`]
+                        {[situacaoPublica(e), e.grupoPrincipalId ? `grupo: ${nomeEmpresa((lista ?? []).find((x) => x.id === e.grupoPrincipalId) ?? { razaoSocial: 'outra empresa', nomeFantasia: null })}` : null, idade ? `${idade.texto} de empresa` : null, e.municipio ? `${e.municipio}/${e.uf}` : null, `${e.totalEmpreendimentos ?? 0} empreendimento(s)`]
                           .filter(Boolean)
                           .join(' · ')}
                       </div>
@@ -169,7 +169,7 @@ export default function EmpresasPainel() {
                         type="button"
                         onClick={() => {
                           setEditando(aberto ? null : e);
-                          setForm({ nomeFantasia: e.nomeFantasia ?? '', historico: e.historico ?? '' });
+                          setForm({ nomePerfil: e.nomePerfil ?? '', historico: e.historico ?? '', anoFundacao: e.anoFundacao ? String(e.anoFundacao) : '', grupoPrincipalId: e.grupoPrincipalId ?? '' });
                         }}
                         className="rounded-full bg-ink px-3.5 py-1.5 text-sm font-bold text-white"
                       >
@@ -208,25 +208,63 @@ export default function EmpresasPainel() {
                   )}
                   {aberto && (
                     <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4">
+                      <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
+                        <label className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                          Nome do perfil (o nome usado hoje no marketing; vale sobre o da Receita)
+                          <input
+                            className={`${input} mt-1 normal-case`}
+                            value={form.nomePerfil}
+                            onChange={(ev) => setForm({ ...form, nomePerfil: ev.target.value })}
+                            placeholder={e.nomeFantasia ?? e.razaoSocial}
+                          />
+                        </label>
+                        <label className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                          Ano de fundação
+                          <input
+                            className={`${input} mt-1`}
+                            inputMode="numeric"
+                            value={form.anoFundacao}
+                            onChange={(ev) => setForm({ ...form, anoFundacao: ev.target.value.replace(/\D/g, '').slice(0, 4) })}
+                            placeholder={e.dataInicio ? e.dataInicio.slice(0, 4) : 'ex.: 1981'}
+                          />
+                        </label>
+                      </div>
+                      <p className="-mt-1 text-xs text-[var(--text-faint)]">
+                        Ano de fundação: use quando a empresa é mais antiga que o CNPJ atual. A idade no site passa a contar a partir dele.
+                      </p>
                       <label className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                        Nome fantasia (como aparece no site)
-                        <input className={`${input} mt-1 normal-case`} value={form.nomeFantasia} onChange={(ev) => setForm({ ...form, nomeFantasia: ev.target.value })} placeholder={e.razaoSocial} />
+                        Grupo: faz parte do grupo de…
+                        <select className={`${input} mt-1 normal-case`} value={form.grupoPrincipalId} onChange={(ev) => setForm({ ...form, grupoPrincipalId: ev.target.value })}>
+                          <option value="">Não faz parte de outro grupo (ou é a principal)</option>
+                          {(lista ?? [])
+                            .filter((x) => x.id !== e.id && !x.grupoPrincipalId)
+                            .map((x) => (
+                              <option key={x.id} value={x.id}>
+                                {nomeEmpresa(x)}
+                              </option>
+                            ))}
+                        </select>
                       </label>
+                      <p className="-mt-1 text-xs text-[var(--text-faint)]">
+                        Ex.: EBM Urbanismo faz parte do grupo da EBM. O perfil da principal mostra os empreendimentos de todas as empresas do grupo. Se a
+                        principal não aparecer na lista, busque o nome dela no campo de busca acima.
+                      </p>
                       <label className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                        Breve histórico ({form.historico.length}/2000)
+                        Breve história ({form.historico.length}/3000)
                         <textarea
-                          className={`${input} mt-1 min-h-[140px] normal-case`}
+                          className={`${input} mt-1 min-h-[160px] normal-case`}
                           value={form.historico}
-                          maxLength={2000}
+                          maxLength={3000}
                           onChange={(ev) => setForm({ ...form, historico: ev.target.value })}
-                          placeholder="Fundação, sócios fundadores, obras marcantes, especialidade (alto padrão, horizontal…), cidades onde atua."
+                          placeholder="Fundação, fundadores, obras marcantes, especialidade (alto padrão, horizontal…), cidades onde atua. Sem texto, o site mostra um resumo automático."
                         />
                       </label>
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={async () => {
-                            await salvarEmpresa(e.id, form);
+                            const r = await salvarEmpresa(e.id, { ...form, anoFundacao: form.anoFundacao ? Number(form.anoFundacao) : null, grupoPrincipalId: form.grupoPrincipalId || null });
+                            if (!r.ok) return setMsg({ ok: false, t: r.erro ?? 'Não foi possível salvar.' });
                             setEditando(null);
                             setMsg({ ok: true, t: 'Perfil salvo.' });
                             carregar();

@@ -297,7 +297,7 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
          left join developments pd on pd.id = p.empreendimento_id
          left join tl ptl on ptl.k = p.tipo_unidade
          cross join lateral (
-           select ${norm(`concat_ws(' ', p.titulo, p.location, p.bairro, p.cidade, p.condominio, pd.name, ptl.label, (select string_agg(concat_ws(' ', e.nome_fantasia, e.razao_social), ' ') from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = pd.id))`)} as txt
+           select ${norm(`concat_ws(' ', p.titulo, p.location, p.bairro, p.cidade, p.condominio, pd.name, ptl.label, (select string_agg(concat_ws(' ', e.nome_perfil, e.nome_fantasia, e.razao_social), ' ') from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = pd.id))`)} as txt
          ) pt
 `;
   const fromCondo = `from developments d
@@ -323,7 +323,7 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
              from jsonb_array_elements_text(d.tipos_unidade) t left join tl ttl on ttl.k = t
          ) dt on true
          cross join lateral (
-           select ${norm(`concat_ws(' ', d.name, d.location, d.bairro, d.cidade, 'empreendimento condominio lancamento', u.tipos_texto, dt.tipos_texto, (select string_agg(concat_ws(' ', e.nome_fantasia, e.razao_social), ' ') from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = d.id))`)} as txt
+           select ${norm(`concat_ws(' ', d.name, d.location, d.bairro, d.cidade, 'empreendimento condominio lancamento', u.tipos_texto, dt.tipos_texto, (select string_agg(concat_ws(' ', e.nome_perfil, e.nome_fantasia, e.razao_social), ' ') from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = d.id))`)} as txt
          ) dx
 `;
 
@@ -436,7 +436,7 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
     }
   >(
     `select d.*, u.min_price, u.q_min, u.q_max, u.a_min, u.a_max, u.n, u.unit_tipos, u.anuncios,
-            (select string_agg(coalesce(nullif(e.nome_fantasia, ''), e.razao_social), ' · ' order by de.ordem)
+            (select string_agg(coalesce(nullif(e.nome_perfil, ''), nullif(e.nome_fantasia, ''), e.razao_social), ' · ' order by de.ordem)
                from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = d.id) as concepcao
        from developments d
        left join lateral (
@@ -1854,14 +1854,15 @@ export async function registrarLeadWhatsapp(input: {
 // entrega; breve lançamento primeiro). Paginado (sem rolagem infinita) e com filtros.
 export type FiltrosEmpresa = { cidade?: string; bairro?: string; fase?: string; tipo?: string; q?: string };
 export async function empreendimentosDaEmpresa(
-  empresaId: string,
+  empresaIds: string | string[],
   filtros: FiltrosEmpresa,
   pagina: number,
   porPagina = 24
 ): Promise<{ cards: DevelopmentCardData[]; total: number; cidades: string[]; bairros: string[] }> {
-  if (!/^[0-9a-f-]{36}$/i.test(empresaId)) return { cards: [], total: 0, cidades: [], bairros: [] };
-  const params: unknown[] = [empresaId];
-  const conds = ["d.status = 'publicado'", 'de.empresa_id = $1::uuid'];
+  const ids = (Array.isArray(empresaIds) ? empresaIds : [empresaIds]).filter((i) => /^[0-9a-f-]{36}$/i.test(i));
+  if (!ids.length) return { cards: [], total: 0, cidades: [], bairros: [] };
+  const params: unknown[] = [ids];
+  const conds = ["d.status = 'publicado'", 'de.empresa_id = any($1::uuid[])'];
   const p = (v: unknown) => {
     params.push(v);
     return `$${params.length}`;
@@ -1876,14 +1877,14 @@ export async function empreendimentosDaEmpresa(
   const w = conds.join(' and ');
   const [lista, total, locais] = await Promise.all([
     query<{ id: string }>(
-      `select d.id from developments d join development_empresas de on de.development_id = d.id where ${w}
-        order by d.delivery_date desc nulls last, d.name limit ${Math.min(60, porPagina)} offset ${Math.max(0, pagina) * porPagina}`,
+      `select distinct on (d.delivery_date, d.name, d.id) d.id from developments d join development_empresas de on de.development_id = d.id where ${w}
+        order by d.delivery_date desc nulls last, d.name, d.id limit ${Math.min(60, porPagina)} offset ${Math.max(0, pagina) * porPagina}`,
       params
     ),
-    query<{ n: string }>(`select count(*) as n from developments d join development_empresas de on de.development_id = d.id where ${w}`, params),
+    query<{ n: string }>(`select count(distinct d.id) as n from developments d join development_empresas de on de.development_id = d.id where ${w}`, params),
     query<{ cidade: string | null; bairro: string | null }>(
       `select distinct d.cidade, d.bairro from developments d join development_empresas de on de.development_id = d.id where ${base.join(' and ')}`,
-      [empresaId]
+      [ids]
     )
   ]);
   const cardsDesordenados = await getDevelopmentCards(lista.map((r) => r.id));

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { buscarEmpresas, cadastrarPorCnpj, cadastrarPorNome, definirCnpj } from '@/lib/actions-empresas';
-import { PAPEL_LABEL, empresaAtiva, formatarCnpj, nomeEmpresa, textoSituacao, type ConcepcaoItem, type Empresa, type PapelEmpresa } from '@/lib/empresas-tipos';
+import { PAPEL_LABEL, empresaAtiva, formatarCnpj, nomeEmpresa, situacaoPublica, type ConcepcaoItem, type Empresa, type PapelEmpresa } from '@/lib/empresas-tipos';
 
 const inputClass = 'w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-accent';
 
@@ -63,7 +63,7 @@ export default function ConcepcaoPicker({ value, onChange, obrigatorio }: { valu
           <span className={`min-w-0 flex-1 text-sm font-semibold ${empresaAtiva(v.empresa) ? '' : 'text-[var(--text-faint)]'}`}>
             {nomeEmpresa(v.empresa)}
             <span className="block text-[11px] font-normal text-[var(--text-muted)]">
-              {v.empresa.cnpj ? `CNPJ ${formatarCnpj(v.empresa.cnpj)} · ${textoSituacao(v.empresa) ?? 'situação não informada'}` : 'Sem CNPJ: complete em Painel → Construtoras'}
+              {v.empresa.cnpj ? `CNPJ ${formatarCnpj(v.empresa.cnpj)} · ${situacaoPublica(v.empresa) ?? 'situação não informada'}` : 'Sem CNPJ: complete em Painel → Construtoras'}
             </span>
           </span>
           <select
@@ -114,7 +114,7 @@ export default function ConcepcaoPicker({ value, onChange, obrigatorio }: { valu
               <button key={e.id} type="button" onClick={() => adicionar(e)} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[var(--pill-bg)]">
                 <span className={`font-semibold ${empresaAtiva(e) ? '' : 'text-[var(--text-faint)]'}`}>{nomeEmpresa(e)}</span>
                 <span className="block text-xs text-[var(--text-muted)]">
-                  {e.cnpj ? `${formatarCnpj(e.cnpj)} · ${textoSituacao(e) ?? ''}` : 'sem CNPJ'}
+                  {e.cnpj ? `${formatarCnpj(e.cnpj)} · ${situacaoPublica(e) ?? ''}` : 'sem CNPJ'}
                   {e.totalEmpreendimentos ? ` · ${e.totalEmpreendimentos} empreendimento(s)` : ''}
                 </span>
               </button>

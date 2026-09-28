@@ -21,13 +21,31 @@ export type Empresa = {
   historico: string | null;
   receitaAtualizadaEm: string | null;
   totalEmpreendimentos?: number;
+  nomePerfil: string | null; // nome usado hoje no marketing: vale sobre os nomes da Receita
+  anoFundacao: number | null; // quando a empresa é mais antiga que o CNPJ atual
+  grupoPrincipalId: string | null; // empresa principal do grupo (ex.: EBM Urbanismo → EBM)
+  situacaoEspecial: string | null; // ex.: RECUPERACAO JUDICIAL
 };
 
 export type EmpresaNaConcepcao = { empresaId: string; papel: PapelEmpresa };
 export type ConcepcaoItem = { empresa: Empresa; papel: PapelEmpresa };
 
-export const nomeEmpresa = (e: Pick<Empresa, 'nomeFantasia' | 'razaoSocial'>) => (e.nomeFantasia?.trim() ? e.nomeFantasia : e.razaoSocial);
-export const empresaAtiva = (e: Pick<Empresa, 'situacao'>) => !e.situacao || e.situacao.toUpperCase() === 'ATIVA';
+export const nomeEmpresa = (e: Pick<Empresa, 'nomeFantasia' | 'razaoSocial'> & { nomePerfil?: string | null }) =>
+  e.nomePerfil?.trim() ? e.nomePerfil : e.nomeFantasia?.trim() ? e.nomeFantasia : e.razaoSocial;
+const emRecuperacao = (e: { situacaoEspecial?: string | null }) => /recupera/i.test(e.situacaoEspecial ?? '');
+/** Ativa e sem recuperação judicial (as outras situações aparecem em cinza) */
+export const empresaAtiva = (e: Pick<Empresa, 'situacao'> & { situacaoEspecial?: string | null }) =>
+  (!e.situacao || e.situacao.toUpperCase() === 'ATIVA') && !emRecuperacao(e);
+
+/** Situação para o público: Ativa, Suspensa, Inativa ou Em recuperação judicial */
+export function situacaoPublica(e: Pick<Empresa, 'situacao'> & { situacaoEspecial?: string | null }): string | null {
+  if (emRecuperacao(e)) return 'Em recuperação judicial';
+  const s = (e.situacao ?? '').toUpperCase();
+  if (!s) return null;
+  if (s === 'ATIVA') return 'Ativa';
+  if (s === 'SUSPENSA') return 'Suspensa';
+  return 'Inativa'; // baixada, inapta, nula
+}
 export const formatarCnpj = (c: string | null | undefined) => (c ?? '').replace(/\D/g, '').replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
 const dataBR = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 
@@ -38,8 +56,12 @@ export function textoSituacao(e: Pick<Empresa, 'situacao' | 'dataSituacao'>): st
   return e.dataSituacao ? `${s} desde ${dataBR(e.dataSituacao)}` : s;
 }
 
-/** Idade da empresa pela data de abertura no CNPJ */
-export function idadeEmpresa(dataInicio: string | null, hoje = new Date()): { anos: number; texto: string } | null {
+/** Idade da empresa: pelo ano de fundação (se informado) ou pela abertura do CNPJ */
+export function idadeEmpresa(dataInicio: string | null, hoje = new Date(), anoFundacao?: number | null): { anos: number; texto: string } | null {
+  if (anoFundacao && anoFundacao > 1800) {
+    const anos = hoje.getFullYear() - anoFundacao;
+    return { anos, texto: anos < 1 ? 'menos de 1 ano' : anos === 1 ? '1 ano' : `${anos} anos` };
+  }
   if (!dataInicio) return null;
   const d = new Date(`${dataInicio.slice(0, 10)}T00:00:00`);
   let anos = hoje.getFullYear() - d.getFullYear();
@@ -58,3 +80,5 @@ export function cnpjValido(c: string): boolean {
   };
   return calc(12) === Number(d[12]) && calc(13) === Number(d[13]);
 }
+
+export const dataBRCompleta = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '');

@@ -37,7 +37,8 @@ export type AlvoProposta = {
   developmentId: string | null;
   titulo: string; // descrição do imóvel que vai no documento
   valorAnunciado: number | null;
-  vendedor: Pessoa | null; // vendedor guardado (do imóvel ou, se não tiver, do condomínio)
+  vendedor: Pessoa | null; // 1º vendedor guardado (compatibilidade)
+  vendedores: Pessoa[]; // vendedores guardados (do imóvel ou, se não tiver, do condomínio)
   vendedorOrigem: 'imovel' | 'condominio' | null;
 };
 
@@ -48,15 +49,17 @@ export type Proposta = {
   developmentId: string | null;
   imovelTexto: string | null;
   unidade: string | null;
-  comprador: Pessoa;
-  vendedor: Pessoa | null;
+  comprador: Pessoa; // 1º comprador
+  compradores: Pessoa[];
+  vendedor: Pessoa | null; // 1º vendedor
+  vendedores: Pessoa[];
   corretor: Corretor | null;
   valor: number;
   formas: string[];
   entrada: number | null;
   condicoes: string | null;
   validadeDias: number;
-  status: 'nova' | 'em_analise' | 'enviada_proprietario' | 'aceita' | 'recusada' | 'arquivada';
+  status: 'nova' | 'em_analise' | 'enviada_proprietario' | 'aceita' | 'recusada' | 'cancelada' | 'arquivada';
   criadoPor: string | null;
   criadoEm: string;
 };
@@ -91,7 +94,10 @@ function limparPessoa(p: Partial<Pessoa> | null | undefined): Pessoa | null {
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(p.nascimento ?? ''))) out.nascimento = String(p.nascimento);
   return out;
 }
-const pessoaDoBanco = (v: unknown): Pessoa | null => (v && typeof v === 'object' && (v as Pessoa).nome ? (v as Pessoa) : null);
+const pessoaDoBanco = (v: unknown): Pessoa | null => (v && typeof v === 'object' && !Array.isArray(v) && (v as Pessoa).nome ? (v as Pessoa) : null);
+/** Aceita o formato antigo (uma pessoa) e o novo (lista) */
+const pessoasDoBanco = (v: unknown): Pessoa[] =>
+  Array.isArray(v) ? v.filter((p): p is Pessoa => !!p && typeof p === 'object' && !!(p as Pessoa).nome) : pessoaDoBanco(v) ? [v as Pessoa] : [];
 
 async function podeVer(): Promise<{ cond: string; params: unknown[]; email: string; nome: string; gestor: boolean }> {
   const eu = await exigirEquipe();
@@ -144,15 +150,16 @@ export async function carregarAlvo(tipo: AlvoProposta['tipo'], id: string): Prom
     );
     const d = r[0];
     if (!d) return null;
-    const v = pessoaDoBanco(d.vendedor);
+    const vs = pessoasDoBanco(d.vendedor);
     return {
       tipo,
       id: d.id,
       developmentId: d.id,
       titulo: [`Unidade no Condomínio ${d.name}`, d.logradouro, d.bairro, [d.cidade, d.uf].filter(Boolean).join('/')].filter(Boolean).join(', '),
       valorAnunciado: null,
-      vendedor: v,
-      vendedorOrigem: v ? 'condominio' : null
+      vendedor: vs[0] ?? null,
+      vendedores: vs,
+      vendedorOrigem: vs.length ? 'condominio' : null
     };
   }
   const r = await query<{
@@ -179,8 +186,9 @@ export async function carregarAlvo(tipo: AlvoProposta['tipo'], id: string): Prom
   );
   const p = r[0];
   if (!p) return null;
-  const vImovel = pessoaDoBanco(p.vendedor);
-  const vCondo = pessoaDoBanco(p.dvendedor);
+  const vImovel = pessoasDoBanco(p.vendedor);
+  const vCondo = pessoasDoBanco(p.dvendedor);
+  const vs = vImovel.length ? vImovel : vCondo;
   const condo = p.dname || p.condominio;
   const desc = [
     p.titulo || [p.quartos ? `${p.quartos} quartos` : null, p.area ? `${Number(p.area).toLocaleString('pt-BR')} m²` : null].filter(Boolean).join(', '),
@@ -197,8 +205,9 @@ export async function carregarAlvo(tipo: AlvoProposta['tipo'], id: string): Prom
     developmentId: p.empreendimento_id,
     titulo: desc,
     valorAnunciado: p.price_value ? Number(p.price_value) : null,
-    vendedor: vImovel ?? vCondo,
-    vendedorOrigem: vImovel ? 'imovel' : vCondo ? 'condominio' : null
+    vendedor: vs[0] ?? null,
+    vendedores: vs,
+    vendedorOrigem: vImovel.length ? 'imovel' : vCondo.length ? 'condominio' : null
   };
 }
 
@@ -215,11 +224,11 @@ export type PropostaInput = {
   alvo: { tipo: AlvoProposta['tipo']; id: string } | null;
   imovelTexto: string;
   unidade?: string;
-  comprador: Pessoa;
-  vendedor: Pessoa | null;
+  compradores: Pessoa[];
+  vendedores: Pessoa[];
   corretor: Corretor;
   valor: number;
-  formas: string[];
+  formas?: string[];
   entrada?: number | null;
   condicoes?: string;
   validadeDias: number;
@@ -230,17 +239,22 @@ const FORMAS = ['a_vista', 'financiamento', 'fgts', 'consorcio', 'permuta', 'par
 
 export async function salvarProposta(d: PropostaInput): Promise<{ ok: boolean; id?: string; erro?: string }> {
   const eu = await podeVer();
-  const comprador = limparPessoa(d.comprador);
-  if (!comprador) return { ok: false, erro: 'Informe o nome do comprador (proponente).' };
+  const compradores = (d.compradores ?? []).map(limparPessoa).filter((p): p is Pessoa => !!p).slice(0, 6);
+  if (!compradores.length) return { ok: false, erro: 'Informe o nome do comprador (proponente).' };
+  for (const c of compradores) {
+    const dc = soDig(c.documento, 14);
+    if (dc.length === 11 && !cpfValido(dc)) return { ok: false, erro: `O CPF de ${c.nome} não confere. Verifique os números.` };
+  }
+  const comprador = compradores[0];
   const doc = soDig(comprador.documento, 14);
-  if (doc.length === 11 && !cpfValido(doc)) return { ok: false, erro: 'O CPF do comprador não confere. Verifique os números.' };
   const valor = Math.round(Number(d.valor) || 0);
   if (valor < 1000) return { ok: false, erro: 'Informe o valor da proposta.' };
   const formas = (d.formas ?? []).filter((f) => FORMAS.includes(f));
-  if (!formas.length) return { ok: false, erro: 'Escolha a forma de pagamento.' };
+  if (!t(d.condicoes, 20000)) return { ok: false, erro: 'Descreva as condições de pagamento.' };
   const imovelTexto = t(d.imovelTexto, 400);
   if (!imovelTexto) return { ok: false, erro: 'Descreva o imóvel da proposta.' };
-  const vendedor = limparPessoa(d.vendedor);
+  const vendedores = (d.vendedores ?? []).map(limparPessoa).filter((p): p is Pessoa => !!p).slice(0, 6);
+  const vendedor = vendedores[0] ?? null;
   const corretor: Corretor = { nome: t(d.corretor?.nome, 120) || eu.nome, creci: t(d.corretor?.creci, 30) || undefined, email: eu.email };
 
   let propertyId: string | null = null;
@@ -274,10 +288,12 @@ export async function salvarProposta(d: PropostaInput): Promise<{ ok: boolean; i
     valor,
     JSON.stringify(formas),
     d.entrada && d.entrada > 0 ? Math.round(d.entrada) : null,
-    t(d.condicoes, 3000) || null,
+    t(d.condicoes, 20000) || null,
     Math.min(60, Math.max(1, Math.round(Number(d.validadeDias) || 5))),
     vendedor ? JSON.stringify(vendedor) : null,
-    JSON.stringify(corretor)
+    JSON.stringify(corretor),
+    JSON.stringify(compradores),
+    JSON.stringify(vendedores)
   ];
 
   let id = d.id;
@@ -289,7 +305,8 @@ export async function salvarProposta(d: PropostaInput): Promise<{ ok: boolean; i
               telefone=$${eu.params.length + 13}, cep=$${eu.params.length + 14}, endereco=$${eu.params.length + 15}, bairro=$${eu.params.length + 16},
               cidade=$${eu.params.length + 17}, uf=$${eu.params.length + 18}, valor_proposta=$${eu.params.length + 19}, formas_pagamento=$${eu.params.length + 20},
               valor_entrada=$${eu.params.length + 21}, condicoes=$${eu.params.length + 22}, validade_dias=$${eu.params.length + 23},
-              vendedor=$${eu.params.length + 24}, corretor=$${eu.params.length + 25}, updated_at=now()
+              vendedor=$${eu.params.length + 24}, corretor=$${eu.params.length + 25}, compradores=$${eu.params.length + 26}, vendedores=$${eu.params.length + 27},
+              updated_at=now()
         where p.id = $${eu.params.length + 1}::uuid and ${eu.cond} returning p.id`,
       [...eu.params, id, ...vals]
     );
@@ -297,27 +314,46 @@ export async function salvarProposta(d: PropostaInput): Promise<{ ok: boolean; i
   } else {
     const r = await query<{ id: string }>(
       `insert into propostas (property_id, development_id, imovel_texto, unidade, nome, cpf, rg, nascimento, estado_civil, profissao, email, telefone,
-                              cep, endereco, bairro, cidade, uf, valor_proposta, formas_pagamento, valor_entrada, condicoes, validade_dias, vendedor, corretor, criado_por)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25) returning id`,
+                              cep, endereco, bairro, cidade, uf, valor_proposta, formas_pagamento, valor_entrada, condicoes, validade_dias, vendedor, corretor,
+                              compradores, vendedores, criado_por)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27) returning id, numero`,
       [...vals, eu.email]
     );
     id = r[0].id;
+    // compradores entram em Interessados (base para o futuro CRM), com o histórico da proposta
+    const numero = (r[0] as { numero?: number }).numero;
+    for (const c of compradores) {
+      await query(
+        `insert into interest_leads (development_id, condominio, nome, email, telefone, finalidade, mensagem, aceita_contato, status)
+         values ($1, $2, $3, $4, $5, 'venda', $6, true, 'novo')`,
+        [
+          developmentId,
+          imovelTexto.slice(0, 160),
+          c.nome,
+          c.email ?? null,
+          c.telefone ?? null,
+          `Proposta${numero ? ` nº ${String(numero).padStart(4, '0')}` : ''} de ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}${c.documento ? ` · CPF/CNPJ ${c.documento}` : ''} · ${imovelTexto.slice(0, 160)} · feita por ${corretor.nome}`
+        ]
+      ).catch(() => {});
+    }
   }
 
   // guarda o CRECI do corretor para as próximas propostas
   if (corretor.creci) await query('update staff_users set creci = $2 where lower(email) = lower($1)', [eu.email, corretor.creci]).catch(() => {});
   // guarda o vendedor como padrão do imóvel/condomínio (proprietário ou construtora)
-  if (vendedor && d.guardarVendedor === 'imovel' && propertyId) {
-    await query('update properties set vendedor = $2 where id = $1', [propertyId, JSON.stringify(vendedor)]);
-  } else if (vendedor && d.guardarVendedor === 'condominio' && developmentId) {
-    await query('update developments set vendedor = $2 where id = $1', [developmentId, JSON.stringify(vendedor)]);
+  if (vendedores.length && d.guardarVendedor === 'imovel' && propertyId) {
+    await query('update properties set vendedor = $2 where id = $1', [propertyId, JSON.stringify(vendedores)]);
+  } else if (vendedores.length && d.guardarVendedor === 'condominio' && developmentId) {
+    await query('update developments set vendedor = $2 where id = $1', [developmentId, JSON.stringify(vendedores)]);
   }
   return { ok: true, id };
 }
 
 // ---------------- listar / abrir ----------------
 type Row = Record<string, unknown>;
-const mapear = (r: Row): Proposta => ({
+/** Propostas antigas: só o comprador principal nas colunas; entra como lista de 1 */
+const fixCompradores = (p: Proposta): Proposta => (p.compradores.length ? p : { ...p, compradores: [p.comprador] });
+const mapear = (r: Row): Proposta => fixCompradores({
   id: String(r.id),
   numero: Number(r.numero) || 0,
   propertyId: (r.property_id as string) ?? null,
@@ -339,7 +375,9 @@ const mapear = (r: Row): Proposta => ({
     cidade: (r.cidade as string) ?? undefined,
     uf: (r.uf as string) ?? undefined
   },
+  compradores: pessoasDoBanco(r.compradores),
   vendedor: pessoaDoBanco(r.vendedor),
+  vendedores: pessoasDoBanco(r.vendedores).length ? pessoasDoBanco(r.vendedores) : pessoasDoBanco(r.vendedor),
   corretor: r.corretor && typeof r.corretor === 'object' ? (r.corretor as Corretor) : null,
   valor: Number(r.valor_proposta),
   formas: Array.isArray(r.formas_pagamento) ? (r.formas_pagamento as string[]) : [],
@@ -376,7 +414,7 @@ export async function getProposta(id: string): Promise<Proposta | null> {
 
 export async function mudarStatusProposta(id: string, status: Proposta['status']): Promise<void> {
   const f = await podeVer();
-  if (!['nova', 'em_analise', 'enviada_proprietario', 'aceita', 'recusada', 'arquivada'].includes(status)) return;
+  if (!['nova', 'em_analise', 'enviada_proprietario', 'aceita', 'recusada', 'cancelada', 'arquivada'].includes(status)) return;
   await query(`update propostas p set status = $${f.params.length + 2}, updated_at = now() where p.id = $${f.params.length + 1}::uuid and ${f.cond}`, [
     ...f.params,
     id,

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
-import DocumentoProposta from '@/components/DocumentoProposta';
+import DocumentoProposta, { tituloArquivoProposta } from '@/components/DocumentoProposta';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { excluirProposta, getProposta, mudarStatusProposta, type Proposta } from '@/lib/actions-propostas';
 import { STATUS_PROPOSTA } from '@/lib/proposta-textos';
@@ -22,9 +22,16 @@ export default function PropostaDetalhe({ params }: { params: { id: string } }) 
   useEffect(() => {
     if (staff) getProposta(params.id).then(setP).catch(() => setP(null));
   }, [staff, params.id]);
+  // "Baixar" da lista: abre já pedindo o PDF
+  useEffect(() => {
+    if (p && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('baixar') === '1') {
+      const tm = setTimeout(() => imprimirProposta(tituloArquivoProposta(p)), 600);
+      return () => clearTimeout(tm);
+    }
+  }, [p]);
   if (!loaded || !staff) return null;
 
-  const tel = (p?.comprador.telefone ?? '').replace(/\D/g, '');
+  const tel = (p?.compradores[0]?.telefone ?? p?.comprador.telefone ?? '').replace(/\D/g, '');
   const wa = tel ? `https://wa.me/${tel.startsWith('55') ? tel : `55${tel}`}` : null;
 
   return (
@@ -42,9 +49,30 @@ export default function PropostaDetalhe({ params }: { params: { id: string } }) 
         ) : (
           <>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={imprimirProposta} className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white">
-                Salvar em PDF / imprimir
+              <button type="button" onClick={() => imprimirProposta(tituloArquivoProposta(p))} className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white">
+                Baixar PDF / imprimir
               </button>
+              {(['aceita', 'recusada', 'cancelada'] as const).map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={async () => {
+                    setP({ ...p, status: st });
+                    await mudarStatusProposta(p.id, st).catch(() => {});
+                  }}
+                  className={`rounded-full px-4 py-2 text-sm font-bold ${
+                    p.status === st
+                      ? st === 'aceita'
+                        ? 'bg-green-600 text-white'
+                        : st === 'recusada'
+                          ? 'bg-red-600 text-white'
+                          : 'bg-[var(--text-muted)] text-white'
+                      : 'bg-[var(--pill-bg)] hover:bg-[var(--pill-bg-hover)]'
+                  }`}
+                >
+                  {st === 'aceita' ? 'Aceita' : st === 'recusada' ? 'Recusada' : 'Cancelar'}
+                </button>
+              ))}
               <Link href={`/dashboard/propostas/nova?id=${p.id}`} className="rounded-full bg-[var(--pill-bg)] px-4 py-2 text-sm font-bold hover:bg-[var(--pill-bg-hover)]">
                 Editar
               </Link>
@@ -95,8 +123,8 @@ export default function PropostaDetalhe({ params }: { params: { id: string } }) 
                   numero: p.numero,
                   imovel: p.imovelTexto ?? '',
                   unidade: p.unidade,
-                  comprador: p.comprador,
-                  vendedor: p.vendedor,
+                  compradores: p.compradores,
+                  vendedores: p.vendedores,
                   corretor: p.corretor,
                   valor: p.valor,
                   formas: p.formas,

@@ -19,6 +19,10 @@ export type EmpresaRow = {
   historico: string | null;
   receita_atualizada_em: Date | string | null;
   total?: string | number | null;
+  nome_perfil?: string | null;
+  ano_fundacao?: number | null;
+  grupo_principal_id?: string | null;
+  situacao_especial?: string | null;
 };
 const dia = (v: Date | string | null) => (v ? new Date(v).toISOString().slice(0, 10) : null);
 export const mapEmpresa = (r: EmpresaRow): Empresa => ({
@@ -35,7 +39,11 @@ export const mapEmpresa = (r: EmpresaRow): Empresa => ({
   atividade: r.atividade,
   historico: r.historico,
   receitaAtualizadaEm: r.receita_atualizada_em ? new Date(r.receita_atualizada_em).toISOString() : null,
-  totalEmpreendimentos: r.total != null ? Number(r.total) : undefined
+  totalEmpreendimentos: r.total != null ? Number(r.total) : undefined,
+  nomePerfil: r.nome_perfil ?? null,
+  anoFundacao: r.ano_fundacao ?? null,
+  grupoPrincipalId: r.grupo_principal_id ?? null,
+  situacaoEspecial: r.situacao_especial ?? null
 });
 
 export type DadosReceita = {
@@ -48,6 +56,8 @@ export type DadosReceita = {
   municipio: string | null;
   uf: string | null;
   atividade: string | null;
+  situacaoEspecial: string | null;
+  dataSituacaoEspecial: string | null;
   bruto: Record<string, unknown>;
 };
 
@@ -63,6 +73,28 @@ export function nomeBonito(s: string | null): string | null {
     .split(/\s+/)
     .map((w, i) => (siglas.has(w.toUpperCase()) ? w.toUpperCase() : i > 0 && minusculas.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
     .join(' ');
+}
+
+// A Receita manda o município sem acento
+const CIDADES: Record<string, string> = {
+  goiania: 'Goiânia',
+  'aparecida de goiania': 'Aparecida de Goiânia',
+  anapolis: 'Anápolis',
+  brasilia: 'Brasília',
+  'sao paulo': 'São Paulo',
+  'rio verde': 'Rio Verde',
+  'caldas novas': 'Caldas Novas',
+  'goianesia': 'Goianésia',
+  'itumbiara': 'Itumbiara',
+  'jatai': 'Jataí',
+  'uberlandia': 'Uberlândia',
+  'belo horizonte': 'Belo Horizonte',
+  'cuiaba': 'Cuiabá',
+  'palmas': 'Palmas'
+};
+export function acentuarCidade(c: string | null): string | null {
+  if (!c) return c;
+  return CIDADES[c.toLowerCase()] ?? c;
 }
 
 export async function consultarReceita(cnpj: string): Promise<DadosReceita | null> {
@@ -82,9 +114,11 @@ export async function consultarReceita(cnpj: string): Promise<DadosReceita | nul
         situacao: texto(j.descricao_situacao_cadastral)?.toUpperCase() ?? (typeof j.situacao_cadastral === 'string' ? j.situacao_cadastral.toUpperCase() : null),
         dataSituacao: data(j.data_situacao_cadastral),
         dataInicio: data(j.data_inicio_atividade),
-        municipio: nomeBonito(texto(j.municipio)),
+        municipio: acentuarCidade(nomeBonito(texto(j.municipio))),
         uf: texto(j.uf)?.toUpperCase() ?? null,
         atividade: texto(j.cnae_fiscal_descricao),
+        situacaoEspecial: texto(j.situacao_especial)?.toUpperCase() ?? null,
+        dataSituacaoEspecial: data(j.data_situacao_especial),
         bruto: j
       };
     } catch {
@@ -121,13 +155,13 @@ export async function gravarConcepcao(developmentId: string, itens: EmpresaNaCon
   }
 }
 
-const normNome = (c: string) => `regexp_replace(translate(lower(coalesce(${c}, '')), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc'), '\\m(ltda|s/?a|eireli|me|epp|construtora|incorporadora|engenharia|empreendimentos|imobiliarios?|construcoes|incorporacoes|participacoes|urbanismo|spe|e|de|da|do)\\M|[^a-z0-9]', '', 'g')`;
+const normNome = (c: string) => `regexp_replace(translate(lower(coalesce(${c}, '')), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc'), '\\m(ltda|s/?a|eireli|me|epp|construtora|incorporadora|engenharia|empreendimentos|imobiliarios?|construcoes|incorporacoes|participacoes|spe|e|de|da|do)\\M|[^a-z0-9]', '', 'g')`;
 export const chaveNomeEmpresa = (s: string) =>
   s
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\b(ltda|s\/?a|eireli|me|epp|construtora|incorporadora|engenharia|empreendimentos|imobiliarios?|construcoes|incorporacoes|participacoes|urbanismo|spe|e|de|da|do)\b|[^a-z0-9]/g, '');
+    .replace(/\b(ltda|s\/?a|eireli|me|epp|construtora|incorporadora|engenharia|empreendimentos|imobiliarios?|construcoes|incorporacoes|participacoes|spe|e|de|da|do)\b|[^a-z0-9]/g, '');
 
 /** Acha a empresa pelo nome (ignora "Construtora", "Ltda", acentos…) ou cadastra só com o nome, sem CNPJ. */
 export async function empresaPorNome(nome: string, criadoPor?: string): Promise<Empresa | null> {
@@ -135,7 +169,7 @@ export async function empresaPorNome(nome: string, criadoPor?: string): Promise<
   const chave = chaveNomeEmpresa(limpo);
   if (chave.length < 2) return null;
   const achou = await query<EmpresaRow>(
-    `select * from empresas e where ${normNome('e.nome_fantasia')} = $1 or ${normNome('e.razao_social')} = $1 order by (e.cnpj is not null) desc limit 1`,
+    `select * from empresas e where ${normNome('e.nome_perfil')} = $1 or ${normNome('e.nome_fantasia')} = $1 or ${normNome('e.razao_social')} = $1 order by (e.nome_perfil is not null) desc, (e.cnpj is not null) desc limit 1`,
     [chave]
   );
   if (achou[0]) return mapEmpresa(achou[0]);
@@ -163,7 +197,7 @@ export async function resolverEmpresaImport(e: { nome?: string; cnpj?: string },
       const semCnpj =
         chave.length >= 2
           ? await query<{ id: string }>(
-              `select id from empresas e where e.cnpj is null and (${normNome('e.nome_fantasia')} = $1 or ${normNome('e.razao_social')} = $1) limit 1`,
+              `select id from empresas e where e.cnpj is null and (${normNome('e.nome_perfil')} = $1 or ${normNome('e.nome_fantasia')} = $1 or ${normNome('e.razao_social')} = $1) limit 1`,
               [chave]
             )
           : [];

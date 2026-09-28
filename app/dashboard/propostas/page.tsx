@@ -7,7 +7,7 @@ import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
-import { listarPropostas, type Proposta } from '@/lib/actions-propostas';
+import { listarPropostas, mudarStatusProposta, type Proposta } from '@/lib/actions-propostas';
 import { STATUS_PROPOSTA, brl } from '@/lib/proposta-textos';
 
 // Propostas feitas pela equipe (uso interno). Corretor vê só as dele.
@@ -17,6 +17,9 @@ export default function PropostasPage() {
   const [itens, setItens] = useState<Proposta[] | null>(null);
   const [filtro, setFiltro] = useState('todas');
   const [q, setQ] = useState('');
+  const [de, setDe] = useState('');
+  const [ate, setAte] = useState('');
+  const [doc, setDoc] = useState('');
 
   useEffect(() => {
     if (loaded && !staff) router.replace('/dashboard/login');
@@ -27,12 +30,19 @@ export default function PropostasPage() {
 
   const lista = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return (itens ?? []).filter(
-      (p) =>
+    const d = doc.replace(/\D/g, '');
+    return (itens ?? []).filter((p) => {
+      const dia = p.criadoEm.slice(0, 10);
+      const pessoas = [...p.compradores, ...p.vendedores];
+      return (
         (filtro === 'todas' || p.status === filtro) &&
-        (!t || [p.comprador.nome, p.imovelTexto, p.unidade, p.vendedor?.nome, p.corretor?.nome].filter(Boolean).join(' ').toLowerCase().includes(t))
-    );
-  }, [itens, filtro, q]);
+        (!de || dia >= de) &&
+        (!ate || dia <= ate) &&
+        (!d || pessoas.some((x) => (x.documento ?? '').replace(/\D/g, '').includes(d))) &&
+        (!t || [...pessoas.map((x) => x.nome), p.imovelTexto, p.unidade, p.corretor?.nome].filter(Boolean).join(' ').toLowerCase().includes(t))
+      );
+    });
+  }, [itens, filtro, q, de, ate, doc]);
 
   // várias propostas no mesmo imóvel: mostra quantas existem
   const porImovel = useMemo(() => {
@@ -66,6 +76,26 @@ export default function PropostasPage() {
           placeholder="Buscar por comprador, imóvel, vendedor ou corretor"
           className="mt-5 w-full rounded-full border border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 text-sm outline-none focus:border-accent"
         />
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <label className="flex items-center gap-1.5">
+            De <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className="rounded-full border border-[var(--border)] bg-[var(--bg)] px-3 py-2" />
+          </label>
+          <label className="flex items-center gap-1.5">
+            até <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className="rounded-full border border-[var(--border)] bg-[var(--bg)] px-3 py-2" />
+          </label>
+          <input
+            value={doc}
+            onChange={(e) => setDoc(e.target.value)}
+            inputMode="numeric"
+            placeholder="CPF/CNPJ do comprador ou vendedor"
+            className="min-w-[240px] flex-1 rounded-full border border-[var(--border)] bg-[var(--bg)] px-4 py-2"
+          />
+          {(de || ate || doc) && (
+            <button type="button" onClick={() => (setDe(''), setAte(''), setDoc(''))} className="px-2 font-semibold text-[var(--text-muted)] hover:underline">
+              Limpar
+            </button>
+          )}
+        </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {['todas', ...Object.keys(STATUS_PROPOSTA)].map((s) => (
             <button
@@ -87,7 +117,8 @@ export default function PropostasPage() {
             {lista.map((p) => {
               const n = porImovel.get(p.propertyId ?? p.developmentId ?? '') ?? 0;
               return (
-                <Link key={p.id} href={`/dashboard/propostas/${p.id}`} className="block rounded-xl border border-[var(--border)] p-4 hover:border-accent">
+                <div key={p.id} className="rounded-xl border border-[var(--border)] p-4 hover:border-accent">
+                  <Link href={`/dashboard/propostas/${p.id}`} className="block">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs font-bold text-[var(--text-faint)]">Nº {String(p.numero).padStart(4, '0')}</span>
                     <span className="text-lg font-bold">{brl(p.valor)}</span>
@@ -95,15 +126,42 @@ export default function PropostasPage() {
                     {n > 1 && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900">{n} propostas neste imóvel</span>}
                     <span className="ml-auto text-xs text-[var(--text-muted)]">{new Date(p.criadoEm).toLocaleDateString('pt-BR')}</span>
                   </div>
-                  <div className="mt-1 text-sm font-semibold">{p.comprador.nome}</div>
+                  <div className="mt-1 text-sm font-semibold">{p.compradores.map((c) => c.nome).join(' e ')}</div>
                   <div className="line-clamp-1 text-sm text-[var(--text-muted)]">
                     {p.imovelTexto}
                     {p.unidade ? ` · ${p.unidade}` : ''}
                   </div>
                   <div className="text-xs text-[var(--text-faint)]">
-                    Vendedor: {p.vendedor?.nome ?? 'não informado'} · Corretor: {p.corretor?.nome ?? p.criadoPor}
+                    Vendedor: {p.vendedores.map((v) => v.nome).join(' e ') || 'não informado'} · Corretor: {p.corretor?.nome ?? p.criadoPor}
                   </div>
-                </Link>
+                  </Link>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <a href={`/dashboard/propostas/${p.id}?baixar=1`} className="rounded-full bg-ink px-3.5 py-1.5 text-xs font-bold text-white">
+                      Baixar proposta
+                    </a>
+                    {(['aceita', 'recusada', 'cancelada'] as const).map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={async () => {
+                          setItens((l) => l?.map((x) => (x.id === p.id ? { ...x, status: st } : x)) ?? l);
+                          await mudarStatusProposta(p.id, st).catch(() => {});
+                        }}
+                        className={`rounded-full px-3.5 py-1.5 text-xs font-bold ${
+                          p.status === st
+                            ? st === 'aceita'
+                              ? 'bg-green-600 text-white'
+                              : st === 'recusada'
+                                ? 'bg-red-600 text-white'
+                                : 'bg-[var(--text-muted)] text-white'
+                            : 'bg-[var(--pill-bg)] hover:bg-[var(--pill-bg-hover)]'
+                        }`}
+                      >
+                        {st === 'aceita' ? 'Aceita' : st === 'recusada' ? 'Recusada' : 'Cancelar'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               );
             })}
           </div>

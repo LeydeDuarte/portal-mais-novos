@@ -6,15 +6,15 @@ export type DadosDocumento = {
   numero?: number;
   imovel: string;
   unidade?: string | null;
-  comprador: Pessoa;
-  vendedor: Pessoa | null;
+  compradores: Pessoa[];
+  vendedores: Pessoa[];
   corretor: Corretor | null;
   valor: number;
-  formas: string[];
+  formas?: string[];
   entrada?: number | null;
   condicoes?: string | null;
   validadeDias: number;
-  data: string; // ISO
+  data: string; // ISO: data em que a proposta foi gerada
 };
 
 const dataBR = (iso?: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '');
@@ -49,11 +49,45 @@ function qualificacao(p: Pessoa): string {
   return partes.length ? `, ${partes.join(', ')}` : '';
 }
 
-const Titulo = ({ children }: { children: React.ReactNode }) => <h3 className="mt-5 text-[11px] font-bold uppercase tracking-wider text-[#5f6368]">{children}</h3>;
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const dataExtenso = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+};
+
+/** Nome do arquivo ao salvar em PDF: "Proposta - Fulano - R$ 500.000" */
+export const tituloArquivoProposta = (d: { compradores: Pessoa[]; valor: number }) =>
+  `Proposta - ${d.compradores.map((c) => c.nome).join(' e ') || 'comprador'} - ${brl(d.valor)}`;
+
+function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-6 break-inside-avoid">
+      <h3 className="mb-1.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#1B5FCC]">
+        <span className="h-px w-5 bg-[#1B5FCC]" />
+        {titulo}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+function Pessoas({ lista, vazio }: { lista: Pessoa[]; vazio: string }) {
+  if (!lista.length) return <p>{vazio}</p>;
+  return (
+    <div className="flex flex-col gap-2">
+      {lista.map((p, i) => (
+        <p key={i}>
+          <strong>{p.nome}</strong>
+          {qualificacao(p)}.
+        </p>
+      ))}
+    </div>
+  );
+}
 
 function Assinatura({ nome, papel, extra }: { nome: string; papel: string; extra?: string }) {
   return (
-    <div className="pt-12">
+    <div className="break-inside-avoid pt-[88px]">
       <div className="border-t border-[#14161a] pt-1.5 text-center text-[11.5px] leading-snug">
         <strong>{nome || '\u00a0'}</strong>
         <br />
@@ -69,88 +103,123 @@ function Assinatura({ nome, papel, extra }: { nome: string; papel: string; extra
   );
 }
 
-// Documento "Proposta de compra" para imprimir ou salvar em PDF. Uso interno da equipe.
+// Documento "Proposta de compra" para salvar em PDF ou imprimir. Uso interno da equipe.
 export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
-  const cidade = EMPRESA.cidade;
+  const corretorTxt = d.corretor?.nome ? `${d.corretor.nome}${d.corretor.creci ? `, CRECI ${d.corretor.creci}` : ''}` : null;
   return (
-    <article className="documento-proposta mx-auto max-w-[780px] rounded-2xl border border-[var(--border)] bg-white p-8 text-[13px] leading-relaxed text-[#14161a] print:rounded-none print:border-0 print:p-0">
-      <header className="flex items-start justify-between gap-4 border-b-2 border-[#14161a] pb-3">
+    <article className="documento-proposta mx-auto max-w-[800px] rounded-3xl border border-[var(--border)] bg-white px-10 py-9 text-[13px] leading-relaxed text-[#14161a] shadow-sm print:max-w-none print:rounded-none print:border-0 print:shadow-none">
+      <header className="flex items-center justify-between gap-6 border-b border-[#e6e8eb] pb-5">
         <div>
-          <div className="font-serif text-[22px] font-semibold leading-tight">Proposta de compra de imóvel</div>
-          <div className="text-[11.5px] text-[#5f6368]">
-            {d.numero ? `Nº ${String(d.numero).padStart(4, '0')} · ` : ''}Emitida em {dataBR(d.data)} · válida por {d.validadeDias} dias
+          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#1B5FCC]">
+            Proposta de compra{d.numero ? ` · nº ${String(d.numero).padStart(4, '0')}` : ''}
+          </div>
+          <div className="mt-1 font-serif text-[24px] font-semibold leading-tight">Proposta de compra de imóvel</div>
+          <div className="mt-0.5 text-[12px] text-[#5f6368]">
+            {EMPRESA.cidade}/{EMPRESA.uf}, {dataExtenso(d.data)} · válida por {d.validadeDias} dias
           </div>
         </div>
-        <div className="text-right text-[10.5px] leading-snug text-[#5f6368]">
-          <div className="font-serif text-sm font-semibold text-[#14161a]">Mais Novos Imóveis</div>
-          {EMPRESA.razao}
-          <br />
-          CNPJ {EMPRESA.cnpj} · {EMPRESA.creci}
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/marca/logotipo-preto.png" alt="Mais Novos Imóveis" className="h-12 w-auto shrink-0" />
       </header>
 
-      <Titulo>Proponente comprador(a)</Titulo>
-      <p className="mt-1">
-        <strong>{d.comprador.nome}</strong>
-        {qualificacao(d.comprador)}.
+      <Secao titulo={d.compradores.length > 1 ? 'Proponentes compradores' : 'Proponente comprador(a)'}>
+        <Pessoas lista={d.compradores} vazio="Proponente não informado." />
+      </Secao>
+
+      <Secao titulo={d.vendedores.length > 1 ? 'Vendedores / proprietários' : 'Vendedor(a) / proprietário(a)'}>
+        <Pessoas lista={d.vendedores} vazio="Proprietário(a) do imóvel descrito abaixo." />
+      </Secao>
+
+      <Secao titulo="Corretor responsável">
+        <p>
+          {corretorTxt ?? 'Mais Novos Imóveis'}. Intermediação: {EMPRESA.razao}, CNPJ {EMPRESA.cnpj}, {EMPRESA.creci}.
+        </p>
+      </Secao>
+
+      <Secao titulo="Imóvel">
+        <p>
+          {d.imovel}
+          {d.unidade ? `. Unidade: ${d.unidade}` : ''}.
+        </p>
+      </Secao>
+
+      <Secao titulo="Valor e forma de pagamento">
+        <p>
+          O(a) proponente oferece pelo imóvel o valor total de <strong>{brl(d.valor)}</strong> ({porExtenso(d.valor)}), a ser pago da seguinte forma:
+        </p>
+        <div className="mt-3 rounded-2xl border-l-4 border-[#257CFF] bg-[#F2F7FF] px-5 py-4">
+          <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#1B5FCC]">Condições de pagamento</div>
+          <div className="whitespace-pre-line text-[13.5px]">
+            {d.condicoes?.trim() ||
+              [d.entrada ? `Entrada / sinal de ${brl(d.entrada)}.` : null, ...(d.formas ?? []).map((f) => FORMAS_PAGAMENTO[f] ?? f)].filter(Boolean).join('\n')}
+          </div>
+        </div>
+      </Secao>
+
+      <Secao titulo="Condições gerais">
+        <ol className="flex list-none flex-col gap-2 text-[12px] text-[#3c4043]">
+          <li>
+            <strong>1.</strong> Esta proposta é válida por {d.validadeDias} dias a contar da emissão e não obriga o(a) vendedor(a) a aceitá-la.
+          </li>
+          <li>
+            <strong>I.</strong> O proponente autoriza a coleta e o compartilhamento dos seus dados pessoais e documentos pelo intermediador, exclusivamente
+            para análise cadastral e apresentação desta proposta ao vendedor, nos termos da lei vigente da LGPD (Lei nº 13.709/2018).
+          </li>
+          <li>
+            <strong>II.</strong> Esta proposta constitui manifestação preliminar e depende da aceitação expressa do VENDEDOR, que poderá recusá-la ou
+            apresentar contraproposta imotivadamente.
+          </li>
+          <li>
+            <strong>III.</strong> A concessão de financiamento bancário/FGTS sujeita-se às normas do agente financeiro e órgãos de crédito. A obtenção dos
+            recursos é de exclusiva responsabilidade do proponente comprador, devendo estar ciente de sua pré-aprovação para o uso de tais recursos e quitar
+            o saldo com recursos próprios em caso de negativa.
+          </li>
+          <li>
+            <strong>IV.</strong> O proponente comprador e vendedor reconhecem a efetiva prestação dos serviços de intermediação imobiliária, firmando neste
+            ato o respectivo instrumento de prestação de serviços e anuindo expressamente que os honorários de corretagem integram o preço global desta
+            proposta, sendo deduzidos e pagos diretamente à Empresa Intermediadora pelo vendedor ou comprador, conforme será ajustado no contrato de compra e
+            venda entre as partes. O referido destaque e transferência encontram lastro legal no art. 725 do Código Civil e na tese vinculante do STJ firmada
+            no REsp Repetitivo nº 1.599.511 (Tema 938), constituindo verba autônoma que, aperfeiçoado o negócio, não será objeto de restituição em caso de
+            posterior a assinatura do contrato, rescisão ou arrependimento imotivado das partes.
+          </li>
+          <li>
+            <strong>V. Assinatura eletrônica:</strong> As partes convencionam e declaram como válida, eficaz e plenamente vinculante a formalização deste
+            instrumento por meio de assinatura eletrônica avançada ou qualificada (como a plataforma Gov.br, certificados ICP-Brasil ou plataformas digitais
+            reconhecidas), nos termos da Lei nº 14.063/2020 e da MP nº 2.200-2/2001, renunciando a qualquer impugnação quanto à sua autenticidade e
+            integridade.
+          </li>
+          <li>
+            <strong>VI.</strong> Fica eleito o foro da Comarca de Goiânia/GO para dirimir quaisquer dúvidas decorrentes desta proposta, com renúncia a
+            qualquer outro, ressalvadas as disposições do CDC.
+          </li>
+        </ol>
+      </Secao>
+
+      <p className="mt-8 break-inside-avoid">
+        {EMPRESA.cidade}/{EMPRESA.uf}, {dataExtenso(d.data)}.
       </p>
 
-      <Titulo>Vendedor(a) / proprietário(a)</Titulo>
-      <p className="mt-1">
-        {d.vendedor ? (
-          <>
-            <strong>{d.vendedor.nome}</strong>
-            {qualificacao(d.vendedor)}.
-          </>
-        ) : (
-          'Proprietário(a) do imóvel descrito abaixo.'
-        )}
-      </p>
-
-      <Titulo>Imóvel</Titulo>
-      <p className="mt-1">
-        {d.imovel}
-        {d.unidade ? `. Unidade: ${d.unidade}` : ''}.
-      </p>
-
-      <Titulo>Valor e forma de pagamento</Titulo>
-      <p className="mt-1">
-        O(a) proponente oferece pelo imóvel o valor total de <strong>{brl(d.valor)}</strong> ({porExtenso(d.valor)}), a ser pago da seguinte forma:
-      </p>
-      <ul className="mt-1 list-disc pl-5">
-        {d.entrada ? <li>Entrada / sinal de {brl(d.entrada)} ({porExtenso(d.entrada)})</li> : null}
-        {d.formas.map((f) => (
-          <li key={f}>{FORMAS_PAGAMENTO[f] ?? f}</li>
+      <div className="grid grid-cols-1 gap-x-10 sm:grid-cols-2 print:grid-cols-2">
+        {d.compradores.map((c, i) => (
+          <Assinatura key={`c${i}`} nome={c.nome} papel="Proponente comprador(a)" extra={doc(c.documento) || undefined} />
         ))}
-      </ul>
-      {d.condicoes && (
-        <>
-          <Titulo>Condições</Titulo>
-          <p className="mt-1 whitespace-pre-line">{d.condicoes}</p>
-        </>
-      )}
-
-      <Titulo>Disposições</Titulo>
-      <p className="mt-1 text-[12px]">
-        Esta proposta é válida por {d.validadeDias} dias a contar da emissão e não obriga o(a) vendedor(a) a aceitá-la. A concretização do negócio depende
-        da análise da documentação do imóvel e das partes e, havendo financiamento, da aprovação do crédito. Aceita a proposta, as partes formalizarão a
-        compra e venda por contrato próprio. Intermediação: Mais Novos Imóveis ({EMPRESA.creci})
-        {d.corretor?.nome ? `, corretor(a) ${d.corretor.nome}${d.corretor.creci ? `, CRECI ${d.corretor.creci}` : ''}` : ''}.
-      </p>
-
-      <p className="mt-6">
-        {cidade}/{EMPRESA.uf}, ______ de ______________________ de ________.
-      </p>
-
-      <div className="mt-2 grid grid-cols-1 gap-x-8 sm:grid-cols-3 print:grid-cols-3">
-        <Assinatura nome={d.comprador.nome} papel="Proponente comprador(a)" extra={doc(d.comprador.documento)} />
-        <Assinatura
-          nome={d.vendedor?.nome ?? ''}
-          papel="Vendedor(a): de acordo"
-          extra={[doc(d.vendedor?.documento), d.vendedor?.representante].filter(Boolean).join(' · ') || undefined}
-        />
-        <Assinatura nome={d.corretor?.nome ?? ''} papel="Corretor(a) de imóveis" extra={d.corretor?.creci ? `CRECI ${d.corretor.creci}` : EMPRESA.creci} />
+        {(d.vendedores.length ? d.vendedores : [{ nome: '' } as Pessoa]).map((v, i) => (
+          <Assinatura
+            key={`v${i}`}
+            nome={v.nome}
+            papel="Vendedor(a): de acordo"
+            extra={[doc(v.documento), v.representante].filter(Boolean).join(' · ') || undefined}
+          />
+        ))}
+        <Assinatura nome={d.corretor?.nome ?? ''} papel="Corretor(a) responsável" extra={d.corretor?.creci ? `CRECI ${d.corretor.creci}` : EMPRESA.creci} />
       </div>
+
+      <footer className="mt-10 flex items-center justify-between border-t border-[#e6e8eb] pt-3 text-[10.5px] text-[#9aa0a6]">
+        <span>
+          {EMPRESA.razao} · CNPJ {EMPRESA.cnpj} · {EMPRESA.creci}
+        </span>
+        <span>maisnovosimoveis.com</span>
+      </footer>
     </article>
   );
 }

@@ -16,8 +16,8 @@ export async function buscarEmpresas(q: string): Promise<Empresa[]> {
   const like = `%${t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}%`;
   const rows = await query<EmpresaRow>(
     `select e.*, (select count(*) from development_empresas de where de.empresa_id = e.id) as total from empresas e
-      where $1 = '' or ${norm('e.razao_social')} like $2 or ${norm('e.nome_fantasia')} like $2 or ($3 <> '' and e.cnpj like $3 || '%')
-      order by total desc, coalesce(e.nome_fantasia, e.razao_social) limit 30`,
+      where $1 = '' or ${norm('e.razao_social')} like $2 or ${norm('e.nome_fantasia')} like $2 or ${norm('e.nome_perfil')} like $2 or ($3 <> '' and e.cnpj like $3 || '%')
+      order by total desc, coalesce(e.nome_perfil, e.nome_fantasia, e.razao_social) limit 30`,
     [t, like, dig.length >= 4 ? dig : '']
   );
   return rows.map(mapEmpresa);
@@ -38,10 +38,11 @@ export async function cadastrarPorCnpj(cnpj: string): Promise<{ ok: true; empres
   }
   if (!dados) return { ok: false, erro: 'CNPJ não encontrado na Receita Federal.' };
   const r = await query<EmpresaRow>(
-    `insert into empresas (cnpj, razao_social, nome_fantasia, situacao, data_situacao, data_inicio, municipio, uf, atividade, receita, receita_atualizada_em, criado_por)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11)
+    `insert into empresas (cnpj, razao_social, nome_fantasia, situacao, data_situacao, data_inicio, municipio, uf, atividade, receita, receita_atualizada_em, criado_por,
+                           situacao_especial, data_situacao_especial)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,now(),$11,$12,$13)
      on conflict (cnpj) do update set updated_at = now() returning *`,
-    [d, dados.razaoSocial, dados.nomeFantasia, dados.situacao, dados.dataSituacao, dados.dataInicio, dados.municipio, dados.uf, dados.atividade, JSON.stringify(dados.bruto), eu.email]
+    [d, dados.razaoSocial, dados.nomeFantasia, dados.situacao, dados.dataSituacao, dados.dataInicio, dados.municipio, dados.uf, dados.atividade, JSON.stringify(dados.bruto), eu.email, dados.situacaoEspecial, dados.dataSituacaoEspecial]
   );
   return { ok: true, empresa: mapEmpresa(r[0]), nova: true };
 }
@@ -61,19 +62,37 @@ export async function atualizarPelaReceita(id: string): Promise<{ ok: boolean; e
   if (!dados) return { ok: false, erro: 'CNPJ não encontrado na Receita Federal.' };
   const r = await query<EmpresaRow>(
     `update empresas set razao_social=$2, situacao=$3, data_situacao=$4, data_inicio=$5, municipio=$6, uf=$7, atividade=$8, receita=$9,
-            nome_fantasia = coalesce(nome_fantasia, $10), receita_atualizada_em = now(), updated_at = now()
+            nome_fantasia = coalesce(nome_fantasia, $10), situacao_especial = $11, data_situacao_especial = $12, receita_atualizada_em = now(), updated_at = now()
       where id = $1::uuid returning *`,
-    [id, dados.razaoSocial, dados.situacao, dados.dataSituacao, dados.dataInicio, dados.municipio, dados.uf, dados.atividade, JSON.stringify(dados.bruto), dados.nomeFantasia]
+    [id, dados.razaoSocial, dados.situacao, dados.dataSituacao, dados.dataInicio, dados.municipio, dados.uf, dados.atividade, JSON.stringify(dados.bruto), dados.nomeFantasia, dados.situacaoEspecial, dados.dataSituacaoEspecial]
   );
   return { ok: true, empresa: mapEmpresa(r[0]) };
 }
 
-export async function salvarEmpresa(id: string, d: { nomeFantasia: string; historico: string }): Promise<{ ok: boolean; erro?: string }> {
+export async function salvarEmpresa(
+  id: string,
+  d: { nomePerfil: string; historico: string; anoFundacao?: number | null; grupoPrincipalId?: string | null }
+): Promise<{ ok: boolean; erro?: string }> {
   await exigirGestor();
-  await query('update empresas set nome_fantasia = $2, historico = $3, updated_at = now() where id = $1::uuid', [
+  const ano = d.anoFundacao ? Math.round(Number(d.anoFundacao)) : null;
+  if (ano && (ano < 1850 || ano > new Date().getFullYear())) return { ok: false, erro: 'Ano de fundação inválido.' };
+  let grupo = d.grupoPrincipalId && /^[0-9a-f-]{36}$/i.test(d.grupoPrincipalId) ? d.grupoPrincipalId : null;
+  if (grupo === id) grupo = null;
+  if (grupo) {
+    // a principal não pode estar dentro de outro grupo (evita "grupo de grupo")
+    const g = await query<{ grupo_principal_id: string | null }>('select grupo_principal_id from empresas where id = $1::uuid', [grupo]);
+    if (!g[0]) return { ok: false, erro: 'Empresa principal não encontrada.' };
+    if (g[0].grupo_principal_id) grupo = g[0].grupo_principal_id === id ? null : g[0].grupo_principal_id;
+    // esta empresa deixa de ser principal: as que estavam no grupo dela passam para o novo
+    if (grupo) await query('update empresas set grupo_principal_id = $2::uuid where grupo_principal_id = $1::uuid', [id, grupo]);
+  }
+  await query('update empresas set nome_perfil = $2, historico = $3, ano_fundacao = $4, grupo_principal_id = $5, slug = case when $6 then null else slug end, updated_at = now() where id = $1::uuid', [
     id,
-    String(d.nomeFantasia ?? '').trim().slice(0, 120) || null,
-    String(d.historico ?? '').trim().slice(0, 2000) || null
+    String(d.nomePerfil ?? '').trim().slice(0, 120) || null,
+    String(d.historico ?? '').trim().slice(0, 3000) || null,
+    ano,
+    grupo,
+    false
   ]);
   return { ok: true };
 }
@@ -136,9 +155,10 @@ export async function definirCnpj(id: string, cnpj: string): Promise<{ ok: true;
   // o nome que a equipe já usava (ex.: veio do PDF) continua como nome fantasia
   const r = await query<EmpresaRow>(
     `update empresas set cnpj = $2, razao_social = $3, nome_fantasia = coalesce(nullif(nome_fantasia, ''), $4), situacao = $5, data_situacao = $6,
-            data_inicio = $7, municipio = $8, uf = $9, atividade = $10, receita = $11, receita_atualizada_em = now(), updated_at = now()
+            data_inicio = $7, municipio = $8, uf = $9, atividade = $10, receita = $11, situacao_especial = $12, data_situacao_especial = $13,
+            receita_atualizada_em = now(), updated_at = now()
       where id = $1::uuid returning *`,
-    [id, d, dados.razaoSocial, dados.nomeFantasia, dados.situacao, dados.dataSituacao, dados.dataInicio, dados.municipio, dados.uf, dados.atividade, JSON.stringify(dados.bruto)]
+    [id, d, dados.razaoSocial, dados.nomeFantasia, dados.situacao, dados.dataSituacao, dados.dataInicio, dados.municipio, dados.uf, dados.atividade, JSON.stringify(dados.bruto), dados.situacaoEspecial, dados.dataSituacaoEspecial]
   );
   return { ok: true, empresa: mapEmpresa(r[0]), juntou: false };
 }
@@ -170,9 +190,9 @@ export async function completarPendentesReceita(limite = 4): Promise<{ feitos: n
       }
       await query(
         `update empresas set razao_social = $2, nome_fantasia = coalesce(nullif(nome_fantasia, ''), $3), situacao = $4, data_situacao = $5, data_inicio = $6,
-                municipio = $7, uf = $8, atividade = $9, receita = $10, receita_atualizada_em = now(), updated_at = now()
+                municipio = $7, uf = $8, atividade = $9, receita = $10, situacao_especial = $11, data_situacao_especial = $12, receita_atualizada_em = now(), updated_at = now()
           where id = $1`,
-        [e.id, dados.razaoSocial, dados.nomeFantasia, dados.situacao, dados.dataSituacao, dados.dataInicio, dados.municipio, dados.uf, dados.atividade, JSON.stringify(dados.bruto)]
+        [e.id, dados.razaoSocial, dados.nomeFantasia, dados.situacao, dados.dataSituacao, dados.dataInicio, dados.municipio, dados.uf, dados.atividade, JSON.stringify(dados.bruto), dados.situacaoEspecial, dados.dataSituacaoEspecial]
       );
       feitos++;
     } catch {

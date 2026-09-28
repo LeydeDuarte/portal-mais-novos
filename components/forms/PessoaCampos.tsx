@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 import CepField, { type Endereco } from '../CepField';
 import { textoDoArquivo, lerIdentidade, lerComprovante, formatarCpf } from '@/lib/leitura-documentos';
 import { ESTADO_CIVIL } from '@/lib/proposta-textos';
+import { buscarEmpresas } from '@/lib/actions-empresas';
+import { formatarCnpj, nomeEmpresa, type Empresa } from '@/lib/empresas-tipos';
 import type { Pessoa } from '@/lib/actions-propostas';
 
 export const input = 'w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 text-sm outline-none focus:border-accent';
@@ -32,7 +34,21 @@ export default function PessoaCampos({ valor, onChange, empresa = false }: { val
   const set = (m: Partial<PessoaForm>) => onChange({ ...ref.current, ...m });
   const [lendo, setLendo] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [sugestoesEmp, setSugestoesEmp] = useState<Empresa[]>([]);
+  const buscaEmp = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const digitarNome = (nome: string) => {
+    set({ nome });
+    if (!pjAtivo) return;
+    if (buscaEmp.current) clearTimeout(buscaEmp.current);
+    if (nome.trim().length < 2) return setSugestoesEmp([]);
+    buscaEmp.current = setTimeout(() => buscarEmpresas(nome).then(setSugestoesEmp).catch(() => {}), 250);
+  };
+  const escolherEmpresa = (e: Empresa) => {
+    set({ nome: e.razaoSocial, documento: e.cnpj ? formatarCnpj(e.cnpj) : ref.current.documento, cidade: e.municipio ?? ref.current.cidade, uf: e.uf ?? ref.current.uf });
+    setSugestoesEmp([]);
+  };
   const pj = empresa || (valor.documento ?? '').replace(/\D/g, '').length > 11;
+  const pjAtivo = pj;
 
   const ler = async (tipo: 'identidade' | 'endereco', f?: File) => {
     if (!f) return;
@@ -98,8 +114,30 @@ export default function PessoaCampos({ valor, onChange, empresa = false }: { val
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <span className={label}>{pj ? 'Razão social / nome *' : 'Nome completo *'}</span>
-          <input className={input} value={valor.nome} onChange={(e) => set({ nome: e.target.value })} maxLength={160} />
+          <span className={label}>{pj ? 'Empresa: razão social *' : 'Nome completo *'}</span>
+          <div className="relative">
+            <input
+              className={input}
+              value={valor.nome}
+              onChange={(e) => digitarNome(e.target.value)}
+              onBlur={() => setTimeout(() => setSugestoesEmp([]), 200)}
+              maxLength={160}
+              placeholder={pj ? 'Comece a digitar: aparecem as empresas cadastradas' : ''}
+            />
+            {pj && sugestoesEmp.length > 0 && (
+              <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-[var(--border)] bg-[var(--bg)] p-1 shadow-xl">
+                {sugestoesEmp.map((e) => (
+                  <button key={e.id} type="button" onMouseDown={() => escolherEmpresa(e)} className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-[var(--pill-bg)]">
+                    <span className="font-semibold">{nomeEmpresa(e)}</span>
+                    <span className="block text-xs text-[var(--text-muted)]">
+                      {e.razaoSocial}
+                      {e.cnpj ? ` · ${formatarCnpj(e.cnpj)}` : ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div>
           <span className={label}>{pj ? 'CNPJ ou CPF' : 'CPF'}</span>
@@ -149,6 +187,7 @@ export default function PessoaCampos({ valor, onChange, empresa = false }: { val
         </div>
       </div>
       <CepField
+        modo="pessoa"
         value={end}
         onChange={(e) => set({ cep: e.cep, endereco: e.logradouro, bairro: e.bairro, cidade: e.cidade, uf: e.uf })}
       />

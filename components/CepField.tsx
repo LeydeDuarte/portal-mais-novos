@@ -52,7 +52,7 @@ type Props = {
   // Chamado quando a pessoa escolhe um condomínio já cadastrado com o mesmo CEP
   onPickCondominio?: (s: CondominioSugestao) => void;
   // No cadastro de empreendimento: só avisa que já existe, pra não duplicar
-  modo?: 'imovel' | 'empreendimento';
+  modo?: 'imovel' | 'empreendimento' | 'pessoa';
 };
 
 const inputClass = 'w-full min-w-0 rounded-lg border border-[var(--border)] px-3 py-2.5 text-sm outline-none';
@@ -73,7 +73,7 @@ export default function CepField({ value, onChange, onPickCondominio, modo = 'im
     setStatus('loading');
     setSugestoes([]);
     (async () => {
-      const [endereco, condos] = await Promise.all([buscarCep(cep), findCondominiosByCep(cep).catch(() => [])]);
+      const [endereco, condos] = await Promise.all([buscarCep(cep), modo === 'pessoa' ? Promise.resolve([]) : findCondominiosByCep(cep).catch(() => [])]);
       if (endereco) {
         // CEP geral da cidade (ex.: 74000-000) vem sem rua/bairro: não apaga o que já foi digitado
         const atual = valueRef.current;

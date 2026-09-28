@@ -16,7 +16,7 @@ import {
   type Corretor,
   type OpcaoAlvo
 } from '@/lib/actions-propostas';
-import { FORMAS_PAGAMENTO, brl } from '@/lib/proposta-textos';
+import { brl } from '@/lib/proposta-textos';
 
 const moeda = (v: string | number) => {
   const d = String(v).replace(/\D/g, '').slice(0, 12);
@@ -35,14 +35,11 @@ function NovaProposta() {
   const [opcoes, setOpcoes] = useState<OpcaoAlvo[]>([]);
   const [imovelTexto, setImovelTexto] = useState('');
   const [unidade, setUnidade] = useState('');
-  const [comprador, setComprador] = useState<PessoaForm>({ nome: '' });
-  const [vendedor, setVendedor] = useState<PessoaForm>({ nome: '' });
-  const [vendedorPJ, setVendedorPJ] = useState(false);
+  const [compradores, setCompradores] = useState<PessoaForm[]>([{ nome: '' }]);
+  const [vendedores, setVendedores] = useState<(PessoaForm & { pj?: boolean })[]>([{ nome: '' }]);
   const [guardarVendedor, setGuardarVendedor] = useState(false);
   const [corretor, setCorretor] = useState<Corretor>({ nome: '' });
   const [valor, setValor] = useState('');
-  const [entrada, setEntrada] = useState('');
-  const [formas, setFormas] = useState<string[]>([]);
   const [condicoes, setCondicoes] = useState('');
   const [validade, setValidade] = useState(5);
   const [erro, setErro] = useState<string | null>(null);
@@ -60,11 +57,8 @@ function NovaProposta() {
     setImovelTexto(a.titulo);
     setOpcoes([]);
     setBusca('');
-    if (a.vendedor) {
-      setVendedor(a.vendedor);
-      setVendedorPJ((a.vendedor.documento ?? '').replace(/\D/g, '').length > 11);
-    }
-    setGuardarVendedor(!a.vendedor);
+    if (a.vendedores.length) setVendedores(a.vendedores.map((v) => ({ ...v, pj: (v.documento ?? '').replace(/\D/g, '').length > 11 })));
+    setGuardarVendedor(!a.vendedores.length);
   };
 
   // abre já com o imóvel (?imovel= / ?tipologia= / ?condominio=) ou editando (?id=)
@@ -77,15 +71,10 @@ function NovaProposta() {
         if (!p) return;
         setImovelTexto(p.imovelTexto ?? '');
         setUnidade(p.unidade ?? '');
-        setComprador(p.comprador);
-        if (p.vendedor) {
-          setVendedor(p.vendedor);
-          setVendedorPJ((p.vendedor.documento ?? '').replace(/\D/g, '').length > 11);
-        }
+        setCompradores(p.compradores.length ? p.compradores : [p.comprador]);
+        if (p.vendedores.length) setVendedores(p.vendedores.map((v) => ({ ...v, pj: (v.documento ?? '').replace(/\D/g, '').length > 11 })));
         if (p.corretor) setCorretor(p.corretor);
         setValor(moeda(p.valor));
-        setEntrada(p.entrada ? moeda(p.entrada) : '');
-        setFormas(p.formas);
         setCondicoes(p.condicoes ?? '');
         setValidade(p.validadeDias);
         if (p.propertyId) carregarAlvo('imovel', p.propertyId).then((a) => a && setAlvo(a));
@@ -119,12 +108,11 @@ function NovaProposta() {
         alvo: alvo ? { tipo: alvo.tipo, id: alvo.id } : null,
         imovelTexto,
         unidade,
-        comprador: fecharEndereco(comprador),
-        vendedor: vendedor.nome.trim() ? fecharEndereco(vendedor) : null,
+        compradores: compradores.filter((c) => c.nome.trim()).map(fecharEndereco),
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        vendedores: vendedores.filter((v) => v.nome.trim()).map(({ pj, ...v }) => fecharEndereco(v)),
         corretor,
         valor: numero(valor),
-        entrada: numero(entrada) || null,
-        formas,
         condicoes,
         validadeDias: validade,
         guardarVendedor: guardarVendedor && alvo ? (alvo.tipo === 'imovel' ? 'imovel' : 'condominio') : null
@@ -217,36 +205,72 @@ function NovaProposta() {
             )
           })}
 
-          {Secao({ n: 2, titulo: 'Comprador (proponente)', children: <PessoaCampos valor={comprador} onChange={setComprador} /> })}
+          {Secao({
+            n: 2,
+            titulo: compradores.length > 1 ? 'Compradores (proponentes)' : 'Comprador (proponente)',
+            children: (
+              <>
+                {compradores.map((c, i) => (
+                  <div key={i} className={i > 0 ? 'border-t border-[var(--border)] pt-4' : ''}>
+                    {compradores.length > 1 && (
+                      <div className="mb-2 flex items-center justify-between text-sm font-bold">
+                        Comprador {i + 1}
+                        <button type="button" onClick={() => setCompradores(compradores.filter((_, j) => j !== i))} className="text-xs font-semibold text-red-600">
+                          Tirar
+                        </button>
+                      </div>
+                    )}
+                    <PessoaCampos valor={c} onChange={(v) => setCompradores((l) => l.map((x, j) => (j === i ? v : x)))} />
+                  </div>
+                ))}
+                <button type="button" onClick={() => setCompradores([...compradores, { nome: '' }])} className="w-fit rounded-full border border-dashed border-accent px-4 py-2 text-sm font-bold text-accent">
+                  + Acrescentar comprador
+                </button>
+              </>
+            )
+          })}
 
           {Secao({
             n: 3,
-            titulo: 'Vendedor (proprietário ou construtora)',
+            titulo: vendedores.length > 1 ? 'Vendedores (proprietários ou construtora)' : 'Vendedor (proprietário ou construtora)',
             dica: alvo?.vendedorOrigem
               ? `Preenchido com o vendedor guardado ${alvo.vendedorOrigem === 'imovel' ? 'neste anúncio' : 'neste condomínio'}.`
-              : 'Guarde o vendedor para as próximas propostas deste imóvel já saírem preenchidas.',
+              : 'Guarde os vendedores para as próximas propostas deste imóvel já saírem preenchidas.',
             children: (
               <>
-                <div className="flex gap-2">
-                  {[
-                    [false, 'Pessoa física'],
-                    [true, 'Empresa (construtora/incorporadora)']
-                  ].map(([v, rot]) => (
-                    <button
-                      key={String(v)}
-                      type="button"
-                      onClick={() => setVendedorPJ(v as boolean)}
-                      className={`rounded-full px-3.5 py-2 text-sm font-semibold ${vendedorPJ === v ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}
-                    >
-                      {rot as string}
-                    </button>
-                  ))}
-                </div>
-                <PessoaCampos valor={vendedor} onChange={setVendedor} empresa={vendedorPJ} />
+                {vendedores.map((v, i) => (
+                  <div key={i} className={`flex flex-col gap-3 ${i > 0 ? 'border-t border-[var(--border)] pt-4' : ''}`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {vendedores.length > 1 && <span className="mr-1 text-sm font-bold">Vendedor {i + 1}</span>}
+                      {[
+                        [false, 'Pessoa física'],
+                        [true, 'Empresa']
+                      ].map(([pj, rot]) => (
+                        <button
+                          key={String(pj)}
+                          type="button"
+                          onClick={() => setVendedores((l) => l.map((x, j) => (j === i ? { ...x, pj: pj as boolean } : x)))}
+                          className={`rounded-full px-3.5 py-2 text-sm font-semibold ${!!v.pj === pj ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}
+                        >
+                          {rot as string}
+                        </button>
+                      ))}
+                      {vendedores.length > 1 && (
+                        <button type="button" onClick={() => setVendedores(vendedores.filter((_, j) => j !== i))} className="ml-auto text-xs font-semibold text-red-600">
+                          Tirar
+                        </button>
+                      )}
+                    </div>
+                    <PessoaCampos valor={v} empresa={!!v.pj} onChange={(nv) => setVendedores((l) => l.map((x, j) => (j === i ? { ...nv, pj: x.pj } : x)))} />
+                  </div>
+                ))}
+                <button type="button" onClick={() => setVendedores([...vendedores, { nome: '' }])} className="w-fit rounded-full border border-dashed border-accent px-4 py-2 text-sm font-bold text-accent">
+                  + Acrescentar vendedor
+                </button>
                 {alvo && (
                   <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={guardarVendedor} onChange={(e) => setGuardarVendedor(e.target.checked)} />
-                    Guardar como vendedor padrão {alvo.tipo === 'imovel' ? 'deste anúncio' : 'deste condomínio (vale para as tipologias)'}
+                    Guardar como vendedor(es) padrão {alvo.tipo === 'imovel' ? 'deste anúncio' : 'deste condomínio (vale para as tipologias)'}
                   </label>
                 )}
               </>
@@ -255,7 +279,7 @@ function NovaProposta() {
 
           {Secao({
             n: 4,
-            titulo: 'Corretor',
+            titulo: 'Corretor responsável',
             children: (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -272,17 +296,13 @@ function NovaProposta() {
 
           {Secao({
             n: 5,
-            titulo: 'Valor e condições',
+            titulo: 'Valor e condições de pagamento',
             children: (
               <>
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <span className={label}>Valor da proposta (R$) *</span>
+                    <span className={label}>Valor total da proposta (R$) *</span>
                     <input className={input} inputMode="numeric" value={valor} onChange={(e) => setValor(moeda(e.target.value))} />
-                  </div>
-                  <div>
-                    <span className={label}>Entrada / sinal (R$)</span>
-                    <input className={input} inputMode="numeric" value={entrada} onChange={(e) => setEntrada(moeda(e.target.value))} />
                   </div>
                   <div>
                     <span className={label}>Validade</span>
@@ -295,32 +315,16 @@ function NovaProposta() {
                     </select>
                   </div>
                 </div>
-                <div>
-                  <span className={label}>Forma de pagamento *</span>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(FORMAS_PAGAMENTO).map(([k, v]) => {
-                      const on = formas.includes(k);
-                      return (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() => setFormas(on ? formas.filter((x) => x !== k) : [...formas, k])}
-                          className={`rounded-full border px-3.5 py-2 text-sm font-semibold ${on ? 'border-accent bg-accent text-white' : 'border-[var(--border)] hover:border-accent'}`}
-                        >
-                          {v}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div>
-                  <span className={label}>Condições (texto que vai no documento)</span>
+                <div className="rounded-2xl border-2 border-accent/40 bg-accent/5 p-4">
+                  <span className="mb-1 block text-sm font-bold uppercase tracking-wide text-accent">Condições de pagamento *</span>
+                  <p className="mb-2 text-xs text-[var(--text-muted)]">
+                    Descreva tudo: se é à vista, sinal, parcelas, financiamento, FGTS, permuta, prazos e posse. Vai em destaque no documento, sem limite de texto.
+                  </p>
                   <textarea
-                    className={`${input} min-h-[110px]`}
+                    className={`${input} min-h-[200px] bg-[var(--bg)]`}
                     value={condicoes}
                     onChange={(e) => setCondicoes(e.target.value)}
-                    placeholder="Ex.: sinal na assinatura do contrato; saldo por financiamento bancário em até 60 dias; posse na entrega das chaves…"
-                    maxLength={3000}
+                    placeholder={'Ex.:\nSinal de R$ 50.000 na assinatura do contrato;\nSaldo de R$ 450.000 por financiamento bancário em até 60 dias;\nPosse na entrega das chaves após a quitação.'}
                   />
                 </div>
               </>
