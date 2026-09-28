@@ -21,6 +21,7 @@ import { chaveNome, mesmoCondominio } from './planilha-condominios';
 import { depoimentosAtivos, destaquesAtivos, hashTexto } from './especiais';
 import { MESES, FASES_EXIGEM_CONCEPCAO, getStatusBucket } from './classification';
 import { gravarConcepcao, resolverEmpresaImport, acrescentarConcepcao } from './empresas';
+import { gravarProprietariosDoImovel } from './proprietarios';
 import type { EmpresaPlanilha } from './planilha-condominios';
 import type { EmpresaNaConcepcao } from './empresas-tipos';
 import type { DepoimentoCard, DestaqueCard } from './especiais-tipos';
@@ -743,6 +744,13 @@ export type CreatePropertyInput = {
   uf?: string;
   condominio?: string;
   isTipologia?: boolean;
+  // novos (set/2026): área do lote (casa), valores mensais e campos só da equipe
+  areaLote?: number;
+  valorCondominio?: number;
+  iptuMensal?: number;
+  complemento?: string; // nº da unidade/apto: nunca aparece no site
+  obsInterna?: string; // observação só do painel
+  proprietarios?: { proprietarioId: string; principal: boolean }[]; // undefined = não mexe
 };
 export type PropertyFields = Omit<CreatePropertyInput, 'id' | 'corretorEmail' | 'isTipologia'>;
 
@@ -787,12 +795,17 @@ function propertyValues(input: PropertyFields) {
     clean(input.condominio ? formatTitulo(input.condominio) : undefined),
     !!input.videoVertical,
     JSON.stringify(sanitizePhotos(input.plantas)),
-    input.visibilidade === 'privado' ? 'privado' : 'publico'
+    input.visibilidade === 'privado' ? 'privado' : 'publico',
+    input.areaLote && input.areaLote > 0 ? input.areaLote : null,
+    input.valorCondominio && input.valorCondominio > 0 ? input.valorCondominio : null,
+    input.iptuMensal && input.iptuMensal > 0 ? input.iptuMensal : null,
+    clean(input.complemento?.slice(0, 120)),
+    clean(input.obsInterna?.slice(0, 4000))
   ];
 }
 const PROPERTY_COLS =
-  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical, plantas, visibilidade';
-const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', '', '::jsonb', ''];
+  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical, plantas, visibilidade, area_lote, valor_condominio, iptu_mensal, complemento, obs_interna';
+const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', '', '::jsonb', '', '', '', '', '', ''];
 
 export async function createProperty(input: CreatePropertyInput): Promise<void> {
   const staff = await requireStaff();
@@ -802,6 +815,7 @@ export async function createProperty(input: CreatePropertyInput): Promise<void> 
     `insert into properties (id, corretor_email, is_tipologia, match_score, ${PROPERTY_COLS}) values ($1, $2, $3, 50, ${placeholders})`,
     [input.id, staff.email, !!input.isTipologia, ...values]
   );
+  if (input.proprietarios) await gravarProprietariosDoImovel(input.id, input.proprietarios);
   if (!input.isTipologia) await avisarInteressados(input.id).catch((err) => console.error('Aviso a interessados falhou', err));
   if (!input.isTipologia) await miniaturaDe('properties', input.id).catch(() => {});
 }
@@ -814,6 +828,7 @@ export async function updateProperty(id: string, input: PropertyFields): Promise
     .map((col, i) => `${col} = $${i + 2}${PROPERTY_CASTS[i]}`)
     .join(', ');
   await query(`update properties set ${sets} where id = $1`, [id, ...values]);
+  if (input.proprietarios) await gravarProprietariosDoImovel(id, input.proprietarios);
   await miniaturaDe('properties', id).catch(() => {});
 }
 
@@ -976,7 +991,12 @@ export async function getPropertyForEdit(id: string): Promise<PropertyEditData |
     bairro: r.bairro ?? undefined,
     cidade: r.cidade ?? undefined,
     uf: r.uf ?? undefined,
-    condominio: r.condominio ?? undefined
+    condominio: r.condominio ?? undefined,
+    areaLote: r.area_lote != null ? Number(r.area_lote) : undefined,
+    valorCondominio: r.valor_condominio != null ? Number(r.valor_condominio) : undefined,
+    iptuMensal: r.iptu_mensal != null ? Number(r.iptu_mensal) : undefined,
+    complemento: r.complemento ?? undefined,
+    obsInterna: r.obs_interna ?? undefined
   };
 }
 
@@ -1717,22 +1737,22 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
 }
 
 // ---------------- Equipe (só o administrador gerencia) ----------------
-export type MembroEquipe = { email: string; name: string; role: StaffRole; criadoEm: string; imoveis: number };
+export type MembroEquipe = { email: string; name: string; role: StaffRole; criadoEm: string; imoveis: number; telefone?: string | null };
 
 const requireAdmin = exigirAdmin;
 
 export async function listarEquipe(): Promise<MembroEquipe[]> {
   await requireAdmin();
-  const rows = await query<{ email: string; name: string; role: StaffRole; created_at: string; imoveis: string }>(
-    `select u.email, u.name, u.role, u.created_at,
+  const rows = await query<{ email: string; name: string; role: StaffRole; created_at: string; imoveis: string; telefone: string | null }>(
+    `select u.email, u.name, u.role, u.created_at, u.telefone,
         (select count(*) from properties p where p.corretor_email = u.email and p.is_tipologia = false) as imoveis
        from staff_users u order by case u.role when 'admin' then 0 when 'analista' then 1 else 2 end, u.name`
   );
-  return rows.map((r) => ({ email: r.email, name: r.name, role: r.role, criadoEm: String(r.created_at), imoveis: Number(r.imoveis) || 0 }));
+  return rows.map((r) => ({ email: r.email, name: r.name, role: r.role, criadoEm: String(r.created_at), imoveis: Number(r.imoveis) || 0, telefone: r.telefone }));
 }
 
 /** Cria ou altera um membro. Senha em branco numa alteração = mantém a atual. */
-export async function salvarMembro(m: { email: string; name: string; role: StaffRole; senha?: string }): Promise<{ ok: boolean; erro?: string }> {
+export async function salvarMembro(m: { email: string; name: string; role: StaffRole; senha?: string; telefone?: string }): Promise<{ ok: boolean; erro?: string }> {
   const eu = await requireAdmin();
   const email = m.email.trim().toLowerCase();
   const name = m.name.trim();
@@ -1754,6 +1774,8 @@ export async function salvarMembro(m: { email: string; name: string; role: Staff
   } else {
     await query('insert into staff_users (email, name, role, password_hash) values ($1, $2, $3, $4)', [email, name, m.role, hash]);
   }
+  // telefone: aparece na marca d'água do link "compartilhar com corretor"
+  if (m.telefone !== undefined) await query('update staff_users set telefone = $2 where lower(email) = $1', [email, String(m.telefone).replace(/\D/g, '').slice(0, 13) || null]);
   return { ok: true };
 }
 

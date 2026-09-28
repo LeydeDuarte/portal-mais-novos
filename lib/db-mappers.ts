@@ -44,6 +44,13 @@ export type PropertyRow = {
   cidade?: string | null;
   uf?: string | null;
   slug?: string | null;
+  area_lote?: string | number | null;
+  valor_condominio?: string | number | null;
+  iptu_mensal?: string | number | null;
+  complemento?: string | null;
+  obs_interna?: string | null;
+  photos_internas?: unknown;
+  compartilhamentos?: number | null;
   condominio?: string | null;
   is_tipologia?: boolean;
   video_vertical?: boolean;

@@ -10,11 +10,18 @@ import { useStaffSession } from '@/lib/use-staff-session';
 import { excluirProposta, getProposta, mudarStatusProposta, type Proposta } from '@/lib/actions-propostas';
 import { STATUS_PROPOSTA } from '@/lib/proposta-textos';
 import { imprimirProposta } from '@/lib/imprimir-proposta';
+import { lerProprietariosDoImovel } from '@/lib/actions-proprietarios';
+import type { ProprietarioDoImovel } from '@/lib/proprietarios';
+import { brl } from '@/lib/proposta-textos';
 
 export default function PropostaDetalhe({ params }: { params: { id: string } }) {
   const { staff, loaded } = useStaffSession();
   const router = useRouter();
   const [p, setP] = useState<Proposta | null | undefined>(undefined);
+  const [donos, setDonos] = useState<ProprietarioDoImovel[]>([]);
+  useEffect(() => {
+    if (p?.propertyId) lerProprietariosDoImovel(p.propertyId).then(setDonos).catch(() => {});
+  }, [p?.propertyId]);
 
   useEffect(() => {
     if (loaded && !staff) router.replace('/dashboard/login');
@@ -113,6 +120,32 @@ export default function PropostaDetalhe({ params }: { params: { id: string } }) 
                 Apagar
               </button>
             </div>
+            {(donos.length > 0 || p.vendedores.some((v) => v.telefone)) && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--pill-bg)] p-3 text-sm">
+                <span className="font-semibold">Enviar ao proprietário pelo WhatsApp:</span>
+                {[
+                  ...donos.map((o) => ({ nome: o.nome, tel: o.whatsapp })),
+                  ...p.vendedores.filter((v) => v.telefone && !donos.some((o) => o.nome === v.nome)).map((v) => ({ nome: v.nome, tel: v.telefone ?? null }))
+                ]
+                  .filter((x) => (x.tel ?? '').replace(/\D/g, '').length >= 10)
+                  .map((x) => {
+                    const n = (x.tel ?? '').replace(/\D/g, '');
+                    const msg = `Olá, ${x.nome.split(' ')[0]}! Temos uma proposta de ${brl(p.valor)} para o seu imóvel. Segue o PDF da proposta para sua análise.`;
+                    return (
+                      <a
+                        key={x.nome}
+                        href={`https://wa.me/${n.startsWith('55') ? n : `55${n}`}?text=${encodeURIComponent(msg)}`}
+                        target="_blank"
+                        rel="noopener"
+                        className="rounded-full bg-[#16A34A] px-3 py-1.5 text-xs font-bold text-white"
+                      >
+                        {x.nome}
+                      </a>
+                    );
+                  })}
+                <span className="w-full text-xs text-[var(--text-muted)]">Baixe o PDF antes e anexe na conversa (o WhatsApp não aceita anexo automático pelo link).</span>
+              </div>
+            )}
             <p className="mt-2 text-xs text-[var(--text-muted)]">
               Para gerar o PDF: &quot;Salvar em PDF&quot; → no destino escolha &quot;Salvar como PDF&quot;. Feita por {p.corretor?.nome ?? p.criadoPor} em{' '}
               {new Date(p.criadoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.

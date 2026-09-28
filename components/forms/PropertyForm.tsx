@@ -9,6 +9,9 @@ import CondominioPicker from '@/components/forms/CondominioPicker';
 import VideoFormato, { pareceVertical } from '@/components/forms/VideoFormato';
 import DescriptionEditor from '@/components/forms/DescriptionEditor';
 import { listCondominios, type CondominioResumo, type PropertyFields, type PropertyEditData } from '@/lib/actions';
+import ProprietariosPicker from './ProprietariosPicker';
+import { lerProprietariosDoImovel } from '@/lib/actions-proprietarios';
+import type { ProprietarioDoImovel } from '@/lib/proprietarios';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, ehCasa, type TipoUnidade } from '@/lib/tipologias';
 import { maskCurrencyInput } from '@/lib/currency';
 
@@ -41,6 +44,11 @@ type Values = {
   endereco: Endereco;
   photos: string[];
   plantas: string[];
+  areaLote: string;
+  valorCondominio: string;
+  iptuMensal: string;
+  complemento: string;
+  obsInterna: string;
 };
 
 const EMPTY: Values = {
@@ -66,6 +74,11 @@ const EMPTY: Values = {
   condominio: '',
   endereco: ENDERECO_VAZIO,
   photos: [],
+  areaLote: '',
+  valorCondominio: '',
+  iptuMensal: '',
+  complemento: '',
+  obsInterna: '',
   plantas: []
 };
 
@@ -95,6 +108,11 @@ function fromEditData(d: PropertyEditData): Values {
     condominio: d.condominio ?? '',
     endereco: { cep: d.cep ?? '', logradouro: d.logradouro ?? '', bairro: d.bairro ?? '', cidade: d.cidade ?? '', uf: d.uf ?? '' },
     photos: d.photos ?? [],
+    areaLote: d.areaLote ? String(d.areaLote) : '',
+    valorCondominio: d.valorCondominio ? String(Math.round(d.valorCondominio)) : '',
+    iptuMensal: d.iptuMensal ? String(Math.round(d.iptuMensal)) : '',
+    complemento: d.complemento ?? '',
+    obsInterna: d.obsInterna ?? '',
     plantas: d.plantas ?? []
   };
 }
@@ -113,6 +131,10 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [proprietarios, setProprietarios] = useState<ProprietarioDoImovel[]>([]);
+  useEffect(() => {
+    if (initial?.id) lerProprietariosDoImovel(initial.id).then(setProprietarios).catch(() => {});
+  }, [initial?.id]);
 
   useEffect(() => {
     listCondominios().then(setCondominios).catch(() => setCondominios([]));
@@ -179,7 +201,13 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         photos: v.photos,
         plantas: v.plantas,
         condominio: v.condominio || undefined,
-        ...v.endereco
+        ...v.endereco,
+        areaLote: v.areaLote ? Number(v.areaLote.replace(',', '.')) : undefined,
+        valorCondominio: Number(v.valorCondominio.replace(/\D/g, '')) || undefined,
+        iptuMensal: Number(v.iptuMensal.replace(/\D/g, '')) || undefined,
+        complemento: v.complemento || undefined,
+        obsInterna: v.obsInterna || undefined,
+        proprietarios: proprietarios.map((p) => ({ proprietarioId: p.id, principal: p.principal }))
       });
     } catch {
       setErro('Não foi possível salvar agora. Confira sua conexão (e se a sessão do painel não expirou) e tente de novo.');
@@ -274,9 +302,38 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
       <ChipSelect label="Banheiros" options={BANHEIRO_OPCOES} value={v.banheiros} onChange={(x) => set('banheiros', x)} />
       <ChipSelect label="Escaninhos" options={['0', '1', '2', '3+']} value={v.escaninhos} onChange={(x) => set('escaninhos', x)} />
 
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-semibold text-[var(--text-muted)]">Área (m²)</label>
-        <input required type="number" className={inputClass} value={v.area} onChange={(e) => set('area', e.target.value)} placeholder="98" />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Área privativa (m²)</label>
+          <input required type="number" className={inputClass} value={v.area} onChange={(e) => set('area', e.target.value)} placeholder="98" />
+        </div>
+        {['casa', 'sobrado', 'casa_condominio', 'terreno_lote', 'chacara_sitio_fazenda'].includes(v.tipoUnidade) && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Área do lote (m²)</label>
+            <input type="number" className={inputClass} value={v.areaLote} onChange={(e) => set('areaLote', e.target.value)} placeholder="360" />
+          </div>
+        )}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Condomínio (R$/mês)</label>
+          <input inputMode="numeric" className={inputClass} value={v.valorCondominio} onChange={(e) => set('valorCondominio', e.target.value.replace(/\D/g, ''))} placeholder="850" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-[var(--text-muted)]">IPTU (R$/mês)</label>
+          <input inputMode="numeric" className={inputClass} value={v.iptuMensal} onChange={(e) => set('iptuMensal', e.target.value.replace(/\D/g, ''))} placeholder="210" />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900 dark:bg-transparent">
+        <div className="text-sm font-bold">Só para a equipe (nunca aparece no site)</div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Complemento (número da unidade, apto, torre)</label>
+          <input className={inputClass} value={v.complemento} onChange={(e) => set('complemento', e.target.value)} placeholder="Apto 1502, Torre B" maxLength={120} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-[var(--text-muted)]">OBS</label>
+          <textarea className={`${inputClass} min-h-[70px]`} value={v.obsInterna} onChange={(e) => set('obsInterna', e.target.value)} placeholder="Chaves na portaria, aceita permuta, melhor horário de visita…" />
+        </div>
+        <ProprietariosPicker value={proprietarios} onChange={setProprietarios} />
       </div>
 
       <DescriptionEditor

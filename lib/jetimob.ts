@@ -403,6 +403,7 @@ export async function sincronizarImoveis(
             JSON.stringify(src)
           ]);
         }
+        await completarDonoEComplemento(e.id, i).catch(() => {});
         continue;
       }
       if (e) {
@@ -417,6 +418,7 @@ export async function sincronizarImoveis(
           fotosMudaram ? [...p, e.id, JSON.stringify(filaDe(fotos, plantas)), JSON.stringify(src)] : [...p, e.id]
         );
         res.atualizados++;
+        await completarDonoEComplemento(e.id, i).catch(() => {});
       } else {
         const id = `jt-${i.id_imovel}`;
         await query(
@@ -430,6 +432,7 @@ export async function sincronizarImoveis(
           [...p, id, email, JSON.stringify(filaDe(fotos, plantas)), JSON.stringify(src)]
         );
         res.criados++;
+        await completarDonoEComplemento(id, i).catch(() => {});
       }
     } catch (err) {
       res.erros.push(`Imóvel ${i?.codigo ?? i?.id_imovel}: ${err instanceof Error ? err.message.slice(0, 120) : 'erro'}`);
@@ -622,4 +625,62 @@ export async function importarLeadsJetimob(): Promise<{ importados: number; jaEx
     importados++;
   }
   return { importados, jaExistiam, total: leads.length };
+}
+
+
+// ---- Complemento e proprietários vindos da Jetimob ----
+// A Jetimob manda esses dados em campos que variam de conta para conta; lemos os
+// nomes mais comuns. Só completa o que está vazio no portal (nunca sobrescreve).
+type Dono = { nome: string; documento: string | null; whatsapp: string | null; email: string | null };
+function lerDonos(bruto: Record<string, unknown>): Dono[] {
+  const cands = [bruto.proprietarios, bruto.proprietario, bruto.owners, bruto.owner, bruto.cliente_proprietario].filter(Boolean);
+  const lista: unknown[] = cands.flatMap((c) => (Array.isArray(c) ? c : [c]));
+  const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : typeof v === 'number' ? String(v) : null);
+  const out: Dono[] = [];
+  for (const x of lista) {
+    if (!x || typeof x !== 'object') continue;
+    const o = x as Record<string, unknown>;
+    const nome = txt(o.nome) ?? txt(o.name) ?? txt(o.razao_social) ?? txt(o.nome_completo);
+    if (!nome) continue;
+    const tels = [o.celular, o.whatsapp, o.telefone, o.telefone_celular, o.fone, ...(Array.isArray(o.telefones) ? o.telefones : [])]
+      .map((t) => (t && typeof t === 'object' ? txt((t as Record<string, unknown>).numero ?? (t as Record<string, unknown>).telefone) : txt(t)))
+      .filter(Boolean) as string[];
+    const emails = [o.email, ...(Array.isArray(o.emails) ? o.emails : [])].map((e) => (e && typeof e === 'object' ? txt((e as Record<string, unknown>).email) : txt(e))).filter(Boolean) as string[];
+    out.push({
+      nome,
+      documento: (txt(o.cpf) ?? txt(o.cnpj) ?? txt(o.documento) ?? txt(o.cpf_cnpj))?.replace(/\D/g, '') || null,
+      whatsapp: tels[0]?.replace(/\D/g, '') || null,
+      email: emails[0] ?? null
+    });
+  }
+  return out;
+}
+
+async function completarDonoEComplemento(propertyId: string, imovel: unknown): Promise<void> {
+  const b = (imovel ?? {}) as Record<string, unknown>;
+  const comp = [b.endereco_complemento, b.complemento, b.unidade, b.endereco_unidade].find((v) => typeof v === 'string' && v.trim()) as string | undefined;
+  if (comp) await query("update properties set complemento = $2 where id = $1 and coalesce(complemento, '') = ''", [propertyId, comp.trim().slice(0, 120)]);
+  const donos = lerDonos(b);
+  if (!donos.length) return;
+  const ja = await query<{ n: string }>('select count(*) as n from property_proprietarios where property_id = $1', [propertyId]);
+  if (Number(ja[0]?.n) > 0) return;
+  for (const [k, d] of donos.entries()) {
+    const existe = d.documento
+      ? await query<{ id: string }>('select id from proprietarios where documento = $1 limit 1', [d.documento])
+      : await query<{ id: string }>('select id from proprietarios where lower(nome) = lower($1) and coalesce(whatsapp, \'\') = coalesce($2, \'\') limit 1', [d.nome, d.whatsapp]);
+    const id =
+      existe[0]?.id ??
+      (
+        await query<{ id: string }>(
+          "insert into proprietarios (tipo, nome, documento, whatsapp, email, criado_por) values ($1, $2, $3, $4, $5, 'jetimob') returning id",
+          [d.documento && d.documento.length === 14 ? 'pj' : 'pf', d.nome, d.documento, d.whatsapp, d.email]
+        )
+      )[0].id;
+    await query('insert into property_proprietarios (property_id, proprietario_id, principal, ordem) values ($1, $2::uuid, $3, $4) on conflict do nothing', [
+      propertyId,
+      id,
+      k === 0,
+      k
+    ]);
+  }
 }

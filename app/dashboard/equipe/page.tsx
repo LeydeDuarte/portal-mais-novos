@@ -14,7 +14,7 @@ const DESCRICAO: Record<StaffRole, string> = {
   corretor: 'Cadastra e edita só os próprios anúncios.'
 };
 
-const vazio = { email: '', name: '', role: 'corretor' as StaffRole, senha: '' };
+const vazio = { email: '', name: '', role: 'corretor' as StaffRole, senha: '', telefone: '' };
 
 export default function EquipePage() {
   const { staff, loaded } = useStaffSession();
@@ -97,6 +97,13 @@ export default function EquipePage() {
             onChange={(e) => setForm({ ...form, senha: e.target.value })}
             className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
           />
+          <input
+            inputMode="tel"
+            placeholder="WhatsApp (aparece na marca d'água do link para corretor)"
+            value={form.telefone}
+            onChange={(e) => setForm({ ...form, telefone: e.target.value })}
+            className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm sm:col-span-2"
+          />
           <div className="flex gap-2 sm:col-span-2">
             <button type="submit" className="rounded-full bg-accent px-5 py-2 text-sm font-bold text-white hover:opacity-90">
               {editando ? 'Salvar' : 'Adicionar'}
@@ -124,7 +131,7 @@ export default function EquipePage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setForm({ email: m.email, name: m.name, role: m.role, senha: '' });
+                    setForm({ email: m.email, name: m.name, role: m.role, senha: '', telefone: m.telefone ?? '' });
                     setEditando(true);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}

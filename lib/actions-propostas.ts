@@ -12,6 +12,7 @@ import { query } from './db';
 import { exigirEquipe } from './staff-auth';
 import { veTudo } from './papeis';
 import { cpfValido } from './leitura-documentos-servidor';
+import { proprietariosDoImovel } from './proprietarios';
 
 export type Pessoa = {
   nome: string;
@@ -188,7 +189,20 @@ export async function carregarAlvo(tipo: AlvoProposta['tipo'], id: string): Prom
   if (!p) return null;
   const vImovel = pessoasDoBanco(p.vendedor);
   const vCondo = pessoasDoBanco(p.dvendedor);
-  const vs = vImovel.length ? vImovel : vCondo;
+  // sem vendedor guardado: usa os proprietários cadastrados no imóvel
+  const donos = vImovel.length ? [] : (await proprietariosDoImovel([p.id])).get(p.id) ?? [];
+  const vDonos: Pessoa[] = donos.map((o) => ({
+    nome: o.nome,
+    documento: o.documento ?? undefined,
+    telefone: o.whatsapp ?? undefined,
+    email: o.email ?? undefined,
+    cep: o.cep ?? undefined,
+    endereco: o.endereco ?? undefined,
+    bairro: o.bairro ?? undefined,
+    cidade: o.cidade ?? undefined,
+    uf: o.uf ?? undefined
+  }));
+  const vs = vImovel.length ? vImovel : vDonos.length ? vDonos : vCondo;
   const condo = p.dname || p.condominio;
   const desc = [
     p.titulo || [p.quartos ? `${p.quartos} quartos` : null, p.area ? `${Number(p.area).toLocaleString('pt-BR')} m²` : null].filter(Boolean).join(', '),
@@ -207,7 +221,7 @@ export async function carregarAlvo(tipo: AlvoProposta['tipo'], id: string): Prom
     valorAnunciado: p.price_value ? Number(p.price_value) : null,
     vendedor: vs[0] ?? null,
     vendedores: vs,
-    vendedorOrigem: vImovel.length ? 'imovel' : vCondo.length ? 'condominio' : null
+    vendedorOrigem: vImovel.length || vDonos.length ? 'imovel' : vCondo.length ? 'condominio' : null
   };
 }
 
