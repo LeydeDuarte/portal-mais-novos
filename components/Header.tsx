@@ -38,6 +38,9 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
     router.push(`${base}?q=${encodeURIComponent(term)}`);
   };
 
+  // Dentro do painel o topo é o do próprio painel (PainelNav)
+  if (pathname?.startsWith('/dashboard') && pathname !== '/dashboard/login') return null;
+
   return (
     <header className="sticky top-0 z-30 flex items-center gap-4 border-b border-[var(--border)] bg-[var(--bg)] px-5 py-2.5 md:gap-6 md:px-8 md:py-3">
       {/* celular: botão de menu + sigla MN; computador: nome completo */}
