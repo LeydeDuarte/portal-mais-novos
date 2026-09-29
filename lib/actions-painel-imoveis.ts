@@ -37,6 +37,9 @@ export type ImovelPainel = {
   valorCondominio: number | null;
   iptuMensal: number | null;
   complemento: string | null;
+  unidade: string | null;
+  quadra: string | null;
+  lote: string | null;
   obsInterna: string | null;
   capa: string | null;
   fotos: string[];
@@ -84,6 +87,9 @@ function mapear(r: Row): ImovelPainel {
     valorCondominio: n(r.valor_condominio),
     iptuMensal: n(r.iptu_mensal),
     complemento: (r.complemento as string) ?? null,
+    unidade: (r.unidade as string) ?? null,
+    quadra: (r.quadra as string) ?? null,
+    lote: (r.lote as string) ?? null,
     obsInterna: (r.obs_interna as string) ?? null,
     capa: (r.capa_mini as string) || fotos[0] || arr(r.photos_internas)[0] || null,
     fotos,

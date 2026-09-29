@@ -1,6 +1,7 @@
 'use client';
 
-import { linhaImovel, mensagemComLink } from '@/lib/compartilhar';
+import { linhaImovel, linkWhatsapp, mensagemComLink, mensagemProprietario } from '@/lib/compartilhar';
+import IconeWhatsapp from '@/components/painel/IconeWhatsapp';
 import { urlImovel } from '@/lib/urls';
 const SITE_PUBLICO = process.env.NEXT_PUBLIC_SITE_URL || 'https://maisnovosimoveis.com';
 import { useEffect, useState } from 'react';
@@ -43,7 +44,7 @@ export default function FichaImovel({ params }: { params: { id: string } }) {
     <div className="flex min-h-screen flex-col">
       <Header />
       <PainelNav />
-      <main className="w-full px-4 py-6 md:px-8">
+      <main className="w-full px-4 pb-28 pt-6 md:px-8">
         <Link href="/dashboard/imoveis" className="text-sm font-semibold text-[var(--text-muted)] hover:underline">
           ← Imóveis
         </Link>
@@ -119,60 +120,6 @@ export default function FichaImovel({ params }: { params: { id: string } }) {
 
             <aside className="flex h-fit flex-col gap-4 xl:sticky xl:top-4">
               {aviso && <p className="rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">{aviso}</p>}
-              <div className="flex flex-wrap gap-2">
-                <Link href={`/dashboard/imoveis/${i.id}/editar`} className="rounded-full bg-ink px-4 py-2 text-sm font-bold text-white">
-                  Editar
-                </Link>
-                <Link href={`/dashboard/propostas/nova?imovel=${i.id}`} className="rounded-full bg-accent px-4 py-2 text-sm font-bold text-white">
-                  Fazer proposta
-                </Link>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const vis = i.visibilidade === 'privado' ? 'publico' : 'privado';
-                    await mudarVisibilidade(i.id, vis);
-                    setI({ ...i, visibilidade: vis });
-                  }}
-                  className="rounded-full bg-[var(--pill-bg)] px-4 py-2 text-sm font-bold"
-                >
-                  {i.visibilidade === 'privado' ? 'Tornar público' : 'Privar anúncio'}
-                </button>
-                {i.visibilidade !== 'privado' && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const r = await linkParaCorretor(i.id);
-                      if (!r.ok) return setAviso(r.erro);
-                      try {
-                        await navigator.clipboard.writeText(r.url);
-                      } catch {
-                        /* ignora */
-                      }
-                      setI({ ...i, compartilhamentos: i.compartilhamentos + 1 });
-                      setAviso(`Link para corretor copiado: ${r.url}`);
-                    }}
-                    className="rounded-full bg-[var(--pill-bg)] px-4 py-2 text-sm font-bold"
-                  >
-                    Compartilhar com corretor
-                  </button>
-                )}
-                <button type="button" onClick={() => setLinkPrivado(true)} className="rounded-full bg-[var(--pill-bg)] px-4 py-2 text-sm font-bold">
-                  Link privado p/ cliente
-                </button>
-                {i.visibilidade !== 'privado' && (
-                  <button
-                    type="button"
-                    onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(mensagemComLink(linhaImovel(i), `${SITE_PUBLICO}${urlImovel(i)}`))}`, '_blank')}
-                    className="rounded-full bg-[#25D366] px-4 py-2 text-sm font-bold text-white"
-                  >
-                    Enviar para cliente
-                  </button>
-                )}
-                <a href={urlImovel(i)} target="_blank" rel="noopener" className="rounded-full px-4 py-2 text-sm font-semibold hover:bg-[var(--pill-bg)]">
-                  Ver no site ↗
-                </a>
-              </div>
-
               <div className="rounded-2xl border border-[var(--border)] p-4">
                 <h2 className="text-sm font-bold">Proprietários</h2>
                 {i.proprietarios.length === 0 ? (
@@ -186,15 +133,27 @@ export default function FichaImovel({ params }: { params: { id: string } }) {
                   <div className="mt-2 flex flex-col gap-2">
                     {i.proprietarios.map((p) => (
                       <div key={p.id} className="rounded-xl bg-[var(--pill-bg)] p-3 text-sm">
-                        <div className="font-bold">
-                          {p.nome} {p.principal && <span className="ml-1 rounded bg-accent px-1.5 py-0.5 text-[9.5px] font-bold uppercase text-white">principal</span>}
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <Link href={`/dashboard/proprietarios/${p.id}`} className="font-bold hover:underline">
+                              {p.nome}
+                            </Link>{' '}
+                            {p.principal && <span className="ml-1 rounded bg-accent px-1.5 py-0.5 text-[9.5px] font-bold uppercase text-white">principal</span>}
+                            <div className="text-xs text-[var(--text-muted)]">{[p.documento, p.email].filter(Boolean).join(' · ')}</div>
+                          </div>
+                          {linkWhatsapp(p.whatsapp, mensagemProprietario(i)) && (
+                            <a
+                              href={linkWhatsapp(p.whatsapp, mensagemProprietario(i))!}
+                              target="_blank"
+                              rel="noopener"
+                              title={`Perguntar a ${p.nome} se o imóvel está disponível`}
+                              aria-label={`WhatsApp de ${p.nome}`}
+                              className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#25D366] text-white hover:opacity-90"
+                            >
+                              <IconeWhatsapp />
+                            </a>
+                          )}
                         </div>
-                        <div className="text-xs text-[var(--text-muted)]">{[p.documento, p.email].filter(Boolean).join(' · ')}</div>
-                        {whats(p.whatsapp) && (
-                          <a href={whats(p.whatsapp)!} target="_blank" rel="noopener" className="mt-2 inline-block rounded-full bg-[#16A34A] px-3 py-1 text-xs font-bold text-white">
-                            Chamar no WhatsApp
-                          </a>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -204,7 +163,94 @@ export default function FichaImovel({ params }: { params: { id: string } }) {
           </div>
         )}
       </main>
+      {i && (
+        <BarraAcoesImovel
+          i={i}
+          onVisibilidade={async () => {
+            const vis = i.visibilidade === 'privado' ? 'publico' : 'privado';
+            await mudarVisibilidade(i.id, vis);
+            setI({ ...i, visibilidade: vis });
+          }}
+          onCompartilharCorretor={async () => {
+            const r = await linkParaCorretor(i.id);
+            if (!r.ok) return setAviso(r.erro);
+            try {
+              await navigator.clipboard.writeText(r.url);
+            } catch {
+              /* ignora */
+            }
+            setI({ ...i, compartilhamentos: i.compartilhamentos + 1 });
+            setAviso(`Link para corretor copiado: ${r.url}`);
+          }}
+          onLinkPrivado={() => setLinkPrivado(true)}
+        />
+      )}
       {linkPrivado && i && <LinkPrivadoModal propertyId={i.id} titulo={i.condominio ?? i.titulo ?? 'Imóvel'} linha={linhaImovel(i)} onClose={() => setLinkPrivado(false)} />}
+    </div>
+  );
+}
+
+// Barra de ações flutuante: fica fixa embaixo da tela, sempre à mão enquanto rola a ficha.
+function BarraAcoesImovel({
+  i,
+  onVisibilidade,
+  onCompartilharCorretor,
+  onLinkPrivado
+}: {
+  i: ImovelPainel;
+  onVisibilidade: () => void;
+  onCompartilharCorretor: () => void;
+  onLinkPrivado: () => void;
+}) {
+  const dono = i.proprietarios.find((p) => p.principal) ?? i.proprietarios[0];
+  const zapDono = dono ? linkWhatsapp(dono.whatsapp, mensagemProprietario(i)) : null;
+  const pill = 'flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[13px] font-semibold';
+  return (
+    <div className="fixed inset-x-0 bottom-3 z-50 flex justify-center px-2 pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-full border border-[var(--border)] bg-[var(--bg)]/95 p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur [scrollbar-width:none]">
+        {zapDono && (
+          <a
+            href={zapDono}
+            target="_blank"
+            rel="noopener"
+            title={`Perguntar a ${dono!.nome} se o imóvel está disponível`}
+            aria-label="WhatsApp do proprietário"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#25D366] text-white hover:opacity-90"
+          >
+            <IconeWhatsapp tamanho={20} />
+          </a>
+        )}
+        <Link href={`/dashboard/imoveis/${i.id}/editar`} className={`${pill} bg-ink text-white`}>
+          Editar
+        </Link>
+        <Link href={`/dashboard/propostas/nova?imovel=${i.id}`} className={`${pill} bg-accent text-white`}>
+          Proposta
+        </Link>
+        {i.visibilidade !== 'privado' && (
+          <button
+            type="button"
+            title="Enviar o anúncio para um cliente pelo WhatsApp"
+            onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(mensagemComLink(linhaImovel(i), `${SITE_PUBLICO}${urlImovel(i)}`))}`, '_blank')}
+            className={`${pill} bg-[var(--pill-bg)]`}
+          >
+            <IconeWhatsapp tamanho={15} /> Cliente
+          </button>
+        )}
+        <button type="button" onClick={onLinkPrivado} className={`${pill} bg-[var(--pill-bg)]`}>
+          Link privado
+        </button>
+        {i.visibilidade !== 'privado' && (
+          <button type="button" onClick={onCompartilharCorretor} className={`${pill} bg-[var(--pill-bg)]`}>
+            Corretor
+          </button>
+        )}
+        <button type="button" onClick={onVisibilidade} className={`${pill} bg-[var(--pill-bg)]`}>
+          {i.visibilidade === 'privado' ? 'Tornar público' : 'Privar'}
+        </button>
+        <a href={urlImovel(i)} target="_blank" rel="noopener" className={`${pill} hover:bg-[var(--pill-bg)]`}>
+          Site ↗
+        </a>
+      </div>
     </div>
   );
 }

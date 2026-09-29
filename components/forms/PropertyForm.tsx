@@ -51,6 +51,9 @@ type Values = {
   valorCondominio: string;
   iptuMensal: string;
   complemento: string;
+  unidade: string;
+  quadra: string;
+  lote: string;
   obsInterna: string;
 };
 
@@ -82,6 +85,9 @@ const EMPTY: Values = {
   valorCondominio: '',
   iptuMensal: '',
   complemento: '',
+  unidade: '',
+  quadra: '',
+  lote: '',
   obsInterna: '',
   plantas: []
 };
@@ -118,6 +124,9 @@ function fromEditData(d: PropertyEditData): Values {
     valorCondominio: d.valorCondominio ? String(Math.round(d.valorCondominio)) : '',
     iptuMensal: d.iptuMensal ? String(Math.round(d.iptuMensal)) : '',
     complemento: d.complemento ?? '',
+    unidade: d.unidade ?? '',
+    quadra: d.quadra ?? '',
+    lote: d.lote ?? '',
     obsInterna: d.obsInterna ?? '',
     plantas: d.plantas ?? []
   };
@@ -220,6 +229,9 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         valorCondominio: Number(v.valorCondominio.replace(/\D/g, '')) || undefined,
         iptuMensal: Number(v.iptuMensal.replace(/\D/g, '')) || undefined,
         complemento: v.complemento || undefined,
+        unidade: v.unidade || undefined,
+        quadra: v.quadra || undefined,
+        lote: v.lote || undefined,
         obsInterna: v.obsInterna || undefined,
         proprietarios: proprietarios.map((p) => ({ proprietarioId: p.id, principal: p.principal })),
         corretorResponsavel: gestor && responsavelEmail ? responsavelEmail : undefined
@@ -344,9 +356,24 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
 
       <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900 dark:bg-transparent">
         <div className="text-sm font-bold">Só para a equipe (nunca aparece no site)</div>
+        {/* identificação do imóvel: vai na mensagem de WhatsApp ao proprietário */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Unidade (apto/sala)</label>
+            <input className={inputClass} value={v.unidade} onChange={(e) => set('unidade', e.target.value)} placeholder="1502" maxLength={30} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Quadra</label>
+            <input className={inputClass} value={v.quadra} onChange={(e) => set('quadra', e.target.value)} placeholder="05" maxLength={20} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Lote</label>
+            <input className={inputClass} value={v.lote} onChange={(e) => set('lote', e.target.value)} placeholder="18" maxLength={20} />
+          </div>
+        </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-[var(--text-muted)]">Complemento (número da unidade, apto, torre)</label>
-          <input className={inputClass} value={v.complemento} onChange={(e) => set('complemento', e.target.value)} placeholder="Apto 1502, Torre B" maxLength={120} />
+          <label className="text-xs font-semibold text-[var(--text-muted)]">Complemento (torre, bloco, anotações)</label>
+          <input className={inputClass} value={v.complemento} onChange={(e) => set('complemento', e.target.value)} placeholder="Torre B" maxLength={120} />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-[var(--text-muted)]">OBS</label>

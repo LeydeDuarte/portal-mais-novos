@@ -50,6 +50,9 @@ export type PropertyRow = {
   valor_condominio?: string | number | null;
   iptu_mensal?: string | number | null;
   complemento?: string | null;
+  unidade?: string | null;
+  quadra?: string | null;
+  lote?: string | null;
   obs_interna?: string | null;
   photos_internas?: unknown;
   compartilhamentos?: number | null;

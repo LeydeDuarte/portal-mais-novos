@@ -833,6 +833,9 @@ export type CreatePropertyInput = {
   valorCondominio?: number;
   iptuMensal?: number;
   complemento?: string; // nº da unidade/apto: nunca aparece no site
+  unidade?: string; // nº do apto/sala (só equipe): vai na mensagem ao proprietário
+  quadra?: string; // casa/lote (só equipe)
+  lote?: string;
   obsInterna?: string; // observação só do painel
   proprietarios?: { proprietarioId: string; principal: boolean }[]; // undefined = não mexe
   corretorResponsavel?: string; // e-mail: admin/analista escolhe quem aparece no anúncio
@@ -886,12 +889,15 @@ function propertyValues(input: PropertyFields) {
     input.iptuMensal && input.iptuMensal > 0 ? input.iptuMensal : null,
     clean(input.complemento?.slice(0, 120)),
     clean(input.obsInterna?.slice(0, 4000)),
-    input.areaTotal && input.areaTotal > 0 ? input.areaTotal : null
+    input.areaTotal && input.areaTotal > 0 ? input.areaTotal : null,
+    clean(input.unidade?.slice(0, 30)),
+    clean(input.quadra?.slice(0, 20)),
+    clean(input.lote?.slice(0, 20))
   ];
 }
 const PROPERTY_COLS =
-  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical, plantas, visibilidade, area_lote, valor_condominio, iptu_mensal, complemento, obs_interna, area_total';
-const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', '', '::jsonb', '', '', '', '', '', '', ''];
+  'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical, plantas, visibilidade, area_lote, valor_condominio, iptu_mensal, complemento, obs_interna, area_total, unidade, quadra, lote';
+const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', '', '::jsonb', '', '', '', '', '', '', '', '', '', ''];
 
 /** Corretor responsável: admin/analista pode escolher alguém da equipe; os demais ficam como responsáveis */
 async function responsavel(staff: StaffSessionPayload, escolhido?: string): Promise<string> {
@@ -1098,6 +1104,9 @@ export async function getPropertyForEdit(id: string): Promise<PropertyEditData |
     valorCondominio: r.valor_condominio != null ? Number(r.valor_condominio) : undefined,
     iptuMensal: r.iptu_mensal != null ? Number(r.iptu_mensal) : undefined,
     complemento: r.complemento ?? undefined,
+    unidade: r.unidade ?? undefined,
+    quadra: r.quadra ?? undefined,
+    lote: r.lote ?? undefined,
     obsInterna: r.obs_interna ?? undefined,
     areaTotal: r.area_total != null ? Number(r.area_total) : undefined
   };

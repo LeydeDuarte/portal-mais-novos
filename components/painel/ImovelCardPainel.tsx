@@ -1,5 +1,7 @@
 'use client';
 
+import IconeWhatsapp from './IconeWhatsapp';
+import { linkWhatsapp, mensagemProprietario } from '@/lib/compartilhar';
 import Link from 'next/link';
 import type { ImovelPainel } from '@/lib/actions-painel-imoveis';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
@@ -31,7 +33,8 @@ export default function ImovelCardPainel({
   menu: ItemMenu[];
 }) {
   const dono = i.proprietarios.find((p) => p.principal) ?? i.proprietarios[0];
-  const w = whats(dono?.whatsapp);
+  // WhatsApp do proprietário já com a pergunta pronta (está disponível?)
+  const w = linkWhatsapp(dono?.whatsapp, mensagemProprietario(i));
   const tipo = TIPO_UNIDADE_LABEL[i.tipo as TipoUnidade] ?? i.tipo;
   const ficha = `/dashboard/imoveis/${i.id}`;
   return (
@@ -105,8 +108,15 @@ export default function ImovelCardPainel({
             <>
               <span className="truncate text-[12px] font-medium">{dono.nome}</span>
               {w && (
-                <a href={w} target="_blank" rel="noopener" className="shrink-0 rounded-full bg-[#E7F5E6] px-2.5 py-1 text-[11px] font-semibold text-[#0A8A00]">
-                  WhatsApp
+                <a
+                  href={w}
+                  target="_blank"
+                  rel="noopener"
+                  title={`Perguntar a ${dono.nome} se o imóvel está disponível`}
+                  aria-label={`WhatsApp de ${dono.nome}`}
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#25D366] text-white hover:opacity-90"
+                >
+                  <IconeWhatsapp tamanho={15} />
                 </a>
               )}
             </>
