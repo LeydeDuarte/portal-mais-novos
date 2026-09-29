@@ -3,8 +3,8 @@ import sharp from 'sharp';
 // Prepara uma foto baixada pela fila (Jetimob, Google Drive, sites de
 // incorporadoras) antes de ir para o R2. Fotos grandes (acima de 2 MB ou
 // mais largas que o limite) são reduzidas e comprimidas em JPEG; as pequenas
-// seguem como vieram. Aceita arquivos de até 80 MB na origem.
-export const MAX_ORIGEM_BYTES = 80 * 1024 * 1024;
+// seguem como vieram. Aceita arquivos de até 150 MB na origem (fotos originais de incorporadora).
+export const MAX_ORIGEM_BYTES = 150 * 1024 * 1024;
 const MAX_FINAL_BYTES = 2 * 1024 * 1024;
 
 export async function prepararFoto(
@@ -12,7 +12,7 @@ export async function prepararFoto(
   tipoOrigem: string,
   ehPlanta = false
 ): Promise<{ buf: Buffer; tipo: string }> {
-  if (buf.length > MAX_ORIGEM_BYTES) throw new Error('foto maior que 80 MB');
+  if (buf.length > MAX_ORIGEM_BYTES) throw new Error('foto maior que 150 MB');
   let meta: sharp.Metadata;
   try {
     meta = await sharp(buf, { failOn: 'none', limitInputPixels: 400_000_000 }).metadata();

@@ -12,7 +12,7 @@ import { query } from './db';
 import { exigirEquipe } from './staff-auth';
 import { veTudo } from './papeis';
 import { cpfValido } from './leitura-documentos-servidor';
-import { proprietariosDoImovel } from './proprietarios';
+import { completarProprietariosDaProposta, pessoasDaProposta, proprietariosDoImovel } from './proprietarios';
 
 export type Pessoa = {
   nome: string;
@@ -191,17 +191,8 @@ export async function carregarAlvo(tipo: AlvoProposta['tipo'], id: string): Prom
   const vCondo = pessoasDoBanco(p.dvendedor);
   // sem vendedor guardado: usa os proprietários cadastrados no imóvel
   const donos = vImovel.length ? [] : (await proprietariosDoImovel([p.id])).get(p.id) ?? [];
-  const vDonos: Pessoa[] = donos.map((o) => ({
-    nome: o.nome,
-    documento: o.documento ?? undefined,
-    telefone: o.whatsapp ?? undefined,
-    email: o.email ?? undefined,
-    cep: o.cep ?? undefined,
-    endereco: o.endereco ?? undefined,
-    bairro: o.bairro ?? undefined,
-    cidade: o.cidade ?? undefined,
-    uf: o.uf ?? undefined
-  }));
+  // cadastro completo do proprietário (RG, estado civil, profissão...) e o cônjuge, se casado
+  const vDonos: Pessoa[] = donos.flatMap((o) => pessoasDaProposta(o));
   const vs = vImovel.length ? vImovel : vDonos.length ? vDonos : vCondo;
   const condo = p.dname || p.condominio;
   const desc = [
@@ -354,6 +345,8 @@ export async function salvarProposta(d: PropostaInput): Promise<{ ok: boolean; i
 
   // guarda o CRECI do corretor para as próximas propostas
   if (corretor.creci) await query('update staff_users set creci = $2 where lower(email) = lower($1)', [eu.email, corretor.creci]).catch(() => {});
+  // o que foi preenchido nos vendedores completa o cadastro dos proprietários
+  await completarProprietariosDaProposta(vendedores, propertyId ?? null).catch(() => {});
   // guarda o vendedor como padrão do imóvel/condomínio (proprietário ou construtora)
   if (vendedores.length && d.guardarVendedor === 'imovel' && propertyId) {
     await query('update properties set vendedor = $2 where id = $1', [propertyId, JSON.stringify(vendedores)]);

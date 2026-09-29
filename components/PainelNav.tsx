@@ -11,6 +11,7 @@ const LINKS: { href: string; label: string; admin?: boolean; gestor?: boolean }[
   { href: '/dashboard', label: 'Início' },
   { href: '/dashboard/imoveis', label: 'Imóveis' },
   { href: '/dashboard/condominios', label: 'Condomínios' },
+  { href: '/dashboard/proprietarios', label: 'Proprietários' },
   { href: '/dashboard/propostas', label: 'Propostas' },
   { href: '/dashboard/interessados', label: 'Interessados' },
   { href: '/dashboard/vender', label: 'Quero vender' },

@@ -52,6 +52,9 @@ export default function ProprietariosPicker({ value, onChange }: { value: Propri
             <span className="font-semibold">{p.nome}</span>
             <span className="block text-xs text-[var(--text-muted)]">{[p.tipo === 'pj' ? 'Empresa' : null, p.documento, tel(p.whatsapp), p.email].filter(Boolean).join(' · ')}</span>
           </span>
+          <a href={`/dashboard/proprietarios/${p.id}`} target="_blank" rel="noopener" className="rounded-full bg-[var(--bg)] px-3 py-1 text-xs font-semibold hover:underline">
+            Cadastro completo ↗
+          </a>
           {linkWhats(p.whatsapp) && (
             <a href={linkWhats(p.whatsapp)!} target="_blank" rel="noopener" className="rounded-full bg-[#16A34A] px-3 py-1 text-xs font-bold text-white">
               WhatsApp
