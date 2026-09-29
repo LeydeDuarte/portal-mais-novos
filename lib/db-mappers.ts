@@ -46,6 +46,7 @@ export type PropertyRow = {
   slug?: string | null;
   area_lote?: string | number | null;
   area_total?: string | number | null;
+  destaque_tamanho?: number | null;
   valor_condominio?: string | number | null;
   iptu_mensal?: string | number | null;
   complemento?: string | null;
@@ -158,6 +159,7 @@ export function mapPropertyRow(row: PropertyRow): PropertyDetail {
     area: row.area != null ? `${Number(row.area).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m²` : '-',
     areaValue: row.area != null ? Number(row.area) : undefined,
     areaTotal: row.area_total != null ? Number(row.area_total) : undefined,
+    destaqueTamanho: row.destaque_tamanho === 3 ? 3 : 2,
     areaLote: row.area_lote != null ? Number(row.area_lote) : undefined,
     valorCondominio: row.valor_condominio != null ? Number(row.valor_condominio) : undefined,
     iptuMensal: row.iptu_mensal != null ? Number(row.iptu_mensal) : undefined,

@@ -9,7 +9,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 // O masonry usa CSS Grid com linhas de 8 px: cada card mede a própria altura
 // (um único ResizeObserver para todos) e ocupa as linhas que precisa. Sem
 // re-render do React ao medir: o estilo é aplicado direto no elemento.
-export type ItemGrade = { chave: string; largo?: boolean; estimativa?: number; node: ReactNode };
+export type ItemGrade = { chave: string; largo?: boolean; alto?: boolean; estimativa?: number; node: ReactNode };
 
 const LINHA = 8; // px
 
@@ -65,7 +65,7 @@ export default function FeedGrid({ itens, modo }: { itens: ItemGrade[]; modo: 'm
         <div
           key={i.chave}
           data-feed-item
-          className={i.largo ? 'feed-largo col-span-2' : ''}
+          className={i.alto ? `feed-largo feed-grande col-span-2 ${modo === 'alinhado' ? 'row-span-2' : ''}` : i.largo ? 'feed-largo col-span-2' : ''}
           // antes de medir (1ª pintura), uma altura estimada evita cards sobrepostos
           style={modo === 'masonry' && i.estimativa ? { gridRowEnd: `span ${Math.ceil(i.estimativa / LINHA)}` } : undefined}
         >

@@ -78,7 +78,7 @@ type DestRow = {
   video_url: string | null;
 };
 const dia = (d: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : null);
-const mapDest = (r: DestRow): Destaque => ({ ...r, colunas: r.colunas === 2 ? 2 : 1, videoUrl: r.video_url, inicio: dia(r.inicio), fim: dia(r.fim), criadoEm: new Date(r.created_at).toISOString() });
+const mapDest = (r: DestRow): Destaque => ({ ...r, colunas: r.colunas === 3 ? 3 : r.colunas === 2 ? 2 : 1, videoUrl: r.video_url, inicio: dia(r.inicio), fim: dia(r.fim), criadoEm: new Date(r.created_at).toISOString() });
 
 export async function listarDestaques(): Promise<Destaque[]> {
   await exigirGestor();
@@ -98,7 +98,7 @@ export type DestaqueInput = {
   ordem?: number;
   inicio?: string;
   fim?: string;
-  colunas?: 1 | 2;
+  colunas?: 1 | 2 | 3;
   videoUrl?: string;
 };
 
@@ -120,7 +120,7 @@ export async function salvarDestaque(d: DestaqueInput): Promise<{ ok: boolean; e
     Math.round(Number(d.ordem) || 0),
     dataOk(d.inicio),
     dataOk(d.fim),
-    d.colunas === 2 ? 2 : 1,
+    d.colunas === 3 ? 3 : d.colunas === 2 ? 2 : 1,
     video.slice(0, 300) || null
   ];
   if (d.id) {

@@ -31,7 +31,14 @@ function range(min: number | null, max: number | null, suffix: string): string |
 // Card de empreendimento/condomínio no feed — mesmo estilo do card de imóvel,
 // mas mostrando o resumo do condomínio: tipos que existem, faixa de quartos e
 // metragem, "a partir de" e a data de entrega.
-export default function DevelopmentCard({ development, prioridade = false }: { development: DevelopmentCardData; prioridade?: boolean }) {
+function youtubeAutoplay(url?: string): string | null {
+  const m = url?.match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/);
+  return m ? `https://www.youtube-nocookie.com/embed/${m[1]}?autoplay=1&mute=1&loop=1&playlist=${m[1]}&controls=0&playsinline=1&modestbranding=1&rel=0` : null;
+}
+
+export default function DevelopmentCard({ development, prioridade = false, emDestaque = false }: { development: DevelopmentCardData; prioridade?: boolean; emDestaque?: boolean }) {
+  // no espaço de destaque, o vídeo do condomínio toca sozinho (sem som)
+  const videoDestaque = emDestaque ? youtubeAutoplay(development.videoUrl) : null;
   const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
   const cover = development.photos[0];
   const [ano, mes] = development.deliveryDate.split('-');
@@ -101,6 +108,14 @@ export default function DevelopmentCard({ development, prioridade = false }: { d
             <ImagemCapa mini={development.capaMini} original={cover} alt={`${development.name}, ${development.location} | Mais Novos Imóveis`} prioridade={prioridade} className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <span className="text-[11px] text-[var(--text-faint)]">[FOTO DO EMPREENDIMENTO]</span>
+          )}
+          {videoDestaque && (
+            <iframe
+              src={videoDestaque}
+              title={development.name}
+              allow="autoplay; encrypted-media"
+              className="pointer-events-none absolute left-1/2 top-1/2 h-full -translate-x-1/2 -translate-y-1/2 [aspect-ratio:16/9] min-w-full"
+            />
           )}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/60" />
           <div className="absolute left-2.5 right-2.5 top-2.5 z-10 flex flex-wrap items-center gap-1.5">

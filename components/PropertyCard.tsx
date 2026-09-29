@@ -24,6 +24,7 @@ type Props = {
   onFavoriteClick: (id: string) => void;
   onDwell: (id: string, ms: number) => void;
   prioridade?: boolean;
+  emDestaque?: boolean; // no espaço de destaque do feed: o vídeo tem prioridade para tocar
 };
 
 const BED_PATH = 'M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6 M3 18h18 M5 10V7a2 2 0 0 1 2-2h3v5';
@@ -56,13 +57,13 @@ function Spec({ children, icon }: { children: React.ReactNode; icon: React.React
   );
 }
 
-export default function PropertyCard({ property, isFavorite, loggedIn, onFavoriteClick, onDwell, prioridade = false }: Props) {
+export default function PropertyCard({ property, isFavorite, loggedIn, onFavoriteClick, onDwell, prioridade = false, emDestaque = false }: Props) {
   const embed = property.videoUrl ? getEmbedInfo(property.videoUrl) : null;
   // Instagram não faz autoplay em embed (exige clique, às vezes até redireciona
   // pra fora do site) — só entra na roleta de autoplay do feed quem é YouTube
   // (toca de verdade) ou não tem link nenhum (simulação antiga, só visual).
   const eligibleForFeedAutoplay = property.video && embed?.platform !== 'instagram';
-  const { ref: videoRef, isPlaying } = useVideoAutoplay(property.id, property.matchScore, eligibleForFeedAutoplay);
+  const { ref: videoRef, isPlaying } = useVideoAutoplay(emDestaque ? `${property.id}-destaque` : property.id, emDestaque ? 1_000_000 : property.matchScore, eligibleForFeedAutoplay);
   const dwellRef = useRef<HTMLDivElement | null>(null);
   const enteredAt = useRef<number | null>(null);
 

@@ -16,25 +16,25 @@ function videoAutoplay(url?: string | null): string | null {
   return null;
 }
 
-export default function DestaqueCard({ d }: { d: Dest }) {
+export default function DestaqueCard({ d, grande = false }: { d: Dest; grande?: boolean }) {
   const externo = !!d.link && /^https?:\/\//.test(d.link) && !d.link.includes('maisnovosimoveis.com');
   const embed = videoAutoplay(d.videoUrl);
   const conteudo = (
     <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg)]">
       {embed ? (
-        <div className="relative aspect-video w-full overflow-hidden bg-black">
+        <div className={`relative w-full overflow-hidden bg-black ${grande ? 'aspect-[4/5]' : 'aspect-video'}`}>
           <iframe
             src={embed}
             title={semTravessoes(d.titulo)}
             loading="lazy"
             allow="autoplay; encrypted-media; picture-in-picture"
-            className="pointer-events-none absolute inset-0 h-full w-full"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-full min-w-full -translate-x-1/2 -translate-y-1/2 [aspect-ratio:16/9]"
           />
         </div>
       ) : (
         d.imagem && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={d.imagem} alt={semTravessoes(d.titulo)} loading="lazy" className="block w-full object-cover" />
+          <img src={d.imagem} alt={semTravessoes(d.titulo)} loading="lazy" className={`block w-full object-cover ${grande ? 'aspect-[4/5]' : ''}`} />
         )
       )}
       <div className="p-3.5">

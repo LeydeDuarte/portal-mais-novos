@@ -252,9 +252,10 @@ export default function FeedEspeciaisPage() {
               <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
                 <div>
                   <span className={label}>Tamanho no feed</span>
-                  <select className={input} value={dest.colunas ?? 1} onChange={(e) => setDest({ ...dest, colunas: Number(e.target.value) === 2 ? 2 : 1 })}>
+                  <select className={input} value={dest.colunas ?? 1} onChange={(e) => setDest({ ...dest, colunas: (Number(e.target.value) as 1 | 2 | 3) || 1 })}>
                     <option value={1}>1 coluna</option>
                     <option value={2}>2 colunas</option>
+                    <option value={3}>2 colunas e 2 linhas (grande)</option>
                   </select>
                 </div>
                 <div>
@@ -310,7 +311,7 @@ export default function FeedEspeciaisPage() {
                   imagem: dest.imagem ?? null,
                   link: null,
                   botao: dest.botao || null,
-                  colunas: dest.colunas === 2 ? 2 : 1,
+                  colunas: dest.colunas ?? 1,
                   videoUrl: dest.videoUrl || null
                 }}
               />

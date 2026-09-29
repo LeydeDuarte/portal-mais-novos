@@ -314,13 +314,17 @@ export default function CondominiosPage() {
                         { rotulo: 'Fazer proposta', href: `/dashboard/propostas/nova?condominio=${c.id}` },
                         ...(gestor
                           ? [
-                              {
-                                rotulo: c.destaque ? '★ Tirar do destaque do feed' : '☆ Destacar no feed (2 colunas)',
+                              ...([
+                                [0, 'Sem destaque'],
+                                [2, 'Destaque: 2 colunas'],
+                                [3, 'Destaque: 2 colunas e 2 linhas']
+                              ] as const).map(([t, l]) => ({
+                                rotulo: `${(t === 0 ? !c.destaque : c.destaque && c.destaqueTamanho === t) ? '● ' : '○ '}${l}`,
                                 onClick: async () => {
-                                  await marcarDestaqueFeed('condominio', c.id, !c.destaque);
-                                  setItens((l) => l?.map((x) => (x.id === c.id ? { ...x, destaque: !c.destaque } : x)) ?? l);
+                                  await marcarDestaqueFeed('condominio', c.id, t);
+                                  setItens((lst) => lst?.map((x) => (x.id === c.id ? { ...x, destaque: t > 0, destaqueTamanho: (t === 3 ? 3 : 2) as 2 | 3 } : x)) ?? lst);
                                 }
-                              },
+                              })),
                               'sep' as const,
                               {
                                 rotulo: 'Excluir condomínio',

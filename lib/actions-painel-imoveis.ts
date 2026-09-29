@@ -28,6 +28,7 @@ export type ImovelPainel = {
   areaTotal: number | null;
   descricao: string;
   destaque: boolean;
+  destaqueTamanho: 2 | 3;
   quartos: number | null;
   banheiros: number | null;
   vagas: number | null;
@@ -73,6 +74,7 @@ function mapear(r: Row): ImovelPainel {
     areaTotal: n(r.area_total),
     descricao: String(r.description ?? ''),
     destaque: !!r.destaque,
+    destaqueTamanho: r.destaque_tamanho === 3 ? 3 : 2,
     quartos: n(r.quartos),
     banheiros: n(r.banheiros),
     vagas: n(r.vagas),

@@ -41,6 +41,7 @@ export type DevelopmentCardData = {
   id: string;
   slug?: string;
   concepcao?: string | null; // construtoras/incorporadoras, ex.: "Consciente · EBM"
+  destaqueTamanho?: 2 | 3;
   name: string;
   location: string;
   deliveryDate: string; // "AAAA-MM"
@@ -152,10 +153,15 @@ export async function getDestaquesFeed(filters: FilterState): Promise<FeedItem[]
 }
 
 /** Equipe (admin/analista) marca ou desmarca um anúncio/condomínio como destaque do feed */
-export async function marcarDestaqueFeed(tipo: 'imovel' | 'condominio', id: string, destaque: boolean): Promise<void> {
+/** tamanho: 0 = sem destaque; 2 = 2 colunas; 3 = 2 colunas e 2 linhas (card grande) */
+export async function marcarDestaqueFeed(tipo: 'imovel' | 'condominio', id: string, tamanho: 0 | 2 | 3): Promise<void> {
   const staff = await requireStaff();
   if (!veTudo(staff.role)) throw new Error('Só admin e analista escolhem os destaques.');
-  await query(`update ${tipo === 'imovel' ? 'properties' : 'developments'} set destaque = $2 where id = $1`, [id, !!destaque]);
+  await query(`update ${tipo === 'imovel' ? 'properties' : 'developments'} set destaque = $2, destaque_tamanho = $3 where id = $1`, [
+    id,
+    tamanho > 0,
+    tamanho === 3 ? 3 : 2
+  ]);
 }
 
 export async function getFeedPage(page: number, filters: FilterState): Promise<{ items: FeedItem[]; hasMore: boolean; total?: number }> {
@@ -500,7 +506,8 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       tipo: base.tipo,
       anuncios: Number(row.anuncios) || 0,
       capaMini: miniValida(row),
-      concepcao: row.concepcao ?? null
+      concepcao: row.concepcao ?? null,
+      destaqueTamanho: (row as { destaque_tamanho?: number }).destaque_tamanho === 3 ? 3 : 2
     };
   });
 }

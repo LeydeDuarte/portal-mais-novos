@@ -190,13 +190,13 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
     }
   };
 
-  const renderItem = (item: FeedItem, idx: number, largo = false) =>
+  const renderItem = (item: FeedItem, idx: number, largo = false, grande = false) =>
     item.kind === 'depoimento' ? (
       <DepoimentoCard d={item.depoimento} />
     ) : item.kind === 'destaque' ? (
-      <DestaqueCard d={item.destaque} />
+      <DestaqueCard d={item.destaque} grande={grande} />
     ) : item.kind === 'empreendimento' ? (
-      <DevelopmentCard development={item.development} prioridade={idx < 4 || largo} />
+      <DevelopmentCard development={item.development} prioridade={idx < 4 || largo} emDestaque={largo} />
     ) : (
       <PropertyCard
         property={item.property}
@@ -205,6 +205,7 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
         onFavoriteClick={handleFavoriteClick}
         onDwell={handleDwell}
         prioridade={idx < 4 || largo}
+        emDestaque={largo}
       />
     );
   const estimar = (item: FeedItem) =>
@@ -215,22 +216,36 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
         : item.kind === 'depoimento'
           ? 280
           : 320;
-  // monta a grade: itens normais + espaço de destaque (2 colunas) no 3º lugar e a cada 20 itens
+  const tamanhoDestaque = (i: FeedItem) => (i.kind === 'imovel' ? i.property.destaqueTamanho : i.kind === 'empreendimento' ? i.development.destaqueTamanho : 2) ?? 2;
+  const grandes = destaques.filter((d) => tamanhoDestaque(d) === 3);
+  const medios = destaques.filter((d) => tamanhoDestaque(d) !== 3);
+  // monta a grade: itens normais + espaços de destaque no 3º lugar e a cada 20 itens.
+  // Os espaços alternam entre GRANDE (2 colunas e 2 linhas) e 2 colunas, conforme houver.
   function montarGrade(): ItemGrade[] {
     const out: ItemGrade[] = [];
     let slot = 0;
     items.forEach((item, idx) => {
       if (destaques.length && (idx === 2 || (idx > 2 && (idx - 2) % 20 === 0))) {
         const s = slot++;
+        const querGrande = s % 2 === 0;
+        const pool = (querGrande && grandes.length) || !medios.length ? grandes : medios;
+        const grande = pool === grandes;
         out.push({
           chave: `rot-${s}`,
           largo: true,
-          estimativa: 420,
-          node: <DestaqueRotativo pool={destaques} inicio={s * 3} render={(it) => renderItem(it, 0, true)} />
+          alto: grande,
+          estimativa: grande ? 820 : 420,
+          node: <DestaqueRotativo pool={pool} inicio={s * 3} render={(it) => renderItem(it, 0, true, grande)} />
         });
       }
-      const largo = item.kind === 'destaque' && item.destaque.colunas === 2;
-      out.push({ chave: chaveItem(item), largo, estimativa: largo ? 420 : estimar(item), node: renderItem(item, idx) });
+      const colunas = item.kind === 'destaque' ? item.destaque.colunas : 1;
+      out.push({
+        chave: chaveItem(item),
+        largo: colunas >= 2,
+        alto: colunas === 3,
+        estimativa: colunas === 3 ? 820 : colunas === 2 ? 420 : estimar(item),
+        node: renderItem(item, idx, false, colunas === 3)
+      });
     });
     return out;
   }

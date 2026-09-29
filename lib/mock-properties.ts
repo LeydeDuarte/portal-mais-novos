@@ -36,6 +36,7 @@ export type Property = {
   slug?: string;
   corretor?: { nome: string; foto: string | null; creci: string | null }; // responsável (público)
   areaTotal?: number;
+  destaqueTamanho?: 2 | 3; // 2 = 2 colunas; 3 = 2 colunas e 2 linhas
   areaLote?: number;
   valorCondominio?: number;
   iptuMensal?: number;

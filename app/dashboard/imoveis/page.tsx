@@ -262,13 +262,17 @@ export default function ImoveisPainelPage() {
                       { rotulo: 'Ver página no site', href: `/imovel/${i.slug ?? i.id}`, novaAba: true },
                       ...(veTudo(staff.role)
                         ? [
-                            {
-                              rotulo: i.destaque ? '★ Tirar do destaque do feed' : '☆ Destacar no feed (2 colunas)',
+                            ...([
+                              [0, 'Sem destaque'],
+                              [2, 'Destaque: 2 colunas'],
+                              [3, 'Destaque: 2 colunas e 2 linhas']
+                            ] as const).map(([t, l]) => ({
+                              rotulo: `${(t === 0 ? !i.destaque : i.destaque && i.destaqueTamanho === t) ? '● ' : '○ '}${l}`,
                               onClick: async () => {
-                                await marcarDestaqueFeed('imovel', i.id, !i.destaque);
-                                atualizar(i.id, { destaque: !i.destaque });
+                                await marcarDestaqueFeed('imovel', i.id, t);
+                                atualizar(i.id, { destaque: t > 0, destaqueTamanho: t === 3 ? 3 : 2 });
                               }
-                            }
+                            }))
                           ]
                         : []),
                       'sep',

@@ -15,7 +15,7 @@ export async function destaquesAtivos(): Promise<DestaqueCard[]> {
       where ativo and (inicio is null or inicio <= current_date) and (fim is null or fim >= current_date)
       order by ordem, created_at desc limit 20`
   ).catch(() => []);
-  return rows.map((r) => ({ id: r.id, selo: r.selo, titulo: r.titulo, texto: r.texto, imagem: r.imagem, link: r.link, botao: r.botao, colunas: r.colunas === 2 ? 2 : 1, videoUrl: r.video_url }));
+  return rows.map((r) => ({ id: r.id, selo: r.selo, titulo: r.titulo, texto: r.texto, imagem: r.imagem, link: r.link, botao: r.botao, colunas: r.colunas === 3 ? 3 : r.colunas === 2 ? 2 : 1, videoUrl: r.video_url }));
 }
 
 /** Número estável a partir de um texto (para variar a ordem por visitante) */

@@ -16,7 +16,7 @@ export type DestaqueCard = {
   imagem: string | null;
   link: string | null;
   botao: string | null;
-  colunas: 1 | 2; // ocupa 1 ou 2 colunas do feed
+  colunas: 1 | 2 | 3; // 1 coluna, 2 colunas, ou 3 = 2 colunas e 2 linhas (grande)
   videoUrl: string | null; // vídeo em autoplay (sem som) no lugar da imagem
 };
 

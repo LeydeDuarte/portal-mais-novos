@@ -63,7 +63,7 @@ export default function PainelFiltros({ filters, onChange }: { filters: FilterSt
       </div>
 
       {/* celular: aba presa na borda esquerda */}
-      <Aba onClick={() => setGaveta(true)} className="fixed left-0 top-1/2 -translate-y-1/2 md:hidden" />
+      <Aba onClick={() => setGaveta(true)} className="fixed left-0 top-[136px] md:hidden" />
       {gaveta && (
         <div className="fixed inset-0 z-50 md:hidden">
           <button type="button" aria-label="Fechar" onClick={() => setGaveta(false)} className="absolute inset-0 bg-black/40" />

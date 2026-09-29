@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { FeedItem } from '@/lib/actions';
 
-// Espaço de destaque (2 colunas): mostra um dos anúncios/condomínios marcados
+// Espaço de destaque (2 colunas, ou 2 colunas e 2 linhas). Sem etiqueta "Destaque":
+// no nosso portal o destaque é mostrado só pelo tamanho do card.
+// mostra um dos anúncios/condomínios marcados
 // como destaque pela equipe, entre os que combinam com a busca e o perfil de quem
 // está vendo. Troca a cada ~30 s e também quando o espaço volta a aparecer na tela
 // (a pessoa rolou e voltou). Cada espaço do feed começa num destaque diferente.
@@ -54,9 +56,6 @@ export default function DestaqueRotativo({
       <div key={idx} className="feed-troca">
         {render(item)}
       </div>
-      <span className="pointer-events-none absolute left-1/2 top-2.5 z-10 -translate-x-1/2 rounded-full bg-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow">
-        Destaque
-      </span>
     </div>
   );
 }

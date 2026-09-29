@@ -9,6 +9,8 @@ import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib
 // (preço, área e ano aplicam ao sair do campo ou apertar Enter).
 const chip = (on: boolean) =>
   `rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition ${on ? 'border-ink bg-ink text-white' : 'border-[var(--border)] hover:bg-[var(--pill-bg)]'}`;
+// Aluguel escondido por enquanto (só venda no portal). Para voltar, trocar para true.
+const MOSTRAR_ALUGUEL = false;
 const campo = 'w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] outline-none focus:border-ink';
 
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
@@ -83,6 +85,7 @@ export default function FiltrosLaterais({ filters, onChange }: { filters: Filter
 
   return (
     <div className="flex flex-col gap-6">
+      {MOSTRAR_ALUGUEL && (
       <Secao titulo="Comprar ou alugar">
         <div className="flex flex-wrap gap-1.5">
           {(
@@ -98,6 +101,7 @@ export default function FiltrosLaterais({ filters, onChange }: { filters: Filter
           ))}
         </div>
       </Secao>
+      )}
 
       <Secao titulo="Tipo de imóvel">
         <div className="flex flex-col gap-3">

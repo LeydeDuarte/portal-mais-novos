@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 // Peças visuais do painel (mesmo estilo em todas as telas): título, busca grande,
 // seções de filtro com "chips", filtros ativos, menu "⋯" e barra de seleção.
@@ -94,58 +95,87 @@ export function FiltrosAtivos({ itens, onLimpar }: { itens: { rotulo: string; ti
   );
 }
 
-/** Botão "⋯" com menu suspenso */
+/** Botão "⋯" com menu suspenso. O menu é desenhado por cima da página inteira
+ * (fora do card), para não ficar cortado dentro de cards com bordas arredondadas. */
 export function MenuAcoes({ itens }: { itens: ({ rotulo: string; onClick?: () => void; href?: string; perigo?: boolean; novaAba?: boolean } | 'sep')[] }) {
-  const [aberto, setAberto] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const LARG = 240;
   useEffect(() => {
-    if (!aberto) return;
-    const fora = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setAberto(false);
+    if (!pos) return;
+    const fora = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!menu.current?.contains(t) && !btn.current?.contains(t)) setPos(null);
+    };
+    const fechar = () => setPos(null);
     document.addEventListener('mousedown', fora);
-    return () => document.removeEventListener('mousedown', fora);
-  }, [aberto]);
+    window.addEventListener('scroll', fechar, true);
+    window.addEventListener('resize', fechar);
+    return () => {
+      document.removeEventListener('mousedown', fora);
+      window.removeEventListener('scroll', fechar, true);
+      window.removeEventListener('resize', fechar);
+    };
+  }, [pos]);
+  const abrir = () => {
+    if (pos) return setPos(null);
+    const r = btn.current!.getBoundingClientRect();
+    const altura = itens.length * 42 + 16;
+    const top = r.bottom + 6 + altura > window.innerHeight ? Math.max(8, r.top - 6 - altura) : r.bottom + 6;
+    setPos({ top, left: Math.max(8, Math.min(r.right - LARG, window.innerWidth - LARG - 8)) });
+  };
+  const fechar = () => setPos(null);
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
+        ref={btn}
         type="button"
-        onClick={() => setAberto((a) => !a)}
+        onClick={abrir}
         aria-label="Mais ações"
-        className="grid h-8 w-8 place-items-center rounded-full bg-[var(--pill-bg)] text-[15px] font-bold transition hover:bg-[var(--pill-bg-hover)]"
+        aria-expanded={!!pos}
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--pill-bg)] text-[15px] font-bold transition hover:bg-[var(--pill-bg-hover)]"
       >
         ⋯
       </button>
-      {aberto && (
-        <div className="absolute right-0 top-10 z-30 w-[230px] rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.14)]">
-          {itens.map((i, k) =>
-            i === 'sep' ? (
-              <div key={k} className="my-1 h-px bg-[var(--border)]" />
-            ) : i.href ? (
-              <a
-                key={k}
-                href={i.href}
-                {...(i.novaAba ? { target: '_blank', rel: 'noopener' } : {})}
-                onClick={() => setAberto(false)}
-                className="flex w-full items-center rounded-[10px] px-3 py-2.5 text-[13px] font-medium hover:bg-[var(--pill-bg)]"
-              >
-                {i.rotulo}
-              </a>
-            ) : (
-              <button
-                key={k}
-                type="button"
-                onClick={() => {
-                  setAberto(false);
-                  i.onClick?.();
-                }}
-                className={`flex w-full items-center rounded-[10px] px-3 py-2.5 text-left text-[13px] font-medium ${i.perigo ? 'text-red-600 hover:bg-red-50' : 'hover:bg-[var(--pill-bg)]'}`}
-              >
-                {i.rotulo}
-              </button>
-            )
-          )}
-        </div>
-      )}
-    </div>
+      {pos &&
+        createPortal(
+          <div
+            ref={menu}
+            style={{ position: 'fixed', top: pos.top, left: pos.left, width: LARG }}
+            className="z-[200] rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.16)]"
+          >
+            {itens.map((i, k) =>
+              i === 'sep' ? (
+                <div key={k} className="my-1 h-px bg-[var(--border)]" />
+              ) : i.href ? (
+                <a
+                  key={k}
+                  href={i.href}
+                  {...(i.novaAba ? { target: '_blank', rel: 'noopener' } : {})}
+                  onClick={fechar}
+                  className="flex w-full items-center rounded-[10px] px-3 py-2.5 text-[13px] font-medium hover:bg-[var(--pill-bg)]"
+                >
+                  {i.rotulo}
+                </a>
+              ) : (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => {
+                    fechar();
+                    i.onClick?.();
+                  }}
+                  className={`flex w-full items-center rounded-[10px] px-3 py-2.5 text-left text-[13px] font-medium ${i.perigo ? 'text-red-600 hover:bg-red-50' : 'hover:bg-[var(--pill-bg)]'}`}
+                >
+                  {i.rotulo}
+                </button>
+              )
+            )}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 
