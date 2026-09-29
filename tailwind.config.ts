@@ -9,7 +9,7 @@ const config: Config = {
         accent: '#257CFF'
       },
       fontFamily: {
-        serif: ['var(--font-playfair)', 'Georgia', 'serif'],
+        serif: ['var(--font-playfair)', 'Poppins', 'system-ui', 'sans-serif'], // "serif" = fonte dos títulos (hoje Poppins)
         sans: ['var(--font-inter)', 'system-ui', 'sans-serif']
       }
     }

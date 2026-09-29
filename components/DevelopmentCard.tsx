@@ -76,7 +76,7 @@ export default function DevelopmentCard({ development, prioridade = false }: { d
     <div className="mb-5 inline-block w-full break-inside-avoid md:mb-7">
       <Link href={urlCondominio(development)} className="block">
         <div
-          className="group relative flex items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)]"
+          className="feed-midia group relative flex items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)]"
           style={{ height: development.height }}
         >
           {cover ? (

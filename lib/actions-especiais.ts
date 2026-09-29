@@ -74,9 +74,11 @@ type DestRow = {
   cliques: number;
   exibicoes: number;
   created_at: Date;
+  colunas: number;
+  video_url: string | null;
 };
 const dia = (d: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : null);
-const mapDest = (r: DestRow): Destaque => ({ ...r, inicio: dia(r.inicio), fim: dia(r.fim), criadoEm: new Date(r.created_at).toISOString() });
+const mapDest = (r: DestRow): Destaque => ({ ...r, colunas: r.colunas === 2 ? 2 : 1, videoUrl: r.video_url, inicio: dia(r.inicio), fim: dia(r.fim), criadoEm: new Date(r.created_at).toISOString() });
 
 export async function listarDestaques(): Promise<Destaque[]> {
   await exigirGestor();
@@ -96,12 +98,16 @@ export type DestaqueInput = {
   ordem?: number;
   inicio?: string;
   fim?: string;
+  colunas?: 1 | 2;
+  videoUrl?: string;
 };
 
 export async function salvarDestaque(d: DestaqueInput): Promise<{ ok: boolean; erro?: string }> {
   const eu = await exigirGestor();
   const titulo = txt(d.titulo, 90);
   if (!titulo) return { ok: false, erro: 'Informe o título.' };
+  const video = String(d.videoUrl ?? '').trim();
+  if (video && !/^https:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\//.test(video)) return { ok: false, erro: 'Vídeo: use um link do YouTube ou do Vimeo.' };
   if (d.link && !urlOk(d.link)) return { ok: false, erro: 'Link inválido. Use um endereço começando com https:// ou uma página do site (ex.: /financiamento).' };
   const vals = [
     txt(d.selo, 24) ?? 'Publi',
@@ -113,16 +119,18 @@ export async function salvarDestaque(d: DestaqueInput): Promise<{ ok: boolean; e
     !!d.ativo,
     Math.round(Number(d.ordem) || 0),
     dataOk(d.inicio),
-    dataOk(d.fim)
+    dataOk(d.fim),
+    d.colunas === 2 ? 2 : 1,
+    video.slice(0, 300) || null
   ];
   if (d.id) {
     await query(
-      'update destaques set selo=$2, titulo=$3, texto=$4, imagem=$5, link=$6, botao=$7, ativo=$8, ordem=$9, inicio=$10, fim=$11, updated_at=now() where id=$1::uuid',
+      'update destaques set selo=$2, titulo=$3, texto=$4, imagem=$5, link=$6, botao=$7, ativo=$8, ordem=$9, inicio=$10, fim=$11, colunas=$12, video_url=$13, updated_at=now() where id=$1::uuid',
       [d.id, ...vals]
     );
   } else {
     await query(
-      'insert into destaques (selo, titulo, texto, imagem, link, botao, ativo, ordem, inicio, fim, criado_por) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+      'insert into destaques (selo, titulo, texto, imagem, link, botao, ativo, ordem, inicio, fim, colunas, video_url, criado_por) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
       [...vals, eu.email]
     );
   }

@@ -8,7 +8,7 @@ import ImovelCardPainel from '@/components/painel/ImovelCardPainel';
 import LinkPrivadoModal from '@/components/LinkPrivadoModal';
 import { BarraSelecao, BuscaGrande, Chips, FiltrosAtivos, SecaoFiltro, TituloPainel, Vazio, botaoBarra, botaoBarraSec, campoPainel } from '@/components/painel/ui';
 import { useStaffSession } from '@/lib/use-staff-session';
-import { deleteProperty, marcarComoVendido } from '@/lib/actions';
+import { deleteProperty, marcarComoVendido, marcarDestaqueFeed } from '@/lib/actions';
 import { linkParaCorretor, listarImoveisPainel, mudarVisibilidade, type ImovelPainel } from '@/lib/actions-painel-imoveis';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { veTudo } from '@/lib/papeis';
@@ -260,6 +260,17 @@ export default function ImoveisPainelPage() {
                       { rotulo: 'Fazer proposta', href: `/dashboard/propostas/nova?imovel=${i.id}` },
                       { rotulo: 'Link privado para cliente', onClick: () => setLinkDe(i) },
                       { rotulo: 'Ver página no site', href: `/imovel/${i.slug ?? i.id}`, novaAba: true },
+                      ...(veTudo(staff.role)
+                        ? [
+                            {
+                              rotulo: i.destaque ? '★ Tirar do destaque do feed' : '☆ Destacar no feed (2 colunas)',
+                              onClick: async () => {
+                                await marcarDestaqueFeed('imovel', i.id, !i.destaque);
+                                atualizar(i.id, { destaque: !i.destaque });
+                              }
+                            }
+                          ]
+                        : []),
                       'sep',
                       ...(!i.vendidoEm
                         ? [

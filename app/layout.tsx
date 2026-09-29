@@ -3,7 +3,7 @@ import { cookies, headers } from 'next/headers';
 import { ehHostApp } from '@/lib/dominios';
 import { verifySession } from '@/lib/session';
 import RegistrarApp from '@/components/RegistrarApp';
-import { Playfair_Display, Inter } from 'next/font/google';
+import { Poppins, Inter } from 'next/font/google';
 import './globals.css';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
 import ProtecaoImagens from '@/components/ProtecaoImagens';
@@ -12,10 +12,12 @@ import { GtmHead, GtmBody } from '@/components/GoogleTagManager';
 // Nunca reaproveitar respostas antigas do banco em nenhuma página
 export const fetchCache = 'default-no-store';
 
-const playfair = Playfair_Display({
+// Títulos: Poppins (substituiu a fonte com serifa em todo o site)
+const playfair = Poppins({
   subsets: ['latin'],
   weight: ['500', '600', '700'],
-  variable: '--font-playfair'
+  variable: '--font-playfair',
+  display: 'swap'
 });
 
 const inter = Inter({

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { aprenderPerfil } from '@/lib/perfil-cliente';
-import { getFeedPage, getAnunciosOcultos, contarImoveisAVenda, feedModoEquipe, condominiosDosBairros, type FeedItem, type AnuncioOculto, type CondoDoBairro } from '@/lib/actions';
+import { getDestaquesFeed, getFeedPage, getAnunciosOcultos, contarImoveisAVenda, feedModoEquipe, condominiosDosBairros, type FeedItem, type AnuncioOculto, type CondoDoBairro } from '@/lib/actions';
 import Link from 'next/link';
 import { countActiveFilters, type FilterState } from '@/lib/filters';
 import OcultoCard from './OcultoCard';
@@ -10,21 +10,38 @@ import { useFavorites } from '@/lib/use-favorites';
 import { useSession } from '@/lib/use-session';
 import PropertyCard from './PropertyCard';
 import DevelopmentCard from './DevelopmentCard';
+import FeedGrid, { type ItemGrade } from './feed/FeedGrid';
+import FeedModoToggle from './feed/FeedModoToggle';
+import DestaqueRotativo from './feed/DestaqueRotativo';
 import DepoimentoCard from './DepoimentoCard';
 import DestaqueCard from './DestaqueCard';
 import LoginModal from './LoginModal';
 import type { Cliente } from '@/lib/cliente-auth';
 import { urlImovel, urlCondominio } from '@/lib/urls';
 
-export type FeedInicial = { items: FeedItem[]; hasMore: boolean; totalAVenda: number; modoEquipe: boolean; filtrosChave: string };
+export type FeedInicial = { items: FeedItem[]; hasMore: boolean; totalAVenda: number; modoEquipe: boolean; filtrosChave: string; modoFeed?: 'masonry' | 'alinhado'; escolheuFeed?: boolean };
 
 const chaveItem = (i: FeedItem) =>
   i.kind === 'empreendimento' ? `d-${i.development.id}` : i.kind === 'imovel' ? `p-${i.property.id}` : i.chave;
 
 export default function MasonryFeed({ filters, inicial }: { filters: FilterState; inicial?: FeedInicial }) {
+  // destaques da equipe que combinam com esta busca (espaço de 2 colunas que se reveza)
+  const filtrosJson = JSON.stringify(filters);
+  useEffect(() => {
+    let vivo = true;
+    getDestaquesFeed(JSON.parse(filtrosJson))
+      .then((d) => vivo && setDestaques(d))
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [filtrosJson]);
   // 1ª página já vem pronta do servidor (aparece na hora e o Google enxerga os links)
   const usarInicial = useRef(!!inicial);
   const [items, setItems] = useState<FeedItem[]>(inicial?.items ?? []);
+  const [modoFeed, setModoFeed] = useState<'masonry' | 'alinhado'>(inicial?.modoFeed ?? 'masonry');
+  const [escolheuFeed, setEscolheuFeed] = useState(!!inicial?.escolheuFeed);
+  const [destaques, setDestaques] = useState<FeedItem[]>([]);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -173,23 +190,78 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
     }
   };
 
+  const renderItem = (item: FeedItem, idx: number, largo = false) =>
+    item.kind === 'depoimento' ? (
+      <DepoimentoCard d={item.depoimento} />
+    ) : item.kind === 'destaque' ? (
+      <DestaqueCard d={item.destaque} />
+    ) : item.kind === 'empreendimento' ? (
+      <DevelopmentCard development={item.development} prioridade={idx < 4 || largo} />
+    ) : (
+      <PropertyCard
+        property={item.property}
+        isFavorite={!!favorites[item.property.id]}
+        loggedIn={session.loggedIn}
+        onFavoriteClick={handleFavoriteClick}
+        onDwell={handleDwell}
+        prioridade={idx < 4 || largo}
+      />
+    );
+  const estimar = (item: FeedItem) =>
+    item.kind === 'imovel'
+      ? (item.property.height ?? 300) + 150
+      : item.kind === 'empreendimento'
+        ? (item.development.height ?? 300) + 170
+        : item.kind === 'depoimento'
+          ? 280
+          : 320;
+  // monta a grade: itens normais + espaço de destaque (2 colunas) no 3º lugar e a cada 20 itens
+  function montarGrade(): ItemGrade[] {
+    const out: ItemGrade[] = [];
+    let slot = 0;
+    items.forEach((item, idx) => {
+      if (destaques.length && (idx === 2 || (idx > 2 && (idx - 2) % 20 === 0))) {
+        const s = slot++;
+        out.push({
+          chave: `rot-${s}`,
+          largo: true,
+          estimativa: 420,
+          node: <DestaqueRotativo pool={destaques} inicio={s * 3} render={(it) => renderItem(it, 0, true)} />
+        });
+      }
+      const largo = item.kind === 'destaque' && item.destaque.colunas === 2;
+      out.push({ chave: chaveItem(item), largo, estimativa: largo ? 420 : estimar(item), node: renderItem(item, idx) });
+    });
+    return out;
+  }
+
   return (
     <>
-      <div className="px-4 pb-1 pt-5 text-[15px] font-bold md:px-8 md:pt-6">
-        {filters.modo === 'lancamentos' ? 'Lançamentos e empreendimentos' : 'Imóveis para você'}
-        {totalAVenda != null && (totalAVenda > 0 || filtrando) ? (
-          <span className="ml-2 inline-flex translate-y-[-1px] items-center rounded-full bg-accent/10 px-2.5 py-0.5 align-middle text-xs font-bold text-accent">
-            <span className="font-sans tabular-nums">{totalAVenda.toLocaleString('pt-BR')}</span>&nbsp;
-            {totalAVenda === 1 ? 'imóvel' : 'imóveis'} {filters.finalidade === 'aluguel' ? 'para alugar' : 'à venda'}
-            {filtrando ? ' nesta busca' : ''}
-          </span>
-        ) : null}
-        {filters.locais.length ? (
-          <span className="font-normal text-[var(--text-muted)]"> · em {filters.locais.map((l) => l.nome).join(', ')}</span>
-        ) : null}
-        {filters.termos.length ? (
-          <span className="font-normal text-[var(--text-muted)]"> · busca por {filters.termos.map((t) => `“${t}”`).join(' ou ')}</span>
-        ) : null}
+      <div className="flex items-center gap-3 px-4 pb-1 pt-5 md:px-8 md:pt-6">
+        <div className="min-w-0 flex-1 text-[15px] font-bold">
+          {filters.modo === 'lancamentos' ? 'Lançamentos e empreendimentos' : 'Imóveis para você'}
+          {totalAVenda != null && (totalAVenda > 0 || filtrando) ? (
+            <span className="ml-2 inline-flex translate-y-[-1px] items-center rounded-full bg-accent/10 px-2.5 py-0.5 align-middle text-xs font-bold text-accent">
+              <span className="font-sans tabular-nums">{totalAVenda.toLocaleString('pt-BR')}</span>&nbsp;
+              {totalAVenda === 1 ? 'imóvel' : 'imóveis'} {filters.finalidade === 'aluguel' ? 'para alugar' : 'à venda'}
+              {filtrando ? ' nesta busca' : ''}
+            </span>
+          ) : null}
+          {filters.locais.length ? (
+            <span className="font-normal text-[var(--text-muted)]"> · em {filters.locais.map((l) => l.nome).join(', ')}</span>
+          ) : null}
+          {filters.termos.length ? (
+            <span className="font-normal text-[var(--text-muted)]"> · busca por {filters.termos.map((t) => `“${t}”`).join(' ou ')}</span>
+          ) : null}
+        </div>
+        <FeedModoToggle
+          modo={modoFeed}
+          jaEscolheu={escolheuFeed}
+          onChange={(m) => {
+            setModoFeed(m);
+            setEscolheuFeed(true);
+          }}
+        />
       </div>
 
       {modoEquipe && (
@@ -199,27 +271,7 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
         </p>
       )}
 
-      <div className="columns-2 gap-2.5 px-2.5 pb-16 pt-2.5 sm:columns-3 sm:gap-3 sm:px-5 md:columns-4 md:gap-4 md:px-7 xl:columns-5 xl:gap-4.5 2xl:columns-6">
-        {items.map((item, idx) =>
-          item.kind === 'depoimento' ? (
-            <DepoimentoCard key={chaveItem(item)} d={item.depoimento} />
-          ) : item.kind === 'destaque' ? (
-            <DestaqueCard key={chaveItem(item)} d={item.destaque} />
-          ) : item.kind === 'empreendimento' ? (
-            <DevelopmentCard key={chaveItem(item)} development={item.development} prioridade={idx < 4} />
-          ) : (
-            <PropertyCard
-              key={chaveItem(item)}
-              property={item.property}
-              isFavorite={!!favorites[item.property.id]}
-              loggedIn={session.loggedIn}
-              onFavoriteClick={handleFavoriteClick}
-              onDwell={handleDwell}
-              prioridade={idx < 4}
-            />
-          )
-        )}
-      </div>
+      <FeedGrid modo={modoFeed} itens={montarGrade()} />
 
       {items.length === 0 && !loading && (
         <div className="px-4 pb-16 text-center text-sm text-[var(--text-muted)]">

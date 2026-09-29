@@ -6,13 +6,36 @@ import { semTravessoes } from '@/lib/text';
 
 // Card de DESTAQUE (propaganda própria) no feed: borda escura, barrinha com o selo
 // ("Destaque", "Oportunidade", "Crédito"...) e botão para a página ou link.
+/** Link do YouTube/Vimeo → vídeo que toca sozinho, sem som e em loop */
+function videoAutoplay(url?: string | null): string | null {
+  if (!url) return null;
+  const yt = url.match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/);
+  if (yt) return `https://www.youtube-nocookie.com/embed/${yt[1]}?autoplay=1&mute=1&loop=1&playlist=${yt[1]}&controls=0&playsinline=1&modestbranding=1&rel=0`;
+  const vm = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vm) return `https://player.vimeo.com/video/${vm[1]}?background=1&autoplay=1&muted=1&loop=1`;
+  return null;
+}
+
 export default function DestaqueCard({ d }: { d: Dest }) {
   const externo = !!d.link && /^https?:\/\//.test(d.link) && !d.link.includes('maisnovosimoveis.com');
+  const embed = videoAutoplay(d.videoUrl);
   const conteudo = (
     <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg)]">
-      {d.imagem && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={d.imagem} alt={semTravessoes(d.titulo)} loading="lazy" className="block w-full object-cover" />
+      {embed ? (
+        <div className="relative aspect-video w-full overflow-hidden bg-black">
+          <iframe
+            src={embed}
+            title={semTravessoes(d.titulo)}
+            loading="lazy"
+            allow="autoplay; encrypted-media; picture-in-picture"
+            className="pointer-events-none absolute inset-0 h-full w-full"
+          />
+        </div>
+      ) : (
+        d.imagem && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={d.imagem} alt={semTravessoes(d.titulo)} loading="lazy" className="block w-full object-cover" />
+        )
       )}
       <div className="p-3.5">
         <div className="mb-1 flex items-center gap-1 text-[10.5px] font-semibold text-[var(--text-faint)]">

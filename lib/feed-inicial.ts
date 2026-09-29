@@ -3,6 +3,7 @@
 import { getFeedPage, contarImoveisAVenda, feedModoEquipe } from './actions';
 import { DEFAULT_FILTERS, splitTermos, type FilterState } from './filters';
 import type { FeedInicial } from '@/components/MasonryFeed';
+import { cookies } from 'next/headers';
 
 export async function montarFeedInicial(modo: FilterState['modo'], q: string): Promise<FeedInicial> {
   const filtros: FilterState = { ...DEFAULT_FILTERS, modo, termos: splitTermos(q) };
@@ -12,5 +13,8 @@ export async function montarFeedInicial(modo: FilterState['modo'], q: string): P
     feedModoEquipe().catch(() => false)
   ]);
   const total = 'total' in pagina && typeof pagina.total === 'number' ? pagina.total : totalAVenda;
-  return { items: pagina.items, hasMore: pagina.hasMore, totalAVenda: total, modoEquipe, filtrosChave: JSON.stringify(filtros) };
+  // formato do feed escolhido pela pessoa (fica gravado até ela trocar de novo)
+  const c = cookies().get('mn_feed')?.value;
+  const modoFeed = c === 'alinhado' ? 'alinhado' : 'masonry';
+  return { items: pagina.items, hasMore: pagina.hasMore, totalAVenda: total, modoEquipe, filtrosChave: JSON.stringify(filtros), modoFeed, escolheuFeed: !!c };
 }

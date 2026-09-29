@@ -98,7 +98,7 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
       <Link href={urlImovel(property)} className="block">
         <div
           ref={setRefs}
-          className={`group relative flex items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)] ${
+          className={`feed-midia group relative flex items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)] ${
             isPlaying && !embed ? 'video-playing' : ''
           }`}
           style={{ height: property.height }}

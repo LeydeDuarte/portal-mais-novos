@@ -10,12 +10,12 @@ export async function depoimentosAtivos(): Promise<DepoimentoCard[]> {
 }
 
 export async function destaquesAtivos(): Promise<DestaqueCard[]> {
-  const rows = await query<{ id: string; selo: string; titulo: string; texto: string | null; imagem: string | null; link: string | null; botao: string | null }>(
-    `select id, selo, titulo, texto, imagem, link, botao from destaques
+  const rows = await query<{ id: string; selo: string; titulo: string; texto: string | null; imagem: string | null; link: string | null; botao: string | null; colunas: number; video_url: string | null }>(
+    `select id, selo, titulo, texto, imagem, link, botao, colunas, video_url from destaques
       where ativo and (inicio is null or inicio <= current_date) and (fim is null or fim >= current_date)
       order by ordem, created_at desc limit 20`
   ).catch(() => []);
-  return rows;
+  return rows.map((r) => ({ id: r.id, selo: r.selo, titulo: r.titulo, texto: r.texto, imagem: r.imagem, link: r.link, botao: r.botao, colunas: r.colunas === 2 ? 2 : 1, videoUrl: r.video_url }));
 }
 
 /** Número estável a partir de um texto (para variar a ordem por visitante) */

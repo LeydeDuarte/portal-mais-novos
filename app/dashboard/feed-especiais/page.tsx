@@ -25,7 +25,7 @@ const input = 'w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px
 const label = 'mb-1 block text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]';
 
 const depVazio: DepoimentoInput = { nome: '', subtitulo: '', texto: '', foto: null, nota: 5, ativo: true, ordem: 0 };
-const destVazio: DestaqueInput = { selo: 'Destaque', titulo: '', texto: '', imagem: null, link: '', botao: 'Saiba mais', ativo: true, ordem: 0, inicio: '', fim: '' };
+const destVazio: DestaqueInput = { colunas: 1, videoUrl: '', selo: 'Publi', titulo: '', texto: '', imagem: null, link: '', botao: 'Saiba mais', ativo: true, ordem: 0, inicio: '', fim: '' };
 
 // Painel → Depoimentos e destaques: os dois cards especiais que entram no meio do feed.
 export default function FeedEspeciaisPage() {
@@ -249,6 +249,19 @@ export default function FeedEspeciaisPage() {
                   <input className={input} value={dest.botao ?? ''} onChange={(e) => setDest({ ...dest, botao: e.target.value })} placeholder="Saiba mais" maxLength={30} />
                 </div>
               </div>
+              <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
+                <div>
+                  <span className={label}>Tamanho no feed</span>
+                  <select className={input} value={dest.colunas ?? 1} onChange={(e) => setDest({ ...dest, colunas: Number(e.target.value) === 2 ? 2 : 1 })}>
+                    <option value={1}>1 coluna</option>
+                    <option value={2}>2 colunas</option>
+                  </select>
+                </div>
+                <div>
+                  <span className={label}>Vídeo em autoplay (YouTube ou Vimeo, opcional)</span>
+                  <input className={input} value={dest.videoUrl ?? ''} onChange={(e) => setDest({ ...dest, videoUrl: e.target.value })} placeholder="https://youtu.be/…" />
+                </div>
+              </div>
               <div className="grid gap-4 sm:grid-cols-4">
                 <div>
                   <span className={label}>Início</span>
@@ -296,7 +309,9 @@ export default function FeedEspeciaisPage() {
                   texto: dest.texto || null,
                   imagem: dest.imagem ?? null,
                   link: null,
-                  botao: dest.botao || null
+                  botao: dest.botao || null,
+                  colunas: dest.colunas === 2 ? 2 : 1,
+                  videoUrl: dest.videoUrl || null
                 }}
               />
             </div>
@@ -330,7 +345,9 @@ export default function FeedEspeciaisPage() {
                           ativo: d.ativo,
                           ordem: d.ordem,
                           inicio: d.inicio ?? '',
-                          fim: d.fim ?? ''
+                          fim: d.fim ?? '',
+                          colunas: d.colunas,
+                          videoUrl: d.videoUrl ?? ''
                         });
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}

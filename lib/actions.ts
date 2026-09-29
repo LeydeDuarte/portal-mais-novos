@@ -141,6 +141,22 @@ const TIPOS_CTE = `tl(k, label) as (values ${Object.entries(TIPO_UNIDADE_LABEL)
   .join(', ')})`;
 
 // Ação pública: sempre o feed PÚBLICO (os privados nunca saem daqui).
+/**
+ * Destaques da equipe que combinam com a busca atual (já ordenados pelo perfil do
+ * visitante): alimentam o espaço de 2 colunas que se reveza no feed.
+ */
+export async function getDestaquesFeed(filters: FilterState): Promise<FeedItem[]> {
+  const r = await feedInterno(0, filters, false, true).catch(() => ({ items: [] as FeedItem[] }));
+  return r.items.filter((i) => i.kind === 'imovel' || i.kind === 'empreendimento').slice(0, 12);
+}
+
+/** Equipe (admin/analista) marca ou desmarca um anúncio/condomínio como destaque do feed */
+export async function marcarDestaqueFeed(tipo: 'imovel' | 'condominio', id: string, destaque: boolean): Promise<void> {
+  const staff = await requireStaff();
+  if (!veTudo(staff.role)) throw new Error('Só admin e analista escolhem os destaques.');
+  await query(`update ${tipo === 'imovel' ? 'properties' : 'developments'} set destaque = $2 where id = $1`, [id, !!destaque]);
+}
+
 export async function getFeedPage(page: number, filters: FilterState): Promise<{ items: FeedItem[]; hasMore: boolean; total?: number }> {
   const r = await feedInterno(page, filters, false);
   return { ...r, items: await intercalarEspeciais(r.items, page) };
@@ -148,7 +164,7 @@ export async function getFeedPage(page: number, filters: FilterState): Promise<{
 
 // Uso interno (não exportado → não vira endpoint): com ocultos=true devolve os
 // privados, que só saem daqui mascarados (getAnunciosOcultos).
-async function feedInterno(page: number, filters: FilterState, ocultos: boolean): Promise<{ items: FeedItem[]; hasMore: boolean; total?: number }> {
+async function feedInterno(page: number, filters: FilterState, ocultos: boolean, soDestaques = false): Promise<{ items: FeedItem[]; hasMore: boolean; total?: number }> {
   page = Math.max(0, Math.min(500, Math.floor(Number(page) || 0)));
   // Os filtros vêm do navegador: limita tamanho de listas e textos
   const lista = <T,>(v: unknown, n: number): T[] => (Array.isArray(v) ? (v.slice(0, n) as T[]) : []);
@@ -172,6 +188,11 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean)
 
   const propConds: string[] = [];
   const devConds: string[] = [];
+  // Destaques (2 colunas no feed): só os marcados pela equipe, dentro da mesma busca
+  if (soDestaques) {
+    propConds.push('p.destaque');
+    devConds.push('d.destaque');
+  }
 
   // ---- Condições dos imóveis (alias p, com o empreendimento em d) ----
   if (filters.finalidade !== 'todas') propConds.push(`p.finalidade = ${p(filters.finalidade)}`);

@@ -16,6 +16,8 @@ export type DestaqueCard = {
   imagem: string | null;
   link: string | null;
   botao: string | null;
+  colunas: 1 | 2; // ocupa 1 ou 2 colunas do feed
+  videoUrl: string | null; // vídeo em autoplay (sem som) no lugar da imagem
 };
 
 export type Depoimento = DepoimentoCard & { ativo: boolean; ordem: number; criadoEm: string };

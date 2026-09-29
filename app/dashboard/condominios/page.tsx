@@ -8,6 +8,7 @@ import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { contarDuplicados, juntarCondominios } from '@/lib/duplicados';
 import { compartilharCondominio, excluirCondominio, listarCondominiosPainel, type CondoPainel } from '@/lib/actions-painel-condominios';
+import { marcarDestaqueFeed } from '@/lib/actions';
 import { BUCKET_LABEL, FASES, getStatusBucket, type StatusBucket } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { BarraSelecao, BuscaGrande, Chips, FiltrosAtivos, MenuAcoes, SecaoFiltro, TituloPainel, Vazio, botaoBarra, campoPainel } from '@/components/painel/ui';
@@ -261,6 +262,7 @@ export default function CondominiosPage() {
                         )}
                         {!c.entrega && <span className="rounded bg-black/55 px-1.5 py-0.5 text-[9.5px] font-bold text-white">SEM DATA</span>}
                         {c.status === 'rascunho' && <span className="rounded bg-amber-500 px-1.5 py-0.5 text-[9.5px] font-bold text-white">RASCUNHO</span>}
+                        {c.destaque && <span className="rounded bg-accent px-1.5 py-0.5 text-[9.5px] font-bold text-white">★ DESTAQUE</span>}
                       </div>
                       <div className="absolute bottom-1.5 right-1.5 flex gap-1 text-[10px] font-bold text-white">
                         <span className="rounded bg-black/55 px-1.5 py-0.5" title="Visualizações">👁 {c.visualizacoes}</span>
@@ -312,6 +314,13 @@ export default function CondominiosPage() {
                         { rotulo: 'Fazer proposta', href: `/dashboard/propostas/nova?condominio=${c.id}` },
                         ...(gestor
                           ? [
+                              {
+                                rotulo: c.destaque ? '★ Tirar do destaque do feed' : '☆ Destacar no feed (2 colunas)',
+                                onClick: async () => {
+                                  await marcarDestaqueFeed('condominio', c.id, !c.destaque);
+                                  setItens((l) => l?.map((x) => (x.id === c.id ? { ...x, destaque: !c.destaque } : x)) ?? l);
+                                }
+                              },
                               'sep' as const,
                               {
                                 rotulo: 'Excluir condomínio',

@@ -63,6 +63,7 @@ export default function ImovelCardPainel({
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">{tipo}</span>
             {i.visibilidade === 'privado' && <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-semibold text-white">Privado</span>}
+            {i.destaque && <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-white">★ Destaque</span>}
             {i.codigo && <span className="text-[11px] font-medium text-[var(--text-muted)]">cód. {i.codigo}</span>}
           </div>
           <div className="mt-1.5 truncate text-[15px] font-bold leading-tight">{i.condominio ?? i.titulo ?? tipo}</div>
