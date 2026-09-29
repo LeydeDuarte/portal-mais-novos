@@ -43,15 +43,29 @@ function getVisitorKey(createIfMissing: boolean): string | null {
 export async function getMyFavorites(): Promise<string[]> {
   const key = getVisitorKey(false);
   if (!key) return [];
-  const rows = await query<{ property_id: string }>(
-    'select property_id from favorites where user_email = $1 order by created_at desc',
+  // imóveis e condomínios favoritados (os ids não se repetem entre as duas tabelas)
+  const rows = await query<{ id: string }>(
+    `select id from (
+       select property_id as id, created_at from favorites where user_email = $1
+       union all
+       select development_id as id, created_at from favoritos_condominios where user_email = $1
+     ) f order by created_at desc`,
     [key]
   );
-  return rows.map((r) => r.property_id);
+  return rows.map((r) => r.id);
 }
 
 export async function setFavorite(propertyId: string, favorite: boolean): Promise<void> {
   const key = getVisitorKey(true)!;
+  if (typeof propertyId !== 'string' || propertyId.length > 80) return;
+  // Condomínio/empreendimento também pode ser favoritado (tabela própria)
+  const ehCondominio = (await query('select 1 from developments where id = $1', [propertyId])).length > 0;
+  if (ehCondominio) {
+    if (favorite)
+      await query('insert into favoritos_condominios (user_email, development_id) values ($1, $2) on conflict do nothing', [key, propertyId]);
+    else await query('delete from favoritos_condominios where user_email = $1 and development_id = $2', [key, propertyId]);
+    return;
+  }
   if (favorite) {
     // "where exists" evita erro de chave estrangeira se o imóvel já foi excluído
     await query(
@@ -190,4 +204,18 @@ export async function getMyFavoriteProperties(): Promise<import('./property-deta
     [key]
   );
   return rows.map(mapPropertyRow);
+}
+
+// Condomínios favoritados (só os publicados), no formato do card do feed
+export async function getMyFavoriteDevelopments(): Promise<import('./actions').DevelopmentCardData[]> {
+  const key = getVisitorKey(false);
+  if (!key) return [];
+  const rows = await query<{ development_id: string }>(
+    `select f.development_id from favoritos_condominios f join developments d on d.id = f.development_id
+      where f.user_email = $1 and d.status = 'publicado' order by f.created_at desc limit 100`,
+    [key]
+  );
+  if (!rows.length) return [];
+  const { cardsDeCondominios } = await import('./actions');
+  return cardsDeCondominios(rows.map((r) => r.development_id));
 }

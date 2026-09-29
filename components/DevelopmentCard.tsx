@@ -36,7 +36,36 @@ function youtubeAutoplay(url?: string): string | null {
   return m ? `https://www.youtube-nocookie.com/embed/${m[1]}?autoplay=1&mute=1&loop=1&playlist=${m[1]}&controls=0&playsinline=1&modestbranding=1&rel=0` : null;
 }
 
-export default function DevelopmentCard({ development, prioridade = false, emDestaque = false }: { development: DevelopmentCardData; prioridade?: boolean; emDestaque?: boolean }) {
+export default function DevelopmentCard({
+  development,
+  prioridade = false,
+  emDestaque = false,
+  isFavorite = false,
+  onFavoriteClick
+}: {
+  development: DevelopmentCardData;
+  prioridade?: boolean;
+  emDestaque?: boolean;
+  isFavorite?: boolean;
+  onFavoriteClick?: (id: string) => void;
+}) {
+  const coracao = onFavoriteClick ? (
+    <button
+      type="button"
+      aria-label="Favoritar empreendimento"
+      aria-pressed={isFavorite}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onFavoriteClick(development.id);
+      }}
+      className={`absolute right-2 top-2 z-20 flex h-[34px] w-[34px] items-center justify-center rounded-full transition-transform hover:scale-105 ${isFavorite ? 'bg-accent' : 'bg-ink/40'}`}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill={isFavorite ? '#fff' : 'rgba(255,255,255,0.85)'} stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 21s-6.7-4.35-9.3-8.2C1 10.1 1.6 6.9 4.3 5.4c2.2-1.2 4.9-.5 6.2 1.6l1.5 2.4 1.5-2.4c1.3-2.1 4-2.8 6.2-1.6 2.7 1.5 3.3 4.7 1.6 7.4C18.7 16.65 12 21 12 21z" />
+      </svg>
+    </button>
+  ) : null;
   // no espaço de destaque, o vídeo do condomínio toca sozinho (sem som)
   const videoDestaque = emDestaque ? youtubeAutoplay(development.videoUrl) : null;
   const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
@@ -118,7 +147,8 @@ export default function DevelopmentCard({ development, prioridade = false, emDes
             />
           )}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/60" />
-          <div className="absolute left-2.5 right-2.5 top-2.5 z-10 flex flex-wrap items-center gap-1.5">
+          {coracao}
+          <div className={`absolute left-2.5 top-2.5 z-10 flex flex-wrap items-center gap-1.5 ${coracao ? 'right-12' : 'right-2.5'}`}>
             <AnunciosBadge n={development.anuncios} />
             <Visualizacoes n={development.visualizacoes} />
             <span className="whitespace-nowrap rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>

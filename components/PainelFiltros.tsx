@@ -25,7 +25,7 @@ export default function PainelFiltros({ filters, onChange }: { filters: FilterSt
       /* ignora */
     }
   };
-  const n = countActiveFilters({ ...filters, situacao: 'todas', termos: [], locais: [] });
+  const n = countActiveFilters({ ...filters, situacao: [], termos: [], locais: [] });
 
   const Aba = ({ onClick, className = '' }: { onClick: () => void; className?: string }) => (
     <button

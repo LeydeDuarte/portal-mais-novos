@@ -196,7 +196,13 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
     ) : item.kind === 'destaque' ? (
       <DestaqueCard d={item.destaque} grande={grande} />
     ) : item.kind === 'empreendimento' ? (
-      <DevelopmentCard development={item.development} prioridade={idx < 4 || largo} emDestaque={largo} />
+      <DevelopmentCard
+        development={item.development}
+        prioridade={idx < 4 || largo}
+        emDestaque={largo}
+        isFavorite={!!favorites[item.development.id]}
+        onFavoriteClick={handleFavoriteClick}
+      />
     ) : (
       <PropertyCard
         property={item.property}

@@ -1,6 +1,8 @@
 'use server';
 
 // Painel → Condomínios: lista para a grade (com números), excluir e compartilhar.
+import { linhaCondominio, mensagemComLink } from './compartilhar';
+import { urlCondominio } from './urls';
 import { query } from './db';
 import { exigirEquipe, exigirGestor } from './staff-auth';
 import { veTudo } from './session';
@@ -46,7 +48,7 @@ export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
        from developments d
        left join lateral (
          select count(*) filter (where not p.is_tipologia and p.vendido_em is null) as anuncios,
-                (select count(*) from favorites f join properties pf on pf.id = f.property_id where pf.empreendimento_id = d.id) as salvamentos,
+                ((select count(*) from favorites f join properties pf on pf.id = f.property_id where pf.empreendimento_id = d.id) + (select count(*) from favoritos_condominios fc where fc.development_id = d.id)) as salvamentos,
                 avg(p.price_value / nullif(p.area, 0)) filter (where p.price_value > 0 and p.area > 0 and p.vendido_em is null) as m2,
                 min(p.price_value) filter (where p.price_value > 0 and p.vendido_em is null) as minimo
            from properties p where p.empreendimento_id = d.id
@@ -85,11 +87,30 @@ export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
     .filter((c) => veTudo(eu.role) || c.status === 'publicado' || c.corretorEmail?.toLowerCase() === eu.email.toLowerCase());
 }
 
-/** Link público do condomínio (conta um compartilhamento) */
+/** Mensagem com o link público do condomínio para o cliente (conta um compartilhamento):
+ *  "Marista 262 - Setor Marista - 3 e 4 Quartos - 118 a 252m² - a partir de: R$ 1.430.000" e o link abaixo */
 export async function compartilharCondominio(id: string): Promise<string> {
   await exigirEquipe();
-  const r = await query<{ slug: string | null }>('update developments set compartilhamentos = coalesce(compartilhamentos, 0) + 1 where id = $1 returning slug', [id]);
-  return `${SITE_URL}/empreendimento/${r[0]?.slug ?? id}`;
+  const r = await query<{
+    id: string; slug: string | null; name: string; bairro: string | null; cidade: string | null; uf: string | null;
+    qmin: number | null; qmax: number | null; amin: number | null; amax: number | null; preco: number | null;
+  }>(
+    `update developments d set compartilhamentos = coalesce(d.compartilhamentos, 0) + 1 where d.id = $1
+     returning d.id, d.slug, d.name, d.bairro, d.cidade, d.uf,
+       (select min(q) from (select v::int q from jsonb_array_elements_text(d.quartos_opcoes) v union all select quartos from properties where empreendimento_id = d.id and quartos > 0) x) as qmin,
+       (select max(q) from (select v::int q from jsonb_array_elements_text(d.quartos_opcoes) v union all select quartos from properties where empreendimento_id = d.id and quartos > 0) x) as qmax,
+       (select min(area) from properties where empreendimento_id = d.id and area > 0) as amin,
+       (select max(area) from properties where empreendimento_id = d.id and area > 0) as amax,
+       (select min(price_value) from properties where empreendimento_id = d.id and price_value > 0 and vendido_em is null) as preco`,
+    [id]
+  );
+  const c = r[0];
+  if (!c) return `${SITE_URL}/empreendimento/${id}`;
+  const n = (v: unknown) => (v == null ? null : Number(v));
+  return mensagemComLink(
+    linhaCondominio({ nome: c.name, bairro: c.bairro, cidade: c.cidade, quartosMin: n(c.qmin), quartosMax: n(c.qmax), areaMin: n(c.amin), areaMax: n(c.amax), aPartirDe: n(c.preco) }),
+    `${SITE_URL}${urlCondominio(c)}`
+  );
 }
 
 /** Exclui o condomínio. Anúncios avulsos ligados a ele continuam no ar (só perdem o vínculo). */

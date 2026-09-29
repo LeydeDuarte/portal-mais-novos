@@ -14,6 +14,7 @@ import { mapPropertyRow, type PropertyRow } from './db-mappers';
 import { veTudo } from './session';
 import { exigirEquipe } from './staff-auth';
 import { SITE_URL } from './seo';
+import { urlImovel } from './urls';
 import type { PropertyDetail } from './property-details';
 
 const DEV_COOKIE = 'mn_dev';
@@ -65,10 +66,18 @@ type Row = {
   revogado: boolean;
 };
 
-const urlDo = (propertyId: string, id: string) => `${SITE_URL}/imovel/${propertyId}?l=${id}`;
-const mapear = (r: Row): LinkPrivado => ({
+// endereço amigável (a-venda/go/cidade/bairro/nome) com o código do link no fim
+const caminhos = async (ids: string[]): Promise<Map<string, string>> => {
+  const rows = await query<{ id: string; slug: string | null; finalidade: string; uf: string | null; cidade: string | null; bairro: string | null }>(
+    'select id, slug, finalidade, uf, cidade, bairro from properties where id = any($1::text[])',
+    [ids]
+  ).catch(() => []);
+  return new Map(rows.map((r) => [r.id, urlImovel(r)]));
+};
+const urlDo = (caminho: string | undefined, propertyId: string, id: string) => `${SITE_URL}${caminho ?? `/imovel/${propertyId}`}?l=${id}`;
+const mapear = (r: Row, caminho?: string): LinkPrivado => ({
   id: r.id,
-  url: urlDo(r.property_id, r.id),
+  url: urlDo(caminho, r.property_id, r.id),
   telefone: formatarTelefone(r.telefone),
   nome: r.nome,
   criadoEm: new Date(r.criado_em).toISOString(),
@@ -94,13 +103,15 @@ export async function criarLinkPrivado(
     `insert into links_privados (id, property_id, telefone, nome, criado_por, max_aparelhos) values ($1, $2, $3, $4, $5, $6) returning *`,
     [id, propertyId, tel, dados.nome?.trim() || null, s.email, max]
   );
-  return { ok: true, link: mapear(rows[0]) };
+  const cam = await caminhos([propertyId]);
+  return { ok: true, link: mapear(rows[0], cam.get(propertyId)) };
 }
 
 export async function listarLinksPrivados(propertyId: string): Promise<LinkPrivado[]> {
   await podeMexer(propertyId);
   const rows = await query<Row>('select * from links_privados where property_id = $1 order by criado_em desc limit 50', [propertyId]);
-  return rows.map(mapear);
+  const cam = await caminhos([propertyId]);
+  return rows.map((r) => mapear(r, cam.get(r.property_id)));
 }
 
 export async function revogarLinkPrivado(linkId: string): Promise<void> {

@@ -1,5 +1,8 @@
 'use client';
 
+import { linhaImovel, mensagemComLink } from '@/lib/compartilhar';
+import { urlImovel } from '@/lib/urls';
+const SITE_PUBLICO = process.env.NEXT_PUBLIC_SITE_URL || 'https://maisnovosimoveis.com';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -156,7 +159,16 @@ export default function FichaImovel({ params }: { params: { id: string } }) {
                 <button type="button" onClick={() => setLinkPrivado(true)} className="rounded-full bg-[var(--pill-bg)] px-4 py-2 text-sm font-bold">
                   Link privado p/ cliente
                 </button>
-                <a href={`/imovel/${i.slug ?? i.id}`} target="_blank" rel="noopener" className="rounded-full px-4 py-2 text-sm font-semibold hover:bg-[var(--pill-bg)]">
+                {i.visibilidade !== 'privado' && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(mensagemComLink(linhaImovel(i), `${SITE_PUBLICO}${urlImovel(i)}`))}`, '_blank')}
+                    className="rounded-full bg-[#25D366] px-4 py-2 text-sm font-bold text-white"
+                  >
+                    Enviar para cliente
+                  </button>
+                )}
+                <a href={urlImovel(i)} target="_blank" rel="noopener" className="rounded-full px-4 py-2 text-sm font-semibold hover:bg-[var(--pill-bg)]">
                   Ver no site ↗
                 </a>
               </div>
@@ -192,7 +204,7 @@ export default function FichaImovel({ params }: { params: { id: string } }) {
           </div>
         )}
       </main>
-      {linkPrivado && i && <LinkPrivadoModal propertyId={i.id} titulo={i.condominio ?? i.titulo ?? 'Imóvel'} onClose={() => setLinkPrivado(false)} />}
+      {linkPrivado && i && <LinkPrivadoModal propertyId={i.id} titulo={i.condominio ?? i.titulo ?? 'Imóvel'} linha={linhaImovel(i)} onClose={() => setLinkPrivado(false)} />}
     </div>
   );
 }

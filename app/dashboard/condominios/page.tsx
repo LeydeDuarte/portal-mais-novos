@@ -11,7 +11,7 @@ import { compartilharCondominio, excluirCondominio, listarCondominiosPainel, typ
 import { marcarDestaqueFeed } from '@/lib/actions';
 import { BUCKET_LABEL, FASES, getStatusBucket, type StatusBucket } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
-import { BarraSelecao, BuscaGrande, Chips, FiltrosAtivos, MenuAcoes, SecaoFiltro, TituloPainel, Vazio, botaoBarra, campoPainel } from '@/components/painel/ui';
+import { BarraSelecao, BuscaGrande, Chips, marcados, FiltrosAtivos, MenuAcoes, SecaoFiltro, TituloPainel, Vazio, botaoBarra, campoPainel } from '@/components/painel/ui';
 
 const sa = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const campo = 'w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-2 text-[13px] outline-none focus:border-accent';
@@ -77,13 +77,14 @@ export default function CondominiosPage() {
       if (f.cidade && c.cidade !== f.cidade) return false;
       if (f.bairro && c.bairro !== f.bairro) return false;
       if (f.empresa && !c.empresas.includes(f.empresa)) return false;
-      if (f.data === 'com' && !c.entrega) return false;
-      if (f.data === 'sem' && c.entrega) return false;
+      const datas = marcados(f.data);
+      if (datas.length === 1 && datas[0] === 'com' && !c.entrega) return false;
+      if (datas.length === 1 && datas[0] === 'sem' && c.entrega) return false;
       if (f.anoDe && (!ano || ano < Number(f.anoDe))) return false;
       if (f.anoAte && (!ano || ano > Number(f.anoAte))) return false;
-      if (f.status && c.status !== f.status) return false;
-      if (f.tipo && c.tipo !== f.tipo) return false;
-      if (f.fase && fase !== f.fase) return false;
+      if (f.status && !marcados(f.status).includes(c.status)) return false;
+      if (f.tipo && !marcados(f.tipo).includes(c.tipo)) return false;
+      if (f.fase && !marcados(f.fase).includes(fase as string)) return false;
       return true;
     });
   }, [comFase, f]);
@@ -111,20 +112,20 @@ export default function CondominiosPage() {
   const Filtro = (
     <div className="flex flex-col gap-6">
       <SecaoFiltro titulo="Fase">
-        <Chips opcoes={FASES.map((x) => ({ v: x as string, l: BUCKET_LABEL[x], n: contagem[x] ?? 0 }))} valor={f.fase} onChange={(v) => set('fase', v)} />
+        <Chips opcoes={FASES.map((x) => ({ v: x as string, l: BUCKET_LABEL[x], n: contagem[x] ?? 0 }))} valor={f.fase} onChange={(v) => set('fase', v)} multi />
       </SecaoFiltro>
       <SecaoFiltro titulo="Data de entrega">
-        <Chips opcoes={[{ v: 'com', l: 'Com data' }, { v: 'sem', l: 'Sem data' }]} valor={f.data} onChange={(v) => set('data', v)} />
+        <Chips opcoes={[{ v: 'com', l: 'Com data' }, { v: 'sem', l: 'Sem data' }]} valor={f.data} onChange={(v) => set('data', v)} multi />
         <div className="mt-2 grid grid-cols-2 gap-2">
           <input className={campoPainel} inputMode="numeric" placeholder="ano de" value={f.anoDe} onChange={(e) => set('anoDe', e.target.value.replace(/\D/g, '').slice(0, 4))} />
           <input className={campoPainel} inputMode="numeric" placeholder="até" value={f.anoAte} onChange={(e) => set('anoAte', e.target.value.replace(/\D/g, '').slice(0, 4))} />
         </div>
       </SecaoFiltro>
       <SecaoFiltro titulo="Tipo">
-        <Chips opcoes={[{ v: 'vertical', l: 'Vertical' }, { v: 'horizontal', l: 'Horizontal' }]} valor={f.tipo} onChange={(v) => set('tipo', v)} />
+        <Chips opcoes={[{ v: 'vertical', l: 'Vertical' }, { v: 'horizontal', l: 'Horizontal' }]} valor={f.tipo} onChange={(v) => set('tipo', v)} multi />
       </SecaoFiltro>
       <SecaoFiltro titulo="Cadastro">
-        <Chips opcoes={[{ v: 'publicado', l: 'Publicados' }, { v: 'rascunho', l: 'Rascunhos' }]} valor={f.status} onChange={(v) => set('status', v)} />
+        <Chips opcoes={[{ v: 'publicado', l: 'Publicados' }, { v: 'rascunho', l: 'Rascunhos' }]} valor={f.status} onChange={(v) => set('status', v)} multi />
       </SecaoFiltro>
       <SecaoFiltro titulo="Localização">
         <div className="flex flex-col gap-2">
@@ -152,11 +153,11 @@ export default function CondominiosPage() {
   );
 
   const ativosLista = [
-    f.fase && { rotulo: BUCKET_LABEL[f.fase as StatusBucket], tirar: () => set('fase', '') },
-    f.data && { rotulo: f.data === 'com' ? 'Com data' : 'Sem data', tirar: () => set('data', '') },
+    f.fase && { rotulo: marcados(f.fase).map((x) => BUCKET_LABEL[x as StatusBucket] ?? x).join(', '), tirar: () => set('fase', '') },
+    f.data && { rotulo: marcados(f.data).map((x) => (x === 'com' ? 'Com data' : 'Sem data')).join(', '), tirar: () => set('data', '') },
     (f.anoDe || f.anoAte) && { rotulo: `Entrega ${f.anoDe || '…'}–${f.anoAte || '…'}`, tirar: () => setF((x) => ({ ...x, anoDe: '', anoAte: '' })) },
-    f.tipo && { rotulo: f.tipo === 'vertical' ? 'Vertical' : 'Horizontal', tirar: () => set('tipo', '') },
-    f.status && { rotulo: f.status === 'publicado' ? 'Publicados' : 'Rascunhos', tirar: () => set('status', '') },
+    f.tipo && { rotulo: marcados(f.tipo).map((x) => (x === 'vertical' ? 'Vertical' : 'Horizontal')).join(', '), tirar: () => set('tipo', '') },
+    f.status && { rotulo: marcados(f.status).map((x) => (x === 'publicado' ? 'Publicados' : 'Rascunhos')).join(', '), tirar: () => set('status', '') },
     f.uf && { rotulo: f.uf, tirar: () => set('uf', '') },
     f.cidade && { rotulo: f.cidade, tirar: () => set('cidade', '') },
     f.bairro && { rotulo: f.bairro, tirar: () => set('bairro', '') },
@@ -208,12 +209,14 @@ export default function CondominiosPage() {
           </TituloPainel>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {(['breve_lancamento', 'lancamento', 'obras', 'novo'] as StatusBucket[]).map((fs) => {
-              const on = f.fase === fs;
+              const fases = marcados(f.fase);
+              const on = fases.includes(fs);
               return (
                 <button
                   key={fs}
                   type="button"
-                  onClick={() => set('fase', on ? '' : fs)}
+                  aria-pressed={on}
+                  onClick={() => set('fase', (on ? fases.filter((x) => x !== fs) : [...fases, fs]).join(','))}
                   className={`rounded-[20px] border p-4 text-left transition hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] ${on ? 'border-transparent text-white' : 'border-[var(--border)]'}`}
                   style={on ? { background: COR[fs] } : undefined}
                 >
@@ -295,14 +298,14 @@ export default function CondominiosPage() {
                       type="button"
                       title="Compartilhar link"
                       onClick={async () => {
-                        const url = await compartilharCondominio(c.id);
+                        const url = await compartilharCondominio(c.id); // mensagem com a linha do condomínio e o link
                         try {
                           await navigator.clipboard.writeText(url);
                         } catch {
                           /* ignora */
                         }
                         setItens((l) => l?.map((x) => (x.id === c.id ? { ...x, compartilhamentos: x.compartilhamentos + 1 } : x)) ?? l);
-                        if (window.confirm('Link do condomínio copiado. Abrir no WhatsApp?')) window.open(`https://wa.me/?text=${encodeURIComponent(url)}`, '_blank');
+                        if (window.confirm('Mensagem com o link do condomínio copiada. Abrir no WhatsApp?')) window.open(`https://wa.me/?text=${encodeURIComponent(url)}`, '_blank');
                       }}
                       className="grid h-8 w-8 place-items-center rounded-full bg-[var(--pill-bg)] text-[13px] hover:bg-[var(--pill-bg-hover)]"
                     >

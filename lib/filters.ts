@@ -16,9 +16,13 @@ export type FilterState = {
   // Metragem "de / até", em m²
   areaMin: number | null;
   areaMax: number | null;
-  quartosMin: 'todas' | 1 | 2 | 3 | 4;
-  vagasMin: 'todas' | 1 | 2 | 3 | 4;
-  situacao: 'todas' | StatusBucket;
+  // Quartos, vagas e banheiros: vários valores ao mesmo tempo, de 0 a 4
+  // (4 = 4 ou mais; 0 = sem quartos, ex. sala comercial). Vazio = todos.
+  quartos: number[];
+  vagas: number[];
+  banheiros: number[];
+  // Fases marcadas (várias ao mesmo tempo; vale "OU"). Vazio = todas.
+  situacao: StatusBucket[];
   aceitaTemporada: 'todas' | 'sim';
   // "todos" = feed geral do Comprar; "lancamentos" = só empreendimentos
   // (condomínios cadastrados) e imóveis avulsos com entrega no futuro.
@@ -41,9 +45,10 @@ export const DEFAULT_FILTERS: FilterState = {
   precoMax: null,
   areaMin: null,
   areaMax: null,
-  quartosMin: 'todas',
-  vagasMin: 'todas',
-  situacao: 'todas',
+  quartos: [],
+  vagas: [],
+  banheiros: [],
+  situacao: [],
   aceitaTemporada: 'todas',
   modo: 'todos',
   termos: [],
@@ -59,9 +64,10 @@ export function countActiveFilters(f: FilterState): number {
   if (f.tipos.length) n++;
   if (f.precoMin || f.precoMax) n++;
   if (f.areaMin || f.areaMax) n++;
-  if (f.quartosMin !== 'todas') n++;
-  if (f.vagasMin !== 'todas') n++;
-  if (f.situacao !== 'todas') n++;
+  if (f.quartos?.length) n++;
+  if (f.vagas?.length) n++;
+  if (f.banheiros?.length) n++;
+  if (f.situacao?.length) n++;
   if (f.aceitaTemporada !== 'todas') n++;
   if (f.anoMin || f.anoMax) n++;
   n += f.termos.length + f.locais.length;
@@ -83,3 +89,9 @@ export function addTermos(atuais: string[], novos: string[]): string[] {
   for (const t of novos) if (!out.some((x) => norm(x) === norm(t))) out.push(t);
   return out.slice(0, 8);
 }
+
+// Rótulo dos botões de 0 a 4 (o 4 vale "4 ou mais")
+export const NUMEROS_FILTRO = [0, 1, 2, 3, 4] as const;
+export const rotuloNumero = (n: number) => (n >= 4 ? '4+' : String(n));
+export const alternarNumero = (lista: number[] | undefined, n: number) =>
+  (lista ?? []).includes(n) ? (lista ?? []).filter((x) => x !== n) : [...(lista ?? []), n].sort((a, b) => a - b);

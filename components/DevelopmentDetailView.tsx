@@ -1,4 +1,5 @@
 import TemporadaBadge from '@/components/TemporadaBadge';
+import DetailFavoriteButton from './DetailFavoriteButton';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -230,6 +231,11 @@ export default async function DevelopmentDetailView({ development }: { developme
         {/* Lateral direita: resumo + Fale conosco (fica fixa ao rolar no computador) */}
         <aside className={`${hasGallery ? 'md:mt-6' : ''} flex flex-col gap-4`}>
           <div className="flex flex-col gap-4 md:sticky md:top-24">
+            {development.status !== 'rascunho' && (
+              <div className="rounded-2xl border border-[var(--border)] p-4">
+                <DetailFavoriteButton propertyId={development.id} rotulo="empreendimento" />
+              </div>
+            )}
             <ContatoLateral
               condominio={development.name}
               developmentId={development.id}

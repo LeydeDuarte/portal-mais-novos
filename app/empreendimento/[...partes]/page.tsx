@@ -1,3 +1,4 @@
+import { urlCondominio } from '@/lib/urls';
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { destinoDoMesclado } from '@/lib/duplicados';
@@ -20,13 +21,15 @@ import JsonLd from '@/components/JsonLd';
 // imediatamente (sem isso, o Next guardava a primeira versão da página).
 export const dynamic = 'force-dynamic';
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+export async function generateMetadata({ params: { partes } }: { params: { partes: string[] } }): Promise<Metadata> {
+  const params = { id: partes[partes.length - 1] ?? '' };
   const development = await getDevelopmentById(params.id);
   if (!development) return { title: 'Empreendimento | Mais Novos Imóveis' };
   return buildDevelopmentMetadata(development);
 }
 
-export default async function EmpreendimentoPage({ params }: { params: { id: string } }) {
+export default async function EmpreendimentoPage({ params: { partes } }: { params: { partes: string[] } }) {
+  const params = { id: partes[partes.length - 1] ?? '' };
   const development = await getDevelopmentById(params.id);
   if (!development) {
     // condomínio que foi juntado a outro: o endereço antigo leva para o que ficou
@@ -35,7 +38,9 @@ export default async function EmpreendimentoPage({ params }: { params: { id: str
     notFound();
   }
   // aberto pelo código antigo → endereço com o nome do condomínio (301)
-  if (development.slug && development.slug !== decodeURIComponent(params.id)) permanentRedirect(`/empreendimento/${development.slug}`);
+  // endereço antigo, pelo código ou sem o bairro → endereço completo com o nome (301)
+  const certo = urlCondominio(development);
+  if (certo !== `/empreendimento/${partes.map((x) => decodeURIComponent(x)).join('/')}`) permanentRedirect(certo);
 
   const jsonLd = buildDevelopmentJsonLd(development);
   return (

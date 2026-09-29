@@ -171,8 +171,9 @@ export default function FilterBar({ filters, onChange }: Props) {
           <button
             key={v}
             type="button"
-            onClick={() => set('situacao', filters.situacao === v ? 'todas' : v)}
-            className={`${pillClass} ${filters.situacao === v ? 'bg-ink text-white' : 'bg-[var(--pill-bg)] hover:bg-[var(--pill-bg-hover)]'}`}
+            onClick={() => set('situacao', filters.situacao.includes(v) ? filters.situacao.filter((x) => x !== v) : [...filters.situacao, v])}
+            aria-pressed={filters.situacao.includes(v)}
+            className={`${pillClass} ${filters.situacao.includes(v) ? 'bg-ink text-white' : 'bg-[var(--pill-bg)] hover:bg-[var(--pill-bg-hover)]'}`}
           >
             {l}
           </button>

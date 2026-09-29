@@ -154,15 +154,16 @@ export const condominiosDaRegiao = unstable_cache(
 );
 
 /** Para o sitemap: anúncios e condomínios públicos com data */
-export async function urlsParaSitemap(): Promise<{ imoveis: { id: string; slug: string | null; em: Date }[]; condominios: { id: string; slug: string | null; em: Date }[] }> {
+type Linha = { id: string; slug: string | null; em: Date; finalidade?: string | null; uf: string | null; cidade: string | null; bairro: string | null };
+export async function urlsParaSitemap(): Promise<{ imoveis: Linha[]; condominios: Linha[] }> {
   const [imoveis, condominios] = await Promise.all([
-    query<{ id: string; slug: string | null; em: Date }>(
-      `select id, slug, coalesce(jetimob_atualizado_em, created_at) as em from properties
+    query<Linha>(
+      `select id, slug, finalidade, uf, cidade, bairro, coalesce(jetimob_atualizado_em, created_at) as em from properties
         where visibilidade = 'publico' and is_tipologia = false and vendido_em is null`
     ),
     // condomínio sem anúncio e sem ser lançamento/novo fica de fora do feed, mas a página
     // dele existe e é útil no Google (quem pesquisa pelo nome) — entra no sitemap
-    query<{ id: string; slug: string | null; em: Date }>(`select id, slug, coalesce(jetimob_atualizado_em, created_at) as em from developments where status = 'publicado'`)
+    query<Linha>(`select id, slug, uf, cidade, bairro, coalesce(jetimob_atualizado_em, created_at) as em from developments where status = 'publicado'`)
   ]);
   return { imoveis, condominios };
 }

@@ -44,6 +44,9 @@ export type DevelopmentCardData = {
   destaqueTamanho?: 2 | 3;
   name: string;
   location: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
   deliveryDate: string; // "AAAA-MM"
   photos: string[];
   videoUrl?: string;
@@ -175,9 +178,21 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean,
   page = Math.max(0, Math.min(500, Math.floor(Number(page) || 0)));
   // Os filtros vêm do navegador: limita tamanho de listas e textos
   const lista = <T,>(v: unknown, n: number): T[] => (Array.isArray(v) ? (v.slice(0, n) as T[]) : []);
+  const numeros = (v: unknown): number[] =>
+    Array.from(new Set(lista<unknown>(v, 5).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 4)));
+  // aceita o formato antigo (uma fase só, em texto) e o novo (lista)
+  const fases = (v: unknown): FilterState['situacao'] =>
+    (Array.isArray(v) ? v : typeof v === 'string' && v !== 'todas' ? [v] : [])
+      .map(String)
+      .filter((s) => faseSql('x', s) !== null)
+      .slice(0, 8) as FilterState['situacao'];
   filters = {
     ...filters,
     tipos: lista<FilterState['tipos'][number]>(filters?.tipos, 30),
+    quartos: numeros(filters?.quartos),
+    vagas: numeros(filters?.vagas),
+    banheiros: numeros(filters?.banheiros),
+    situacao: fases(filters?.situacao),
     termos: lista<string>(filters?.termos, 5).map((t) => String(t).slice(0, 80)),
     locais: lista<FilterState['locais'][number]>(filters?.locais, 20).map((l) => ({
       ...l,
@@ -213,8 +228,14 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean,
   if (precoMax) propConds.push(`p.price_value <= ${p(precoMax)}`);
   if (areaMin) propConds.push(`p.area >= ${p(areaMin)}`);
   if (areaMax) propConds.push(`p.area <= ${p(areaMax)}`);
-  if (filters.quartosMin !== 'todas') propConds.push(`p.quartos >= ${p(filters.quartosMin)}`);
-  if (filters.vagasMin !== 'todas') propConds.push(`p.vagas >= ${p(filters.vagasMin)}`);
+  // Quartos / vagas / banheiros: valores marcados (4 = 4 ou mais; 0 = nenhum)
+  const bate = (col: string, v: number[]) => {
+    const a = p(v);
+    return `(coalesce(${col}, 0) = any(${a}::int[]) or (4 = any(${a}::int[]) and coalesce(${col}, 0) >= 4))`;
+  };
+  if (filters.quartos.length) propConds.push(bate('p.quartos', filters.quartos));
+  if (filters.vagas.length) propConds.push(bate('p.vagas', filters.vagas));
+  if (filters.banheiros.length) propConds.push(bate('p.banheiros', filters.banheiros));
   if (filters.aceitaTemporada === 'sim') propConds.push('p.aceita_temporada = true');
   if (filters.modo === 'lancamentos') propConds.push('p.empreendimento_id is null and p.delivery_date > now()');
 
@@ -229,8 +250,19 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean,
   if (precoMax) devConds.push(`u.min_price <= ${p(precoMax)}`);
   if (areaMin) devConds.push(`u.max_area >= ${p(areaMin)}`);
   if (areaMax) devConds.push(`u.min_area <= ${p(areaMax)}`);
-  if (filters.quartosMin !== 'todas') devConds.push(`greatest(u.max_quartos, dq.max_quartos) >= ${p(filters.quartosMin)}`);
-  if (filters.vagasMin !== 'todas') devConds.push(`u.max_vagas >= ${p(filters.vagasMin)}`);
+  // Empreendimento: basta uma tipologia (ou uma opção de quartos do cadastro) bater.
+  // "0 quartos" = empreendimento comercial (salas, lojas).
+  const bateLista = (lista: string, v: number[]) => {
+    const a = p(v);
+    return `exists (select 1 from jsonb_array_elements_text(${lista}) n where n.value::int = any(${a}::int[]) or (4 = any(${a}::int[]) and n.value::int >= 4))`;
+  };
+  const comercial = "d.tipos_unidade ?| array['sala_comercial','loja_ponto_comercial','galpao','predio_comercial']";
+  if (filters.quartos.length)
+    devConds.push(
+      `(${bateLista("coalesce(u.quartos_set, '[]'::jsonb) || coalesce(d.quartos_opcoes, '[]'::jsonb)", filters.quartos)}${filters.quartos.includes(0) ? ` or ${comercial}` : ''})`
+    );
+  if (filters.vagas.length) devConds.push(bateLista("coalesce(u.vagas_set, '[]'::jsonb)", filters.vagas));
+  if (filters.banheiros.length) devConds.push(bateLista("coalesce(u.banheiros_set, '[]'::jsonb)", filters.banheiros));
   if (filters.aceitaTemporada === 'sim') devConds.push('d.aceita_temporada = true');
   // Só condomínios publicados; as tipologias da tabela de vendas aparecem dentro do card do empreendimento
   devConds.push("d.status = 'publicado'"); // sem ano de entrega também aparece (com "----" no lugar do ano)
@@ -253,7 +285,11 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean,
   if (ocultos) devConds.push('false');
 
   // ---- Condições que valem para os dois ----
-  const situacaoSql = (col: string) => faseSql(col, filters.situacao);
+  // várias fases marcadas: vale qualquer uma delas
+  const situacaoSql = (col: string) => {
+    const ors = filters.situacao.map((s) => faseSql(col, s)).filter(Boolean);
+    return ors.length ? `(${ors.map((o) => `(${o})`).join(' or ')})` : null;
+  };
   const sitP = situacaoSql('p.delivery_date');
   const sitD = situacaoSql('d.delivery_date');
   if (sitP) propConds.push(sitP);
@@ -337,6 +373,9 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean,
                   max(x.area) as max_area,
                   max(x.quartos) as max_quartos,
                   max(x.vagas) as max_vagas,
+                  coalesce(jsonb_agg(distinct x.quartos) filter (where x.quartos is not null), '[]'::jsonb) as quartos_set,
+                  coalesce(jsonb_agg(distinct x.vagas) filter (where x.vagas is not null), '[]'::jsonb) as vagas_set,
+                  coalesce(jsonb_agg(distinct x.banheiros) filter (where x.banheiros is not null), '[]'::jsonb) as banheiros_set,
                   jsonb_agg(distinct x.tipo_unidade) as tipos,
                   count(x.id) as n,
                   count(x.id) filter (where not x.is_tipologia and x.vendido_em is null) as avulsos,
@@ -452,6 +491,15 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean,
   return { items, hasMore, total };
 }
 
+/** Cards de condomínio na ordem pedida (usado pela página de favoritos) */
+export async function cardsDeCondominios(ids: string[]): Promise<DevelopmentCardData[]> {
+  const lista = (Array.isArray(ids) ? ids : []).filter((x) => typeof x === 'string').slice(0, 100);
+  if (!lista.length) return [];
+  const cards = await getDevelopmentCards(lista);
+  const pos = new Map(lista.map((id, i) => [id, i]));
+  return cards.sort((x, y) => (pos.get(x.id) ?? 0) - (pos.get(y.id) ?? 0));
+}
+
 async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]> {
   const rows = await query<
     DevelopmentRow & {
@@ -490,6 +538,9 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       slug: base.slug,
       name: base.name,
       location: base.location,
+      bairro: base.bairro,
+      cidade: base.cidade,
+      uf: base.uf,
       deliveryDate: base.deliveryDate,
       photos: base.photos ?? [],
       videoUrl: base.videoUrl,

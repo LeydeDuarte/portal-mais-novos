@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { mensagemComLink } from '@/lib/compartilhar';
 import { criarLinkPrivado, listarLinksPrivados, revogarLinkPrivado, type LinkPrivado } from '@/lib/links-privados';
 
 function maskTelefone(v: string): string {
@@ -14,7 +15,7 @@ const inputClass = 'w-full rounded-lg border border-[var(--border)] bg-[var(--bg
 
 // Painel → Imóveis → "Enviar link privado": gera um link pessoal para o telefone
 // do cliente. Ele abre só no primeiro aparelho (ou nos 2 primeiros) e em nenhum outro.
-export default function LinkPrivadoModal({ propertyId, titulo, onClose }: { propertyId: string; titulo: string; onClose: () => void }) {
+export default function LinkPrivadoModal({ propertyId, titulo, linha, onClose }: { propertyId: string; titulo: string; linha?: string; onClose: () => void }) {
   const [telefone, setTelefone] = useState('');
   const [nome, setNome] = useState('');
   const [max, setMax] = useState<1 | 2>(1);
@@ -42,7 +43,12 @@ export default function LinkPrivadoModal({ propertyId, titulo, onClose }: { prop
         setErro(r.erro);
         return;
       }
-      const texto = `Olá${nome ? `, ${nome.split(' ')[0]}` : ''}! Segue o anúncio exclusivo que separamos para você (${titulo}). O link é pessoal e abre só no seu aparelho: ${r.link.url}`;
+      const texto = mensagemComLink(
+        linha || titulo,
+        r.link.url,
+        `Olá${nome ? `, ${nome.split(' ')[0]}` : ''}! Separei este imóvel exclusivo para você:`,
+        'O link é pessoal e abre só no seu aparelho.'
+      );
       if (enviar === 'whatsapp' && janela) {
         const d = telefone.replace(/\D/g, '');
         janela.location.href = `https://wa.me/${d.length <= 11 ? `55${d}` : d}?text=${encodeURIComponent(texto)}`;

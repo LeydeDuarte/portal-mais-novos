@@ -59,6 +59,12 @@ export async function loginComGoogle(
        on conflict do nothing`,
       [email, `visitor:${visitante}`]
     ).catch(() => {});
+    await query(
+      `insert into favoritos_condominios (user_email, development_id)
+       select $1, development_id from favoritos_condominios where user_email = $2
+       on conflict do nothing`,
+      [email, `visitor:${visitante}`]
+    ).catch(() => {});
   }
 
   const cliente: Cliente = { email, nome, foto: t.picture };
@@ -95,7 +101,7 @@ export async function listClientes(): Promise<ClienteLinha[]> {
     logins: number;
     favoritos: string;
   }>(
-    `select c.*, (select count(*) from favorites f where f.user_email = c.email) as favoritos
+    `select c.*, ((select count(*) from favorites f where f.user_email = c.email) + (select count(*) from favoritos_condominios fc where fc.user_email = c.email)) as favoritos
        from clientes c order by c.criado_em desc limit 5000`
   );
   const iso = (d: Date | string | null) => (d ? new Date(d).toISOString() : null);

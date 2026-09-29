@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { DEFAULT_FILTERS, countActiveFilters, localKey, type FilterState, type LocalFiltro } from '@/lib/filters';
+import { DEFAULT_FILTERS, countActiveFilters, localKey, NUMEROS_FILTRO, rotuloNumero, alternarNumero, type FilterState, type LocalFiltro } from '@/lib/filters';
 import { getLocationIndex, type LocalSugestao } from '@/lib/actions';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 
@@ -158,7 +158,7 @@ export default function FiltrosLaterais({ filters, onChange }: { filters: Filter
   const set = <K extends keyof FilterState>(k: K, v: FilterState[K]) => onChange({ ...filters, [k]: v });
   const alternarTipo = (t: TipoUnidade) => set('tipos', filters.tipos.includes(t) ? filters.tipos.filter((x) => x !== t) : [...filters.tipos, t]);
   const ano = new Date().getFullYear();
-  const ativos = countActiveFilters({ ...filters, situacao: 'todas', termos: [], locais: [] });
+  const ativos = countActiveFilters({ ...filters, situacao: [], termos: [], locais: [] });
 
   return (
     <div className="flex flex-col gap-6">
@@ -222,25 +222,23 @@ export default function FiltrosLaterais({ filters, onChange }: { filters: Filter
         </div>
       </Secao>
 
-      <Secao titulo="Quartos">
-        <div className="flex flex-wrap gap-1.5">
-          {([1, 2, 3, 4] as const).map((n) => (
-            <button key={n} type="button" className={chip(filters.quartosMin === n)} onClick={() => set('quartosMin', filters.quartosMin === n ? 'todas' : n)}>
-              {n}+
-            </button>
-          ))}
-        </div>
-      </Secao>
-
-      <Secao titulo="Vagas">
-        <div className="flex flex-wrap gap-1.5">
-          {([1, 2, 3, 4] as const).map((n) => (
-            <button key={n} type="button" className={chip(filters.vagasMin === n)} onClick={() => set('vagasMin', filters.vagasMin === n ? 'todas' : n)}>
-              {n}+
-            </button>
-          ))}
-        </div>
-      </Secao>
+      {(
+        [
+          ['quartos', 'Quartos'],
+          ['banheiros', 'Banheiros'],
+          ['vagas', 'Vagas']
+        ] as const
+      ).map(([k, titulo]) => (
+        <Secao key={k} titulo={titulo}>
+          <div className="flex flex-wrap gap-1.5">
+            {NUMEROS_FILTRO.map((n) => (
+              <button key={n} type="button" aria-pressed={(filters[k] ?? []).includes(n)} className={chip((filters[k] ?? []).includes(n))} onClick={() => set(k, alternarNumero(filters[k], n))}>
+                {rotuloNumero(n)}
+              </button>
+            ))}
+          </div>
+        </Secao>
+      ))}
 
       <Secao titulo="Metragem (m²)">
         <Faixa min={filters.areaMin} max={filters.areaMax} sufixo="m²" ph={['de', 'até']} onChange={(a, b) => onChange({ ...filters, areaMin: a, areaMax: b })} />

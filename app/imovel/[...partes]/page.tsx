@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { resolverImovel } from '@/lib/slug-resolver';
+import { urlImovel } from '@/lib/urls';
 import Header from '@/components/Header';
 import PropertyDetailView from '@/components/PropertyDetailView';
 import OcultoView from '@/components/OcultoView';
@@ -29,12 +30,18 @@ import JsonLd from '@/components/JsonLd';
 // imediatamente (sem isso, o Next guardava a primeira versão da página).
 export const dynamic = 'force-dynamic';
 
-type Props = { params: { id: string }; searchParams: { l?: string } };
+type Props = { params: { partes: string[] }; searchParams: { l?: string } };
+
+// O anúncio é identificado pelo ÚLTIMO trecho do endereço (slug ou código);
+// os trechos antes dele (a-venda/go/goiania/setor-bueno) são só para leitura.
+const ultimo = (partes: string[]) => partes[partes.length - 1] ?? '';
+const caminhoAtual = (partes: string[]) => `/imovel/${partes.map((x) => decodeURIComponent(x)).join('/')}`;
 
 // Anúncio PRIVADO: a equipe logada vê completo; o cliente só vê completo pelo
 // link pessoal (?l=...) e só no(s) aparelho(s) em que o link foi aberto primeiro.
 // O público (e o Google) vê só o resumo, sem fotos nem endereço.
-export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+export async function generateMetadata({ params: { partes }, searchParams }: Props): Promise<Metadata> {
+  const params = { id: ultimo(partes) };
   const property = await getPropertyById(params.id);
   if (property) {
     const meta = buildPropertyMetadata(property);
@@ -53,11 +60,14 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 
 // Sem generateStaticParams — o catálogo vive no banco e muda o tempo todo,
 // então cada página é renderizada sob demanda (o HTML sai completo pro Google).
-export default async function ImovelPage({ params, searchParams }: Props) {
+export default async function ImovelPage({ params: { partes }, searchParams }: Props) {
+  const params = { id: ultimo(partes) };
   const property = await getPropertyById(params.id);
   // anúncio público aberto pelo código antigo → endereço com o nome (301)
-  if (property && property.visibilidade !== 'privado' && property.slug && property.slug !== decodeURIComponent(params.id) && !searchParams.l) {
-    permanentRedirect(`/imovel/${property.slug}`);
+  // endereço antigo, pelo código ou sem o bairro → endereço completo com o nome (301)
+  if (property && property.visibilidade !== 'privado' && !searchParams.l) {
+    const certo = urlImovel(property);
+    if (certo !== caminhoAtual(partes)) permanentRedirect(certo);
   }
   if (!property) {
     const a = await getResumoOculto(params.id);

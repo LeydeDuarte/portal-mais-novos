@@ -49,16 +49,36 @@ export function SecaoFiltro({ titulo, children }: { titulo: string; children: Re
   );
 }
 
-export function Chips<T extends string>({ opcoes, valor, onChange }: { opcoes: { v: T; l: string; n?: number }[]; valor: T | ''; onChange: (v: T | '') => void }) {
+/** Valores marcados num filtro de várias opções (guardados como "a,b,c") */
+export const marcados = (csv: string | undefined | null): string[] => (csv ? csv.split(',').filter(Boolean) : []);
+
+/** Chips de filtro. Com `multi`, dá para marcar várias opções (o valor vira "a,b,c"). */
+export function Chips<T extends string>({
+  opcoes,
+  valor,
+  onChange,
+  multi = false
+}: {
+  opcoes: { v: T; l: string; n?: number }[];
+  valor: T | '' | string;
+  onChange: (v: T | '') => void;
+  multi?: boolean;
+}) {
+  const lista = multi ? marcados(valor) : [];
   return (
     <div className="flex flex-wrap gap-1.5">
       {opcoes.map((o) => {
-        const on = valor === o.v;
+        const on = multi ? lista.includes(o.v) : valor === o.v;
         return (
           <button
             key={o.v}
             type="button"
-            onClick={() => onChange(on ? '' : o.v)}
+            aria-pressed={on}
+            onClick={() =>
+              onChange(
+                multi ? ((on ? lista.filter((x) => x !== o.v) : [...lista, o.v]).join(',') as T | '') : on ? '' : o.v
+              )
+            }
             className={`rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition ${
               on ? 'border-ink bg-ink text-white' : 'border-[var(--border)] bg-[var(--bg)] hover:bg-[var(--pill-bg)]'
             }`}

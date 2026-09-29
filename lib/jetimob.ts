@@ -19,6 +19,7 @@ import { chaveNome, mesmoCondominio, padronizarBairro } from './planilha-condomi
 import { enviarParaR2, r2Configurado } from './r2';
 import { ehCasa, type TipoUnidade } from './tipologias';
 import { miniaturaDe } from './miniaturas';
+import { prepararFoto } from './fotos-fila';
 
 const BASE = 'https://api.jetimob.com';
 const sa = (s: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -496,11 +497,12 @@ export async function processarFotos(orcamentoMs = 20000): Promise<{ enviadas: n
       while (fila.length && Date.now() < fim) {
         const item = fila.shift()!;
         try {
-          const r = await fetch(item.url, { signal: AbortSignal.timeout(15000) });
-          const tipo = (r.headers.get('content-type') ?? '').split(';')[0];
-          if (!r.ok || !/^image\/(jpeg|png|webp)$/.test(tipo)) throw new Error(`HTTP ${r.status} ${tipo}`);
-          const buf = Buffer.from(await r.arrayBuffer());
-          if (buf.length > 15 * 1024 * 1024) throw new Error('foto maior que 15 MB');
+          const r = await fetch(item.url, { signal: AbortSignal.timeout(30000), redirect: 'follow' });
+          const tipoOrigem = (r.headers.get('content-type') ?? '').split(';')[0];
+          // aceita image/* e também application/octet-stream (Google Drive); o conteúdo é conferido pelo sharp
+          if (!r.ok || !/^(image\/|application\/octet-stream|binary\/)/.test(tipoOrigem)) throw new Error(`HTTP ${r.status} ${tipoOrigem}`);
+          const bruto = Buffer.from(await r.arrayBuffer());
+          const { buf, tipo } = await prepararFoto(bruto, tipoOrigem, item.tipo === 'planta');
           const url = await enviarParaR2(buf, tipo, item.tipo === 'planta' ? 'plantas' : tabela === 'developments' ? 'empreendimentos' : 'imoveis', `${l.nome}${item.tipo === 'planta' ? ' planta' : ''}`);
           const lista = item.tipo === 'planta' ? novas.plantas! : novas.fotos!;
           lista[item.i] = url;

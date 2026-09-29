@@ -1,12 +1,15 @@
 'use client';
 
+import { linhaImovel, mensagemComLink } from '@/lib/compartilhar';
+import { urlImovel } from '@/lib/urls';
+const SITE_PUBLICO = process.env.NEXT_PUBLIC_SITE_URL || 'https://maisnovosimoveis.com';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import PainelNav from '@/components/PainelNav';
 import ImovelCardPainel from '@/components/painel/ImovelCardPainel';
 import LinkPrivadoModal from '@/components/LinkPrivadoModal';
-import { BarraSelecao, BuscaGrande, Chips, FiltrosAtivos, SecaoFiltro, TituloPainel, Vazio, botaoBarra, botaoBarraSec, campoPainel } from '@/components/painel/ui';
+import { BarraSelecao, BuscaGrande, Chips, marcados, FiltrosAtivos, SecaoFiltro, TituloPainel, Vazio, botaoBarra, botaoBarraSec, campoPainel } from '@/components/painel/ui';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { deleteProperty, marcarComoVendido, marcarDestaqueFeed } from '@/lib/actions';
 import { linkParaCorretor, listarImoveisPainel, mudarVisibilidade, type ImovelPainel } from '@/lib/actions-painel-imoveis';
@@ -24,6 +27,7 @@ type Filtros = {
   finalidade: string;
   status: string;
   quartos: string;
+  banheiros: string;
   vagas: string;
   areaMin: string;
   areaMax: string;
@@ -31,7 +35,7 @@ type Filtros = {
   precoMax: string;
   corretor: string;
 };
-const VAZIO: Filtros = { busca: '', condominio: '', proprietario: '', tipo: '', finalidade: '', status: '', quartos: '', vagas: '', areaMin: '', areaMax: '', precoMin: '', precoMax: '', corretor: '' };
+const VAZIO: Filtros = { busca: '', condominio: '', proprietario: '', tipo: '', finalidade: '', status: '', quartos: '', banheiros: '', vagas: '', areaMin: '', areaMax: '', precoMin: '', precoMax: '', corretor: '' };
 const STATUS: Record<string, string> = { publico: 'Públicos', privado: 'Privados', vendido: 'Vendidos', sem_prop: 'Sem proprietário', sem_foto: 'Sem foto' };
 
 // Painel → Imóveis: busca grande, filtros na lateral (chips), cards com foto à
@@ -64,15 +68,32 @@ export default function ImoveisPainelPage() {
     const pr = sa(f.proprietario.trim());
     const prDig = f.proprietario.replace(/\D/g, '');
     const out = (itens ?? []).filter((i) => {
-      if (f.tipo && i.tipo !== f.tipo) return false;
-      if (f.finalidade && i.finalidade !== f.finalidade) return false;
-      if (f.status === 'publico' && (i.visibilidade !== 'publico' || i.vendidoEm)) return false;
-      if (f.status === 'privado' && i.visibilidade !== 'privado') return false;
-      if (f.status === 'vendido' && !i.vendidoEm) return false;
-      if (f.status === 'sem_prop' && i.proprietarios.length) return false;
-      if (f.status === 'sem_foto' && i.fotos.length) return false;
-      if (f.quartos && (i.quartos ?? 0) < num(f.quartos)) return false;
-      if (f.vagas && (i.vagas ?? 0) < num(f.vagas)) return false;
+      const tipos = marcados(f.tipo);
+      if (tipos.length && !tipos.includes(i.tipo)) return false;
+      const fins = marcados(f.finalidade);
+      if (fins.length && !fins.includes(i.finalidade)) return false;
+      // Situação: várias marcadas = basta uma bater
+      const sits = marcados(f.status);
+      if (
+        sits.length &&
+        !sits.some(
+          (s) =>
+            (s === 'publico' && i.visibilidade === 'publico' && !i.vendidoEm) ||
+            (s === 'privado' && i.visibilidade === 'privado') ||
+            (s === 'vendido' && !!i.vendidoEm) ||
+            (s === 'sem_prop' && !i.proprietarios.length) ||
+            (s === 'sem_foto' && !i.fotos.length)
+        )
+      )
+        return false;
+      // Quartos / banheiros / vagas: valores marcados de 0 a 4+ (4 = 4 ou mais)
+      const bate = (csv: string, v: number | null) => {
+        const l = marcados(csv).map(Number);
+        return !l.length || l.includes(v ?? 0) || (l.includes(4) && (v ?? 0) >= 4);
+      };
+      if (!bate(f.quartos, i.quartos)) return false;
+      if (!bate(f.banheiros, i.banheiros)) return false;
+      if (!bate(f.vagas, i.vagas)) return false;
       if (f.areaMin && (i.area ?? 0) < num(f.areaMin)) return false;
       if (f.areaMax && (i.area ?? 0) > num(f.areaMax)) return false;
       if (f.precoMin && (i.preco ?? 0) < num(f.precoMin)) return false;
@@ -107,17 +128,33 @@ export default function ImoveisPainelPage() {
   const pagina0 = lista.slice(0, pagina * POR_PAGINA);
 
   const ativos = [
-    f.tipo && { rotulo: TIPO_UNIDADE_LABEL[f.tipo as TipoUnidade] ?? f.tipo, tirar: () => set('tipo', '') },
-    f.finalidade && { rotulo: f.finalidade === 'venda' ? 'Venda' : 'Aluguel', tirar: () => set('finalidade', '') },
-    f.status && { rotulo: STATUS[f.status], tirar: () => set('status', '') },
-    f.quartos && { rotulo: `${f.quartos}+ quartos`, tirar: () => set('quartos', '') },
-    f.vagas && { rotulo: `${f.vagas}+ vagas`, tirar: () => set('vagas', '') },
+    f.tipo && { rotulo: marcados(f.tipo).map((t) => TIPO_UNIDADE_LABEL[t as TipoUnidade] ?? t).join(', '), tirar: () => set('tipo', '') },
+    f.finalidade && { rotulo: marcados(f.finalidade).map((x) => (x === 'venda' ? 'Venda' : 'Aluguel')).join(', '), tirar: () => set('finalidade', '') },
+    f.status && { rotulo: marcados(f.status).map((x) => STATUS[x] ?? x).join(', '), tirar: () => set('status', '') },
+    f.quartos && { rotulo: `${marcados(f.quartos).map((x) => (x === '4' ? '4+' : x)).join(', ')} quartos`, tirar: () => set('quartos', '') },
+    f.banheiros && { rotulo: `${marcados(f.banheiros).map((x) => (x === '4' ? '4+' : x)).join(', ')} banheiros`, tirar: () => set('banheiros', '') },
+    f.vagas && { rotulo: `${marcados(f.vagas).map((x) => (x === '4' ? '4+' : x)).join(', ')} vagas`, tirar: () => set('vagas', '') },
     f.condominio && { rotulo: `Cond.: ${f.condominio}`, tirar: () => set('condominio', '') },
     f.proprietario && { rotulo: `Prop.: ${f.proprietario}`, tirar: () => set('proprietario', '') },
     (f.areaMin || f.areaMax) && { rotulo: `${f.areaMin || 0}–${f.areaMax || '∞'} m²`, tirar: () => setF((x) => ({ ...x, areaMin: '', areaMax: '' })) },
     (f.precoMin || f.precoMax) && { rotulo: `R$ ${f.precoMin || 0}–${f.precoMax || '∞'}`, tirar: () => setF((x) => ({ ...x, precoMin: '', precoMax: '' })) },
     f.corretor && { rotulo: f.corretor, tirar: () => set('corretor', '') }
   ].filter(Boolean) as { rotulo: string; tirar: () => void }[];
+
+  // Link público para o cliente, com a linha do anúncio em cima (tipo, local, quartos, m², preço)
+  const enviarCliente = async (i: ImovelPainel, como: 'whatsapp' | 'copiar') => {
+    const texto = mensagemComLink(linhaImovel(i), `${SITE_PUBLICO}${urlImovel(i)}`);
+    if (como === 'whatsapp') {
+      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(texto);
+      setAviso('Mensagem com o link copiada. É só colar na conversa do cliente.');
+    } catch {
+      window.prompt('Copie a mensagem com o link:', texto);
+    }
+  };
 
   const compartilhar = async (varios: ImovelPainel[]) => {
     const links: string[] = [];
@@ -142,10 +179,10 @@ export default function ImoveisPainelPage() {
   const Filtros = (
     <div className="flex flex-col gap-6">
       <SecaoFiltro titulo="Situação">
-        <Chips opcoes={Object.entries(STATUS).map(([v, l]) => ({ v, l }))} valor={f.status} onChange={(v) => set('status', v)} />
+        <Chips opcoes={Object.entries(STATUS).map(([v, l]) => ({ v, l }))} valor={f.status} onChange={(v) => set('status', v)} multi />
       </SecaoFiltro>
       <SecaoFiltro titulo="Tipo">
-        <Chips opcoes={porTipo.map(([v, n]) => ({ v, l: TIPO_UNIDADE_LABEL[v as TipoUnidade] ?? v, n }))} valor={f.tipo} onChange={(v) => set('tipo', v)} />
+        <Chips opcoes={porTipo.map(([v, n]) => ({ v, l: TIPO_UNIDADE_LABEL[v as TipoUnidade] ?? v, n }))} valor={f.tipo} onChange={(v) => set('tipo', v)} multi />
       </SecaoFiltro>
       <SecaoFiltro titulo="Finalidade">
         <Chips
@@ -155,13 +192,17 @@ export default function ImoveisPainelPage() {
           ]}
           valor={f.finalidade}
           onChange={(v) => set('finalidade', v)}
+          multi
         />
       </SecaoFiltro>
       <SecaoFiltro titulo="Quartos">
-        <Chips opcoes={['1', '2', '3', '4', '5'].map((v) => ({ v, l: `${v}+` }))} valor={f.quartos} onChange={(v) => set('quartos', v)} />
+        <Chips opcoes={['0', '1', '2', '3', '4'].map((v) => ({ v, l: v === '4' ? '4+' : v }))} valor={f.quartos} onChange={(v) => set('quartos', v)} multi />
+      </SecaoFiltro>
+      <SecaoFiltro titulo="Banheiros">
+        <Chips opcoes={['0', '1', '2', '3', '4'].map((v) => ({ v, l: v === '4' ? '4+' : v }))} valor={f.banheiros} onChange={(v) => set('banheiros', v)} multi />
       </SecaoFiltro>
       <SecaoFiltro titulo="Vagas">
-        <Chips opcoes={['1', '2', '3', '4'].map((v) => ({ v, l: `${v}+` }))} valor={f.vagas} onChange={(v) => set('vagas', v)} />
+        <Chips opcoes={['0', '1', '2', '3', '4'].map((v) => ({ v, l: v === '4' ? '4+' : v }))} valor={f.vagas} onChange={(v) => set('vagas', v)} multi />
       </SecaoFiltro>
       <SecaoFiltro titulo="Condomínio">
         <input className={campoPainel} value={f.condominio} onChange={(e) => set('condominio', e.target.value)} placeholder="Nome do condomínio" />
@@ -258,8 +299,14 @@ export default function ImoveisPainelPage() {
                     menu={[
                       { rotulo: 'Abrir ficha', href: `/dashboard/imoveis/${i.id}` },
                       { rotulo: 'Fazer proposta', href: `/dashboard/propostas/nova?imovel=${i.id}` },
+                      ...(i.visibilidade !== 'privado'
+                        ? [
+                            { rotulo: 'Enviar para cliente (WhatsApp)', onClick: () => enviarCliente(i, 'whatsapp') },
+                            { rotulo: 'Copiar link para cliente', onClick: () => enviarCliente(i, 'copiar') }
+                          ]
+                        : []),
                       { rotulo: 'Link privado para cliente', onClick: () => setLinkDe(i) },
-                      { rotulo: 'Ver página no site', href: `/imovel/${i.slug ?? i.id}`, novaAba: true },
+                      { rotulo: 'Ver página no site', href: urlImovel(i), novaAba: true },
                       ...(veTudo(staff.role)
                         ? [
                             ...([
@@ -359,7 +406,7 @@ export default function ImoveisPainelPage() {
           </div>
         </div>
       )}
-      {linkDe && <LinkPrivadoModal propertyId={linkDe.id} titulo={linkDe.condominio ?? linkDe.titulo ?? 'Imóvel'} onClose={() => setLinkDe(null)} />}
+      {linkDe && <LinkPrivadoModal propertyId={linkDe.id} titulo={linkDe.condominio ?? linkDe.titulo ?? 'Imóvel'} linha={linhaImovel(linkDe)} onClose={() => setLinkDe(null)} />}
     </div>
   );
 }
