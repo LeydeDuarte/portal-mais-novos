@@ -5,7 +5,7 @@
 // vêm da Receita); admin e analista editam o nome fantasia e o histórico.
 import { query } from './db';
 import { exigirEquipe, exigirGestor } from './staff-auth';
-import { consultarReceita, concepcaoDe, empresaPorNome, mapEmpresa, type EmpresaRow } from './empresas';
+import { acrescentarConcepcao, consultarReceita, concepcaoDe, empresaPorNome, mapEmpresa, resolverEmpresaImport, type EmpresaRow } from './empresas';
 import { cnpjValido, type ConcepcaoItem, type Empresa } from './empresas-tipos';
 
 export async function buscarEmpresas(q: string): Promise<Empresa[]> {
@@ -202,4 +202,109 @@ export async function completarPendentesReceita(limite = 4): Promise<{ feitos: n
   }
   const r = await query<{ n: string }>('select count(*) as n from empresas where cnpj is not null and receita_atualizada_em is null');
   return { feitos, falhas, restantes: Number(r[0]?.n) || 0 };
+}
+
+// ---------------- Importar construtoras por planilha ----------------
+export type EmpresaPlanilhaLinha = { nome: string; cnpj?: string; historia?: string; fundacao?: string };
+
+/** "03/1981", "1981-03", "março de 1981" ou só "1981" → { ano, mes } */
+function lerFundacao(v?: string): { ano: number | null; mes: number | null } {
+  const t = String(v ?? '').toLowerCase().trim();
+  if (!t) return { ano: null, mes: null };
+  const ano = Number(t.match(/(18|19|20)\d{2}/)?.[0]) || null;
+  const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  let mes: number | null = null;
+  const nomeMes = meses.findIndex((m) => t.includes(m));
+  if (nomeMes >= 0) mes = nomeMes + 1;
+  else {
+    const m = t.match(/^(\d{1,2})[/.-](\d{4})$/) ?? t.match(/^(\d{4})[/.-](\d{1,2})/);
+    if (m) mes = Number(m[1].length === 4 ? m[2] : m[1]);
+    const dmy = t.match(/^\d{1,2}[/.-](\d{1,2})[/.-]\d{4}$/);
+    if (dmy) mes = Number(dmy[1]);
+  }
+  return { ano, mes: mes && mes >= 1 && mes <= 12 ? mes : null };
+}
+
+export async function importarEmpresasPlanilha(linhas: EmpresaPlanilhaLinha[]): Promise<{ criadas: number; atualizadas: number; erros: string[] }> {
+  const eu = await exigirGestor();
+  const res = { criadas: 0, atualizadas: 0, erros: [] as string[] };
+  const cache = new Map<string, string | null>();
+  for (const l of linhas.slice(0, 500)) {
+    const nome = String(l.nome ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (!nome) continue;
+    try {
+      const antes = await query<{ n: string }>('select count(*) as n from empresas');
+      const cnpj = String(l.cnpj ?? '').replace(/\D/g, '');
+      const id = await resolverEmpresaImport({ nome, cnpj: cnpj.length >= 12 ? cnpj.padStart(14, '0') : undefined }, eu.email, cache);
+      if (!id) continue;
+      const depois = await query<{ n: string }>('select count(*) as n from empresas');
+      if (Number(depois[0].n) > Number(antes[0].n)) res.criadas++;
+      else res.atualizadas++;
+      const f = lerFundacao(l.fundacao);
+      await query(
+        `update empresas set nome_perfil = $2, historico = coalesce($3, historico), ano_fundacao = coalesce($4, ano_fundacao), mes_fundacao = coalesce($5, mes_fundacao),
+                updated_at = now() where id = $1::uuid`,
+        [id, nome, String(l.historia ?? '').trim().slice(0, 3000) || null, f.ano, f.ano ? f.mes : null]
+      );
+    } catch (e) {
+      res.erros.push(`${nome}: ${e instanceof Error ? e.message.slice(0, 80) : 'erro'}`);
+    }
+  }
+  return res;
+}
+
+// ---------------- Empreendimentos da empresa (vincular pelo cadastro da empresa) ----------------
+export type CondoVinculo = { id: string; nome: string; bairro: string | null; cidade: string | null; uf: string | null; papel?: string; vinculado?: boolean };
+
+export async function empreendimentosDaEmpresaPainel(empresaId: string): Promise<CondoVinculo[]> {
+  await exigirEquipe();
+  const r = await query<{ id: string; name: string; bairro: string | null; cidade: string | null; uf: string | null; papel: string }>(
+    `select d.id, d.name, d.bairro, d.cidade, d.uf, de.papel from development_empresas de join developments d on d.id = de.development_id
+      where de.empresa_id = $1::uuid order by d.delivery_date desc nulls last, d.name`,
+    [empresaId]
+  );
+  return r.map((x) => ({ id: x.id, nome: x.name, bairro: x.bairro, cidade: x.cidade, uf: x.uf, papel: x.papel }));
+}
+
+export async function buscarCondominiosParaVincular(
+  empresaId: string,
+  f: { nome?: string; uf?: string; cidade?: string; bairro?: string }
+): Promise<{ lista: CondoVinculo[]; ufs: string[]; cidades: string[]; bairros: string[] }> {
+  await exigirEquipe();
+  const params: unknown[] = [empresaId];
+  const conds: string[] = ['true'];
+  const p = (v: unknown) => (params.push(v), `$${params.length}`);
+  const norm = (c: string) => `translate(lower(coalesce(${c}, '')), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')`;
+  if (f.uf) conds.push(`upper(d.uf) = upper(${p(f.uf)})`);
+  if (f.cidade) conds.push(`lower(d.cidade) = lower(${p(f.cidade)})`);
+  if (f.bairro) conds.push(`lower(d.bairro) = lower(${p(f.bairro)})`);
+  if (f.nome?.trim()) conds.push(`${norm('d.name')} like ${p(`%${f.nome.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}%`)}`);
+  const lista = await query<{ id: string; name: string; bairro: string | null; cidade: string | null; uf: string | null; vinculado: boolean }>(
+    `select d.id, d.name, d.bairro, d.cidade, d.uf,
+            exists (select 1 from development_empresas de where de.development_id = d.id and de.empresa_id = $1::uuid) as vinculado
+       from developments d where ${conds.join(' and ')} order by d.name limit 80`,
+    params
+  );
+  const u = (v: (string | null)[]) => Array.from(new Set(v.filter((x): x is string => !!x))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const locais = await query<{ uf: string | null; cidade: string | null; bairro: string | null }>(
+    `select distinct upper(uf) as uf, cidade, bairro from developments where ($1::text is null or upper(uf) = upper($1)) and ($2::text is null or lower(cidade) = lower($2))`,
+    [f.uf || null, f.cidade || null]
+  );
+  const ufsTodas = await query<{ uf: string }>('select distinct upper(uf) as uf from developments where uf is not null');
+  return {
+    lista: lista.map((x) => ({ id: x.id, nome: x.name, bairro: x.bairro, cidade: x.cidade, uf: x.uf, vinculado: x.vinculado })),
+    ufs: u(ufsTodas.map((x) => x.uf)),
+    cidades: u(locais.map((x) => x.cidade)),
+    bairros: f.cidade ? u(locais.map((x) => x.bairro)) : []
+  };
+}
+
+export async function vincularEmpreendimentos(empresaId: string, ids: string[], papel: 'construtora' | 'incorporadora' | 'construtora_incorporadora'): Promise<void> {
+  await exigirGestor();
+  await acrescentarConcepcao(ids.slice(0, 200).map((developmentId) => ({ developmentId, empresaId, papel })));
+}
+
+export async function desvincularEmpreendimento(empresaId: string, developmentId: string): Promise<void> {
+  await exigirGestor();
+  await query('delete from development_empresas where empresa_id = $1::uuid and development_id = $2', [empresaId, developmentId]);
 }

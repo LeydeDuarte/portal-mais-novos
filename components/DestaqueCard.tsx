@@ -51,7 +51,7 @@ export default function DestaqueCard({ d, grande = false }: { d: Dest; grande?: 
     </div>
   );
   return (
-    <div className="mb-5 inline-block w-full break-inside-avoid md:mb-7">
+    <div className="surgir mb-5 inline-block w-full break-inside-avoid md:mb-7">
       {d.link ? (
         <a
           href={d.link}

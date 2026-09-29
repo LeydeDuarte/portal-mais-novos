@@ -30,6 +30,7 @@ export type CondoPainel = {
   corretorEmail: string | null;
   destaque: boolean;
   destaqueTamanho: 2 | 3;
+  temVideo: boolean;
 };
 
 export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
@@ -38,7 +39,7 @@ export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
     `select d.id, d.slug, d.name, d.status, d.tipo, d.bairro, d.cidade, d.uf, to_char(d.delivery_date, 'YYYY-MM') as entrega,
             coalesce(nullif(d.capa_mini, ''), d.photos->>0) as capa, jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) as fotos,
             length(coalesce(d.description, '')) as descricao, coalesce(d.tipos_unidade, '[]'::jsonb) as tipos, coalesce(d.visualizacoes, 0) as visualizacoes,
-            coalesce(d.compartilhamentos, 0) as compartilhamentos, d.corretor_email, d.destaque, d.destaque_tamanho,
+            coalesce(d.compartilhamentos, 0) as compartilhamentos, d.corretor_email, d.destaque, d.destaque_tamanho, d.video_url,
             s.anuncios, s.salvamentos, s.m2, s.minimo,
             (select array_agg(coalesce(nullif(e.nome_perfil, ''), nullif(e.nome_fantasia, ''), e.razao_social) order by de.ordem)
                from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = d.id) as empresas
@@ -78,7 +79,8 @@ export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
       empresas: Array.isArray(r.empresas) ? (r.empresas as string[]) : [],
       corretorEmail: (r.corretor_email as string) ?? null,
       destaque: !!r.destaque,
-      destaqueTamanho: (r.destaque_tamanho === 3 ? 3 : 2) as 2 | 3
+      destaqueTamanho: (r.destaque_tamanho === 3 ? 3 : 2) as 2 | 3,
+      temVideo: !!r.video_url
     }))
     .filter((c) => veTudo(eu.role) || c.status === 'publicado' || c.corretorEmail?.toLowerCase() === eu.email.toLowerCase());
 }

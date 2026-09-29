@@ -115,7 +115,7 @@ export default async function EmpresaPage({ params, searchParams }: Props) {
             )}
             {e.anoFundacao ? (
               <span className="rounded-full bg-[var(--pill-bg)] px-3 py-1 font-semibold">
-                Fundada em {e.anoFundacao}
+                Fundada em {e.mesFundacao ? `${String(e.mesFundacao).padStart(2, '0')}/` : ''}{e.anoFundacao}
                 {idade ? ` · ${idade.texto}` : ''}
               </span>
             ) : e.dataInicio ? (

@@ -243,7 +243,9 @@ export default function CondominiosPage() {
               return (
                 <div
                   key={c.id}
-                  className={`group flex flex-col overflow-hidden rounded-[20px] border bg-[var(--bg)] text-[12.5px] transition hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] ${marcado ? 'border-ink ring-1 ring-ink' : 'border-[var(--border)]'}`}
+                  className={`group flex flex-col overflow-hidden rounded-[20px] bg-[var(--bg)] text-[12.5px] transition hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] ${
+                    marcado ? 'border border-ink ring-1 ring-ink' : c.destaque ? 'border-2 border-[#257CFF]' : 'border border-[var(--border)]'
+                  } ${c.temVideo && !marcado ? 'ring-4 ring-sky-200 dark:ring-sky-900' : ''}`}
                 >
                   <a href={`/empreendimento/${c.slug ?? c.id}`} className="block">
                     <div className="relative aspect-[16/10] bg-[var(--card-img-bg)]">
@@ -262,7 +264,8 @@ export default function CondominiosPage() {
                         )}
                         {!c.entrega && <span className="rounded bg-black/55 px-1.5 py-0.5 text-[9.5px] font-bold text-white">SEM DATA</span>}
                         {c.status === 'rascunho' && <span className="rounded bg-amber-500 px-1.5 py-0.5 text-[9.5px] font-bold text-white">RASCUNHO</span>}
-                        {c.destaque && <span className="rounded bg-accent px-1.5 py-0.5 text-[9.5px] font-bold text-white">★ DESTAQUE</span>}
+                        {c.destaque && <span className="rounded bg-accent px-1.5 py-0.5 text-[9.5px] font-bold text-white">★ {c.destaqueTamanho === 3 ? '2×2' : '2 COL.'}</span>}
+                        {c.temVideo && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[9.5px] font-bold text-sky-800">▶ VÍDEO</span>}
                       </div>
                       <div className="absolute bottom-1.5 right-1.5 flex gap-1 text-[10px] font-bold text-white">
                         <span className="rounded bg-black/55 px-1.5 py-0.5" title="Visualizações">👁 {c.visualizacoes}</span>

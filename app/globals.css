@@ -85,3 +85,15 @@ img {
 
 /* Destaque grande (2 colunas e 2 linhas): foto em pé, quase a tela toda no celular */
 .feed-grade .feed-grande .feed-midia { aspect-ratio: 4 / 5 !important; height: auto !important; }
+
+/* Cards surgem suavemente ao rolar (ativado por SurgirAoRolar) */
+.js-surgir .surgir { transition: opacity 0.5s ease, transform 0.5s ease; }
+.js-surgir .surgir:not(.visto) { opacity: 0; transform: translateY(16px); }
+
+/* Esqueleto enquanto a próxima leva de cards carrega */
+@keyframes brilho { 0% { background-position: -300px 0; } 100% { background-position: 300px 0; } }
+.esqueleto {
+  background: linear-gradient(90deg, var(--pill-bg) 0px, var(--pill-bg-hover) 120px, var(--pill-bg) 240px);
+  background-size: 600px 100%;
+  animation: brilho 1.3s linear infinite;
+}

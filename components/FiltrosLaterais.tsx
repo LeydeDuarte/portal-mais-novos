@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { DEFAULT_FILTERS, countActiveFilters, type FilterState } from '@/lib/filters';
+import { DEFAULT_FILTERS, countActiveFilters, localKey, type FilterState, type LocalFiltro } from '@/lib/filters';
+import { getLocationIndex, type LocalSugestao } from '@/lib/actions';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 
 // Filtros do feed na LATERAL ESQUERDA (recolhível). No topo ficam só Todos /
@@ -77,6 +78,77 @@ function Faixa({
   );
 }
 
+// índice de cidades e bairros com anúncio (carregado uma vez por visita)
+let indiceCache: Promise<LocalSugestao[]> | null = null;
+const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** Localização: estado (UF) + digitar a cidade ou o bairro, com sugestões "Cidade - UF" */
+function Localizacao({ filters, onChange }: { filters: FilterState; onChange: (f: FilterState) => void }) {
+  const [indice, setIndice] = useState<LocalSugestao[] | null>(null);
+  const [q, setQ] = useState('');
+  const [uf, setUf] = useState('');
+  const carregar = () => {
+    if (!indiceCache) indiceCache = getLocationIndex().catch(() => []);
+    indiceCache.then(setIndice);
+  };
+  const ufs = Array.from(new Set((indice ?? []).map((l) => l.uf).filter(Boolean))).sort();
+  const t = semAcento(q.trim());
+  const sugestoes = t.length >= 2
+    ? (indice ?? [])
+        .filter((l) => l.tipo !== 'condominio' && (!uf || l.uf === uf) && semAcento(l.nome).includes(t))
+        .sort((a, b) => (a.tipo === b.tipo ? b.total - a.total : a.tipo === 'cidade' ? -1 : 1))
+        .slice(0, 8)
+    : [];
+  const escolher = (l: LocalSugestao) => {
+    const novo: LocalFiltro = { tipo: l.tipo, nome: l.nome, cidade: l.cidade, uf: l.uf, id: l.id };
+    if (!filters.locais.some((x) => localKey(x) === localKey(novo))) onChange({ ...filters, locais: [...filters.locais, novo] });
+    setQ('');
+  };
+  return (
+    <div className="flex flex-col gap-2">
+      {ufs.length > 1 && (
+        <select className={campo} value={uf} onFocus={carregar} onChange={(e) => setUf(e.target.value)}>
+          <option value="">Todos os estados</option>
+          {ufs.map((u) => (
+            <option key={u}>{u}</option>
+          ))}
+        </select>
+      )}
+      <div className="relative">
+        <input className={campo} value={q} onFocus={carregar} onChange={(e) => setQ(e.target.value)} placeholder="Digite a cidade ou o bairro" />
+        {sugestoes.length > 0 && (
+          <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)] p-1 shadow-xl">
+            {sugestoes.map((l) => (
+              <button key={`${l.tipo}-${l.nome}-${l.cidade}-${l.uf}`} type="button" onClick={() => escolher(l)} className="block w-full rounded-lg px-3 py-2 text-left text-[13px] hover:bg-[var(--pill-bg)]">
+                <span className="font-semibold">{l.tipo === 'cidade' ? `${l.nome} - ${l.uf}` : l.nome}</span>
+                {l.tipo === 'bairro' && <span className="text-[var(--text-muted)]"> · {l.cidade} - {l.uf}</span>}
+                <span className="ml-1 text-[11px] text-[var(--text-faint)]">{l.total}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {filters.locais.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {filters.locais.map((l) => (
+            <span key={localKey(l)} className="flex items-center gap-1 rounded-full bg-ink py-1 pl-3 pr-1 text-[12px] font-medium text-white">
+              {l.tipo === 'cidade' ? `${l.nome} - ${l.uf}` : l.nome}
+              <button
+                type="button"
+                aria-label={`Tirar ${l.nome}`}
+                onClick={() => onChange({ ...filters, locais: filters.locais.filter((x) => localKey(x) !== localKey(l)) })}
+                className="grid h-5 w-5 place-items-center rounded-full bg-white/20"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FiltrosLaterais({ filters, onChange }: { filters: FilterState; onChange: (f: FilterState) => void }) {
   const set = <K extends keyof FilterState>(k: K, v: FilterState[K]) => onChange({ ...filters, [k]: v });
   const alternarTipo = (t: TipoUnidade) => set('tipos', filters.tipos.includes(t) ? filters.tipos.filter((x) => x !== t) : [...filters.tipos, t]);
@@ -102,6 +174,10 @@ export default function FiltrosLaterais({ filters, onChange }: { filters: Filter
         </div>
       </Secao>
       )}
+
+      <Secao titulo="Localização">
+        <Localizacao filters={filters} onChange={onChange} />
+      </Secao>
 
       <Secao titulo="Tipo de imóvel">
         <div className="flex flex-col gap-3">
@@ -153,7 +229,7 @@ export default function FiltrosLaterais({ filters, onChange }: { filters: Filter
 
       <Secao titulo="Vagas">
         <div className="flex flex-wrap gap-1.5">
-          {([1, 2, 3] as const).map((n) => (
+          {([1, 2, 3, 4] as const).map((n) => (
             <button key={n} type="button" className={chip(filters.vagasMin === n)} onClick={() => set('vagasMin', filters.vagasMin === n ? 'todas' : n)}>
               {n}+
             </button>

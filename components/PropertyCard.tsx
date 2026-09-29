@@ -96,7 +96,7 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
   const badge = getStatusBadge(property.deliveryDate);
 
   return (
-    <div className="mb-5 inline-block w-full break-inside-avoid md:mb-7">
+    <div className="surgir mb-5 inline-block w-full break-inside-avoid md:mb-7">
       <Link href={urlImovel(property)} className="block">
         <div
           ref={setRefs}
@@ -173,9 +173,20 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
         </div>
 
         <div className="flex flex-col gap-0.5 pt-2">
-          {property.condominio && (
-            <div className="mb-0.5 min-w-0">
-              <CondominioTag nome={property.condominio} />
+          {(property.condominio || (emDestaque && property.corretor)) && (
+            <div className="mb-0.5 flex min-w-0 items-center gap-1.5">
+              {/* no destaque: bolinha com a foto do corretor antes da etiqueta do condomínio */}
+              {emDestaque && property.corretor && (
+                <span title={`${property.corretor.nome}${property.corretor.creci ? ` · CRECI ${property.corretor.creci}` : ''}`} className="shrink-0">
+                  {property.corretor.foto ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={property.corretor.foto} alt={property.corretor.nome} className="h-7 w-7 rounded-full object-cover ring-2 ring-[var(--bg)]" />
+                  ) : (
+                    <span className="grid h-7 w-7 place-items-center rounded-full bg-accent/15 text-[11px] font-bold text-accent">{property.corretor.nome.slice(0, 1).toUpperCase()}</span>
+                  )}
+                </span>
+              )}
+              {property.condominio && <CondominioTag nome={property.condominio} />}
             </div>
           )}
           <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[property.tipoUnidade]}</div>

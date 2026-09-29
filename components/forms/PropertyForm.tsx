@@ -19,7 +19,7 @@ import { maskCurrencyInput } from '@/lib/currency';
 
 const inputClass = 'rounded-lg border border-[var(--border)] px-3 py-2.5 text-sm outline-none';
 const QUARTO_OPCOES = ['1', '2', '3', '4', '5+'];
-const VAGA_OPCOES = ['1', '2', '3', '4', '5+'];
+const VAGA_OPCOES = ['1', '2', '3', '4+'];
 const BANHEIRO_OPCOES = ['1', '2', '3', '4', '5+'];
 
 type Values = {
@@ -87,6 +87,7 @@ const EMPTY: Values = {
 };
 
 const chip = (n?: number) => (n == null ? '' : n >= 5 ? '5+' : String(n));
+const chipVaga = (n?: number) => (n == null ? '' : n >= 4 ? '4+' : String(n));
 
 function fromEditData(d: PropertyEditData): Values {
   return {
@@ -97,7 +98,7 @@ function fromEditData(d: PropertyEditData): Values {
     priceDigits: d.priceValue ? String(Math.round(d.priceValue)) : '',
     priceSuffix: d.pricePeriod === 'mensal' ? '/mês' : '',
     quartos: chip(d.quartos),
-    vagas: chip(d.vagas),
+    vagas: chipVaga(d.vagas),
     banheiros: chip(d.banheiros),
     escaninhos: d.escaninhos == null ? '' : d.escaninhos >= 3 ? '3+' : String(d.escaninhos),
     area: d.area != null ? String(d.area) : '',

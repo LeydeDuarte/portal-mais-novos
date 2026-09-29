@@ -8,6 +8,7 @@ import './globals.css';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
 import ProtecaoImagens from '@/components/ProtecaoImagens';
 import AtualizarVersao from '@/components/AtualizarVersao';
+import SurgirAoRolar from '@/components/SurgirAoRolar';
 import { GtmHead, GtmBody } from '@/components/GoogleTagManager';
 
 // Nunca reaproveitar respostas antigas do banco em nenhuma página
@@ -72,6 +73,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {!equipe && <GtmBody />}
         <ProtecaoImagens />
         <AtualizarVersao />
+        <SurgirAoRolar />
         {equipe && <RegistrarApp />}
         {children}
       </body>

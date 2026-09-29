@@ -9,6 +9,8 @@ import { veTudo } from '@/lib/papeis';
 import { atualizarPelaReceita, buscarEmpresas, cadastrarPorCnpj, completarPendentesReceita, contarPendentesReceita, definirCnpj, excluirEmpresa, salvarEmpresa } from '@/lib/actions-empresas';
 import { empresaAtiva, formatarCnpj, idadeEmpresa, nomeEmpresa, situacaoPublica, type Empresa } from '@/lib/empresas-tipos';
 import { SITE_URL } from '@/lib/seo';
+import EmpresaEmpreendimentos from '@/components/painel/EmpresaEmpreendimentos';
+import Link from 'next/link';
 
 const input = 'w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 text-sm outline-none focus:border-accent';
 
@@ -62,7 +64,14 @@ export default function EmpresasPainel() {
       <Header />
       <PainelNav />
       <main className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8">
-        <h1 className="font-serif text-2xl font-semibold">Construtoras e incorporadoras</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="font-serif text-2xl font-semibold">Construtoras e incorporadoras</h1>
+          {gestor && (
+            <Link href="/dashboard/empresas/importar" className="ml-auto rounded-full bg-[var(--pill-bg)] px-4 py-2 text-[13px] font-semibold hover:bg-[var(--pill-bg-hover)]">
+              Importar planilha
+            </Link>
+          )}
+        </div>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
           Cadastre pelo CNPJ: nome, situação cadastral e data de abertura vêm da Receita Federal (Minha Receita). Depois vincule no campo
           &quot;Concepção&quot; de cada empreendimento. Cada empresa ganha um perfil público em maisnovosimoveis.com/empresa/…
@@ -259,6 +268,7 @@ export default function EmpresasPainel() {
                           placeholder="Fundação, fundadores, obras marcantes, especialidade (alto padrão, horizontal…), cidades onde atua. Sem texto, o site mostra um resumo automático."
                         />
                       </label>
+                      <EmpresaEmpreendimentos empresaId={e.id} />
                       <div className="flex gap-2">
                         <button
                           type="button"

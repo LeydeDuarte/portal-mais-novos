@@ -295,8 +295,19 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
       )}
 
       <div ref={sentinelRef} className="h-px" />
+      {loading && (
+        // esqueletos enquanto a próxima leva chega (a tela não parece travada)
+        <div className="grid grid-cols-2 gap-x-2.5 px-2.5 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] sm:gap-x-3 sm:px-5 md:gap-x-4 md:px-6" aria-hidden>
+          {Array.from({ length: 6 }).map((_, k) => (
+            <div key={k} className={`mb-6 ${k > 1 ? 'hidden sm:block' : ''}`}>
+              <div className="esqueleto rounded-2xl" style={{ height: [260, 320, 280, 340, 300, 270][k] }} />
+              <div className="esqueleto mt-2.5 h-3 w-2/3 rounded-full" />
+              <div className="esqueleto mt-2 h-4 w-1/2 rounded-full" />
+            </div>
+          ))}
+        </div>
+      )}
       <div className="px-4 pb-12 text-center text-[13px] text-[var(--text-faint)]">
-        {loading && 'Carregando…'}
         {done && items.length > 0 && 'Você viu todos os imóveis desta busca.'}
       </div>
 

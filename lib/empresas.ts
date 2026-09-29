@@ -21,6 +21,7 @@ export type EmpresaRow = {
   total?: string | number | null;
   nome_perfil?: string | null;
   ano_fundacao?: number | null;
+  mes_fundacao?: number | null;
   grupo_principal_id?: string | null;
   situacao_especial?: string | null;
 };
@@ -42,6 +43,7 @@ export const mapEmpresa = (r: EmpresaRow): Empresa => ({
   totalEmpreendimentos: r.total != null ? Number(r.total) : undefined,
   nomePerfil: r.nome_perfil ?? null,
   anoFundacao: r.ano_fundacao ?? null,
+  mesFundacao: r.mes_fundacao ?? null,
   grupoPrincipalId: r.grupo_principal_id ?? null,
   situacaoEspecial: r.situacao_especial ?? null
 });

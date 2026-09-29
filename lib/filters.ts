@@ -17,7 +17,7 @@ export type FilterState = {
   areaMin: number | null;
   areaMax: number | null;
   quartosMin: 'todas' | 1 | 2 | 3 | 4;
-  vagasMin: 'todas' | 1 | 2 | 3;
+  vagasMin: 'todas' | 1 | 2 | 3 | 4;
   situacao: 'todas' | StatusBucket;
   aceitaTemporada: 'todas' | 'sim';
   // "todos" = feed geral do Comprar; "lancamentos" = só empreendimentos

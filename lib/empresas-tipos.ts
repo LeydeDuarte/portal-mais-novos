@@ -23,6 +23,7 @@ export type Empresa = {
   totalEmpreendimentos?: number;
   nomePerfil: string | null; // nome usado hoje no marketing: vale sobre os nomes da Receita
   anoFundacao: number | null; // quando a empresa é mais antiga que o CNPJ atual
+  mesFundacao?: number | null;
   grupoPrincipalId: string | null; // empresa principal do grupo (ex.: EBM Urbanismo → EBM)
   situacaoEspecial: string | null; // ex.: RECUPERACAO JUDICIAL
 };

@@ -31,7 +31,7 @@ export default function PainelFiltros({ filters, onChange }: { filters: FilterSt
     <button
       type="button"
       onClick={onClick}
-      className={`z-30 flex items-center gap-1.5 rounded-r-xl bg-ink px-2 py-3 text-[12px] font-bold text-white shadow-lg [writing-mode:vertical-rl] ${className}`}
+      className={`z-30 flex items-center gap-1.5 rounded-r-xl bg-[#0038FF] px-2 py-3 text-[12px] font-bold text-white shadow-lg [writing-mode:vertical-rl] ${className}`}
       aria-label="Abrir filtros"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden className="rotate-90">

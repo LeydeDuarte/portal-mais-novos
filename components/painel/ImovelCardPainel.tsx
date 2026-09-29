@@ -36,9 +36,10 @@ export default function ImovelCardPainel({
   const ficha = `/dashboard/imoveis/${i.id}`;
   return (
     <div
-      className={`group flex flex-col rounded-[20px] border bg-[var(--bg)] transition hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] ${
-        selecionado ? 'border-ink ring-1 ring-ink' : 'border-[var(--border)]'
-      }`}
+      // azul forte = destaque do feed; azul claro = tem vídeo (os dois podem juntos)
+      className={`group flex flex-col rounded-[20px] bg-[var(--bg)] transition hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] ${
+        selecionado ? 'border border-ink ring-1 ring-ink' : i.destaque ? 'border-2 border-[#257CFF]' : 'border border-[var(--border)]'
+      } ${i.temVideo && !selecionado ? 'ring-4 ring-sky-200 dark:ring-sky-900' : ''}`}
     >
       <div className="flex gap-3 p-3">
         <div className="relative h-[112px] w-[128px] shrink-0 overflow-hidden rounded-xl bg-[var(--card-img-bg)] md:h-[120px] md:w-[144px]">
@@ -63,7 +64,8 @@ export default function ImovelCardPainel({
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">{tipo}</span>
             {i.visibilidade === 'privado' && <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-semibold text-white">Privado</span>}
-            {i.destaque && <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-white">★ Destaque</span>}
+            {i.destaque && <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-white">★ Destaque {i.destaqueTamanho === 3 ? '2×2' : '2 col.'}</span>}
+            {i.temVideo && <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-800">▶ Vídeo</span>}
             {i.codigo && <span className="text-[11px] font-medium text-[var(--text-muted)]">cód. {i.codigo}</span>}
           </div>
           <div className="mt-1.5 truncate text-[15px] font-bold leading-tight">{i.condominio ?? i.titulo ?? tipo}</div>

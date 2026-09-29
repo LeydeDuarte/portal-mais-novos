@@ -11,7 +11,7 @@ export default function DepoimentoCard({ d }: { d: Dep }) {
   const texto = semTravessoes(d.texto);
   const longo = texto.length > 260;
   return (
-    <div className="mb-5 inline-block w-full break-inside-avoid md:mb-7">
+    <div className="surgir mb-5 inline-block w-full break-inside-avoid md:mb-7">
       <figure className="overflow-hidden rounded-2xl border-2 border-accent/35 bg-[var(--bg)]">
         <div className="flex items-center gap-1.5 bg-accent px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
