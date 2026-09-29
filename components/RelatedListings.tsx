@@ -45,10 +45,10 @@ export default function RelatedListings({ title, subtitle, items, emptyText, gra
                       mini={p.capaMini}
                       original={cover}
                       alt={`${TIPO_UNIDADE_LABEL[p.tipoUnidade]}${p.condominio ? ` no ${formatTitulo(p.condominio)}` : ''}, ${p.bairro || p.location}`}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     />
                   ) : (
-                    <span className="flex h-full items-center justify-center text-[11px] text-[var(--text-faint)]">[FOTO]</span>
+                    <span className="absolute inset-0 flex items-center justify-center text-[11px] text-[var(--text-faint)]">[FOTO]</span>
                   )}
                   <span
                     className="absolute left-2.5 top-2.5 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"

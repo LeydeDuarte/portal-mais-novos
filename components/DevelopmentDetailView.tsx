@@ -8,6 +8,7 @@ import InterestForm from '@/components/InterestForm';
 import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
+import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getRelatedListings, getOcultosDoCondominio, mercadoDoBairro } from '@/lib/actions';
 import { BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
@@ -52,6 +53,13 @@ export default async function DevelopmentDetailView({ development }: { developme
     ? { titulo: `${development.name}, ${[development.bairro, development.cidade].filter(Boolean).join(', ') || development.location}`, caminho: urlCondominio(development), condominio: development.name, developmentId: development.id }
     : null;
   const vendaDireta = futuro || (entregueHaMeses != null && entregueHaMeses <= 12);
+  // "Fale conosco" (barra do rodapé e bloco de venda direta): sempre o WhatsApp de atendimento
+  const whatsAtendimento = whats ?? {
+    titulo: `${development.name}, ${[development.bairro, development.cidade].filter(Boolean).join(', ') || development.location}`,
+    caminho: urlCondominio(development),
+    condominio: development.name,
+    developmentId: development.id
+  };
 
   const youtubeAspect = embed?.platform === 'youtube' ? await getYouTubeAspectRatio(embed.videoId) : null;
   const galleryVideo: GalleryVideo | null = embed
@@ -268,9 +276,7 @@ export default async function DevelopmentDetailView({ development }: { developme
               <h2 className="font-serif text-xl font-semibold">Quer comprar uma unidade no {development.name}?</h2>
               <p className="mt-1 text-sm text-[var(--text-muted)]">Fale conosco e verifique as disponibilidades particulares e direto pela incorporadora.</p>
             </div>
-            <a href="#fale-conosco" className="shrink-0 rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:opacity-90">
-              Fale conosco
-            </a>
+            <BotaoWhatsapp ctx={whatsAtendimento} variante="pilula" rotulo="Fale conosco" />
           </section>
         ) : (
           <InterestForm developmentId={development.id} condominio={development.name} destaque={related.mesmoCondominio.length === 0} />
@@ -284,7 +290,7 @@ export default async function DevelopmentDetailView({ development }: { developme
       {development.status !== 'rascunho' && (
         <>
           <EspacoBarra />
-          <BarraContatoFixa favoritoId={development.id} whats={whats} />
+          <BarraContatoFixa favoritoId={development.id} whats={whatsAtendimento} />
         </>
       )}
     </div>

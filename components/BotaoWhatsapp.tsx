@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { registrarLeadWhatsapp } from '@/lib/actions';
 import { WHATSAPP_ATENDIMENTO } from '@/lib/marca';
 import { SITE_URL } from '@/lib/seo';
@@ -28,13 +29,16 @@ const IconeWhats = ({ size = 20 }: { size?: number }) => (
 // Botão "Falar com Leyde Duarte pelo WhatsApp": abre um balão pedindo o nome
 // (e o telefone, opcional), grava o contato em Painel → Interessados com o link
 // do anúncio e abre o WhatsApp já com a mensagem pronta.
-export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx: WhatsappContexto; variante?: 'bloco' | 'flutuante' | 'barra'; rotulo?: string }) {
+export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx: WhatsappContexto; variante?: 'bloco' | 'flutuante' | 'barra' | 'pilula'; rotulo?: string }) {
   const [aberto, setAberto] = useState(false);
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [indo, setIndo] = useState(false);
   const campo = useRef<HTMLInputElement | null>(null);
+  // a janela abre no corpo da página (por cima de barras fixas e cartões)
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
 
   useEffect(() => {
     try {
@@ -74,7 +78,17 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
 
   return (
     <>
-      {variante === 'barra' ? (
+      {variante === 'pilula' ? (
+        // botão arredondado dentro de um bloco (ex.: "Quer comprar uma unidade?" → Fale conosco)
+        <button
+          type="button"
+          onClick={() => setAberto(true)}
+          className="flex shrink-0 items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:opacity-90"
+        >
+          <IconeWhats size={17} />
+          {rotulo ?? 'Fale conosco'}
+        </button>
+      ) : variante === 'barra' ? (
         // barra fixa do rodapé: "Fale comigo" ocupando o espaço, com o símbolo do WhatsApp
         <button
           type="button"
@@ -106,7 +120,7 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
         </button>
       )}
 
-      {aberto && (
+      {aberto && montado && createPortal(
         <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4" onClick={() => setAberto(false)}>
           <form
             onSubmit={abrirWhats}
@@ -157,8 +171,7 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
             </button>
             <p className="mt-2 text-[11px] leading-snug text-[var(--text-faint)]">A mensagem já vai com o link deste anúncio. Ao continuar, você autoriza o nosso contato.</p>
           </form>
-        </div>
-      )}
+        </div>, document.body)}
     </>
   );
 }

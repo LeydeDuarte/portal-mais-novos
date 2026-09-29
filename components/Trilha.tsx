@@ -5,9 +5,9 @@ import { SITE_URL } from '@/lib/seo';
 // a explorar a região e o Google a entender a estrutura do site.
 export default function Trilha({ itens }: { itens: { nome: string; url: string }[] }) {
   return (
-    <nav aria-label="Você está em" className="mb-5 flex flex-wrap items-center gap-1.5 text-sm text-[var(--text-muted)]">
+    <nav aria-label="Você está em" className="-mx-5 mb-5 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap px-5 text-sm text-[var(--text-muted)] [scrollbar-width:none] md:mx-0 md:flex-wrap md:whitespace-normal md:px-0 [&::-webkit-scrollbar]:hidden">
       {itens.map((it, i) => (
-        <span key={it.url} className="flex items-center gap-1.5">
+        <span key={it.url} className="flex shrink-0 items-center gap-1.5">
           {i > 0 && <span aria-hidden>›</span>}
           {i === itens.length - 1 && i > 0 ? (
             <span className="font-semibold text-[var(--text)]">{it.nome}</span>
