@@ -138,6 +138,24 @@ export default async function PropertyDetailView({
           </section>
         )}
 
+        {/* Preço e características logo abaixo das fotos (celular e computador):
+            é a primeira coisa que a pessoa procura */}
+        <section aria-label="Preço e características" className="mb-8 flex flex-col gap-1 border-b border-[var(--border)] pb-6">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[property.tipoUnidade]}</div>
+              <div className="font-sans tabular-nums text-[28px] font-bold leading-tight tracking-tight md:text-3xl">{property.price}</div>
+              {precoM2 && <div className="text-sm text-[var(--text-muted)]">{formatPricePerM2(precoM2)}</div>}
+              <div className="mt-1 text-sm text-[var(--text-muted)]">{property.location}</div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <Caracteristica icone={<IconeCama size={19} />} valor={numeroDe(property.beds) != null ? `${numeroDe(property.beds)} quartos` : null} titulo="Quartos" />
+                <Caracteristica icone={<IconeChuveiro size={19} />} valor={numeroDe(property.banheiros) != null ? `${numeroDe(property.banheiros)} banheiros` : null} titulo="Banheiros" />
+                <Caracteristica icone={<IconeCarro size={19} />} valor={numeroDe(property.parking) != null ? `${numeroDe(property.parking)} vagas` : null} titulo="Vagas" />
+                <Caracteristica icone={<IconeMetragem size={19} />} valor={property.area !== '-' ? `${property.area} privativos` : null} titulo="Área privativa" />
+                {property.areaTotal ? <Caracteristica icone={<IconeMetragem size={19} />} valor={`${property.areaTotal.toLocaleString('pt-BR')} m² total`} titulo="Área total" /> : null}
+                {property.areaLote ? <Caracteristica icone={<IconeMetragem size={19} />} valor={`Lote ${property.areaLote.toLocaleString('pt-BR')} m²`} titulo="Área do lote" /> : null}
+              </div>
+        </section>
+
         <div className="grid gap-8 md:grid-cols-[1.3fr_1fr]">
           <div>
             {showMediaBlock && (
@@ -203,23 +221,7 @@ export default async function PropertyDetailView({
 
           <aside className="flex flex-col gap-5">
             <div className="rounded-2xl border border-[var(--border)] p-5">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[property.tipoUnidade]}</div>
-              <div className="font-sans tabular-nums text-2xl font-bold tracking-tight">{property.price}</div>
-              {precoM2 && <div className="text-sm text-[var(--text-muted)]">{formatPricePerM2(precoM2)}</div>}
-              <div className="mt-1 text-sm text-[var(--text-muted)]">{property.location}</div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-                <Caracteristica icone={<IconeCama size={19} />} valor={numeroDe(property.beds) != null ? `${numeroDe(property.beds)} quartos` : null} titulo="Quartos" />
-                <Caracteristica icone={<IconeChuveiro size={19} />} valor={numeroDe(property.banheiros) != null ? `${numeroDe(property.banheiros)} banheiros` : null} titulo="Banheiros" />
-                <Caracteristica icone={<IconeCarro size={19} />} valor={numeroDe(property.parking) != null ? `${numeroDe(property.parking)} vagas` : null} titulo="Vagas" />
-                <Caracteristica icone={<IconeMetragem size={19} />} valor={property.area !== '-' ? `${property.area} privativos` : null} titulo="Área privativa" />
-                {property.areaTotal ? <Caracteristica icone={<IconeMetragem size={19} />} valor={`${property.areaTotal.toLocaleString('pt-BR')} m² total`} titulo="Área total" /> : null}
-                {property.areaLote ? <Caracteristica icone={<IconeMetragem size={19} />} valor={`Lote ${property.areaLote.toLocaleString('pt-BR')} m²`} titulo="Área do lote" /> : null}
-              </div>
-
-              <div className="mt-5">
-                <DetailFavoriteButton propertyId={property.id} />
-              </div>
+              <DetailFavoriteButton propertyId={property.id} />
             </div>
 
             <div className="md:sticky md:top-24">

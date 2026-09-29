@@ -242,7 +242,9 @@ export async function importarEmpresasPlanilha(linhas: EmpresaPlanilhaLinha[]): 
       else res.atualizadas++;
       const f = lerFundacao(l.fundacao);
       await query(
-        `update empresas set nome_perfil = $2, historico = coalesce($3, historico), ano_fundacao = coalesce($4, ano_fundacao), mes_fundacao = coalesce($5, mes_fundacao),
+        // só COMPLETA o que está vazio: nunca apaga nem troca o que já foi cadastrado
+        `update empresas set nome_perfil = coalesce(nullif(nome_perfil, ''), $2), historico = coalesce(nullif(historico, ''), $3),
+                ano_fundacao = coalesce(ano_fundacao, $4), mes_fundacao = case when ano_fundacao is null then $5 else coalesce(mes_fundacao, $5) end,
                 updated_at = now() where id = $1::uuid`,
         [id, nome, String(l.historia ?? '').trim().slice(0, 3000) || null, f.ano, f.ano ? f.mes : null]
       );

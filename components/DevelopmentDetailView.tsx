@@ -19,6 +19,7 @@ import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import ContarVisita from '@/components/ContarVisita';
 import Trilha from '@/components/Trilha';
 import BarraEquipe from '@/components/BarraEquipe';
+import { Caracteristica, IconeCama, IconeMetragem } from '@/components/IconesImovel';
 import ConcepcaoBloco from '@/components/ConcepcaoBloco';
 import { concepcaoDe } from '@/lib/empresas';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
@@ -72,6 +73,10 @@ export default async function DevelopmentDetailView({ development }: { developme
   const quartosConhecidos = Array.from(
     new Set([...(development.quartosOpcoes ?? []), ...tabela.map((u) => parseInt(u.beds, 10)).filter((n) => Number.isFinite(n))])
   ).sort((a, b) => a - b);
+  const qs = [...quartosConhecidos].sort((x, y) => x - y);
+  const faixaQuartos = !qs.length ? null : qs.length === 1 ? `${qs[0]}` : qs[qs.length - 1] === qs[0] + 1 ? `${qs[0]} e ${qs[qs.length - 1]}` : `${qs[0]} a ${qs[qs.length - 1]}`;
+  const areas = tabela.map((u) => u.areaValue).filter((n): n is number => !!n).sort((x, y) => x - y);
+  const faixaArea = !areas.length ? null : Math.round(areas[0]) === Math.round(areas[areas.length - 1]) ? `${Math.round(areas[0])} m²` : `${Math.round(areas[0])} a ${Math.round(areas[areas.length - 1])} m²`;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -142,6 +147,23 @@ export default async function DevelopmentDetailView({ development }: { developme
           <span className="text-sm font-semibold text-accent">{development.deliveryNote}</span>
         </div>
 
+        {/* Preço e características logo abaixo das fotos (celular e computador) */}
+        <section aria-label="Preço e características" className="mt-4 flex flex-col gap-1">
+          {precoInicial ? (
+            <div className="font-sans text-[28px] font-bold leading-tight tabular-nums tracking-tight md:text-3xl">A partir {formatBRL(precoInicial)}</div>
+          ) : (
+            <div className="text-base font-semibold">Valores sob consulta</div>
+          )}
+          {avgPricePerM2 > 0 && <div className="text-sm text-[var(--text-muted)]">Média de {formatPricePerM2(avgPricePerM2)}</div>}
+          {(faixaQuartos || faixaArea || tabela.length > 0) && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+              <Caracteristica icone={<IconeCama size={19} />} valor={faixaQuartos ? `${faixaQuartos} quartos` : null} titulo="Quartos" />
+              <Caracteristica icone={<IconeMetragem size={19} />} valor={faixaArea} titulo="Metragens" />
+              {tabela.length > 0 && <span className="text-sm font-semibold text-[var(--text-muted)]">{tabela.length} tipologia(s)</span>}
+            </div>
+          )}
+        </section>
+
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-y border-[var(--border)] py-3 text-sm">
           <span className="text-[var(--text-muted)]">
             {development.tipo === 'vertical' ? 'Condomínio vertical' : 'Condomínio horizontal'}
@@ -208,20 +230,6 @@ export default async function DevelopmentDetailView({ development }: { developme
         {/* Lateral direita: resumo + Fale conosco (fica fixa ao rolar no computador) */}
         <aside className={`${hasGallery ? 'md:mt-6' : ''} flex flex-col gap-4`}>
           <div className="flex flex-col gap-4 md:sticky md:top-24">
-            {(precoInicial || avgPricePerM2 > 0 || development.deliveryDate) && (
-              <div className="rounded-2xl border border-[var(--border)] p-5">
-                {precoInicial ? (
-                  <>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Unidades a partir de</div>
-                    <div className="font-sans text-2xl font-bold tabular-nums tracking-tight">{formatBRL(precoInicial)}</div>
-                  </>
-                ) : (
-                  <div className="text-sm font-semibold">Valores sob consulta</div>
-                )}
-                {avgPricePerM2 > 0 && <div className="mt-1 text-sm text-[var(--text-muted)]">Média de {formatPricePerM2(avgPricePerM2)}</div>}
-                <div className="mt-3 border-t border-[var(--border)] pt-3 text-sm font-semibold text-accent">{development.deliveryNote}</div>
-              </div>
-            )}
             <ContatoLateral
               condominio={development.name}
               developmentId={development.id}
