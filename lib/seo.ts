@@ -1,3 +1,4 @@
+import { tituloAnuncio, tituloCondominio } from './titulos';
 import type { Metadata } from 'next';
 import type { PropertyDetail, Development } from './property-details';
 import type { Property } from './mock-properties';
@@ -69,12 +70,13 @@ export function altFoto(p: Property, i?: number): string {
 
 // ---------- metadados das páginas ----------
 export function buildPropertyMetadata(property: PropertyDetail): Metadata {
-  const title = property.titulo ? `${property.titulo}, ${onde(property)}`.slice(0, 95) : tituloSeoImovel(property);
+  // 50 a 60 caracteres, palavra-chave no início, fórmula pela fase (ver lib/titulos.ts)
+  const title = tituloAnuncio({ ...property, quartos: num(property.beds) || null });
   const description = descricaoSeoImovel(property);
   const url = `${SITE_URL}${urlImovel(property)}`;
   const imagem = property.photos?.[0];
   return {
-    title,
+    title: { absolute: title },
     description,
     alternates: { canonical: url },
     openGraph: {
@@ -223,7 +225,8 @@ export function buildDevelopmentMetadata(development: Development): Metadata {
   const tipoTxt = development.tipo === 'horizontal' ? 'Condomínio de casas' : 'Edifício';
   // Padrão de busca: "Imóveis à venda no Condomínio X, Bairro, Cidade"
   const nomeSeo = nomeCondominioSeo(development.name);
-  const title = `Imóveis à venda no ${nomeSeo}, ${onde}`.slice(0, 95);
+  const quartos = [...(development.quartosOpcoes ?? []), ...development.units.map((u) => num(u.beds)).filter((n): n is number => !!n)];
+  const title = tituloCondominio({ ...development, quartos });
   const fase = badge.label && development.tipo !== 'horizontal' ? ` ${badge.label}.` : '';
   const abertura = `Imóveis à venda no ${nomeSeo}, ${tipoTxt.toLowerCase()} no ${onde}.${fase}`;
   const texto = descricaoTextoPuro(development.description);
@@ -232,7 +235,7 @@ export function buildDevelopmentMetadata(development: Development): Metadata {
   const url = `${SITE_URL}${urlCondominio(development)}`;
   const imagem = development.photos?.[0];
   return {
-    title,
+    title: { absolute: title },
     description,
     alternates: { canonical: url },
     openGraph: {

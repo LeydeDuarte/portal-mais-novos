@@ -9,7 +9,7 @@ export default function Footer() {
         <div className="flex max-w-[320px] flex-col gap-2">
           <Logo tipo="completo" altura={44} />
           <p className="text-[13px] leading-relaxed text-[var(--text-muted)]">
-            Imóveis à venda em Goiânia com vídeo (lançamentos, imóveis novos e casas em condomínio) e estruturação de ativos imobiliários:
+            Os Mais Novos Imóveis à Venda estão aqui: lançamentos, imóveis novos e casas em condomínio em Goiânia, com estruturação de ativos imobiliários:
             compra, venda, financiamento e home equity, também para brasileiros no exterior.
           </p>
         </div>

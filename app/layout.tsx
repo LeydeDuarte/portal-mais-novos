@@ -31,11 +31,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} | Imóveis à venda em Goiânia`,
+    default: 'Os Mais Novos Imóveis à Venda estão aqui | Goiânia',
     template: `%s | ${SITE_NAME}`
   },
   description:
-    'Imóveis à venda em Goiânia com fotos e vídeos: apartamentos, casas em condomínio, coberturas e lançamentos. Atendimento especializado em financiamento e crédito imobiliário.',
+    'Os Mais Novos Imóveis à venda em Goiânia: lançamentos, apartamentos e casas em condomínio. Atendimento especializado em financiamento e crédito imobiliário.',
   openGraph: {
     siteName: SITE_NAME,
     type: 'website',

@@ -10,6 +10,7 @@ import ImagemCapa from '@/components/ImagemCapa';
 import { CATEGORIAS, acharRegiao, anunciosDaRegiao, condominiosDaRegiao, listarRegioes, type Estatisticas, type Regiao } from '@/lib/landing';
 import { SITE_NAME, SITE_URL, trilhaDoImovel, urlRegiao } from '@/lib/seo';
 import { urlImovel, urlCondominio } from '@/lib/urls';
+import { tituloRegiao } from '@/lib/titulos';
 
 // Páginas de região para o Google e para buscadores de IA, em silos (estado na URL):
 //   /imoveis-a-venda                                   → todas as cidades
@@ -84,8 +85,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { est } = await anunciosDaRegiao(r.regiao.cidade, r.regiao.bairro, r.categoria, 1);
     description = `${est.n} ${titulo.toLowerCase()}${est.min ? `, a partir de ${brl(est.min)}` : ''}${est.m2 ? ` (média de ${brl(est.m2)}/m²)` : ''}. Veja fotos, vídeos e condomínios na ${SITE_NAME}.`;
   }
+  // 50 a 60 caracteres com a palavra-chave no início (ex.: "Apartamentos à Venda no Setor Bueno, Goiânia: 42 Opções")
+  let tituloGoogle = titulo;
+  if (r.regiao) {
+    const { est } = await anunciosDaRegiao(r.regiao.cidade, r.regiao.bairro, r.categoria, 1);
+    tituloGoogle = tituloRegiao(r.categoria ? CATEGORIAS[r.categoria].nome : 'Imóveis', r.regiao.bairro, r.regiao.cidade, est.n);
+  }
   return {
-    title: titulo,
+    title: { absolute: tituloGoogle },
     description: description.slice(0, 160),
     alternates: { canonical: url },
     openGraph: { title: `${titulo} | ${SITE_NAME}`, description, url, siteName: SITE_NAME, locale: 'pt_BR', type: 'website' }

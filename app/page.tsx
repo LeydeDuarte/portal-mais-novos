@@ -3,15 +3,16 @@ import Home from '@/components/Home';
 import JsonLd from '@/components/JsonLd';
 import { buildAgentJsonLd, SITE_NAME, SITE_URL } from '@/lib/seo';
 import { montarFeedInicial } from '@/lib/feed-inicial';
+import { TITULO_HOME } from '@/lib/titulos';
 
 export const metadata: Metadata = {
-  title: { absolute: `Imóveis à venda em Goiânia com vídeo | ${SITE_NAME}` },
+  title: { absolute: TITULO_HOME },
   description:
-    'Apartamentos, casas em condomínio, coberturas e lançamentos à venda em Goiânia, com fotos e vídeos. Busque por bairro, condomínio e preço, com crédito imobiliário especializado.',
+    'Os Mais Novos Imóveis à venda em Goiânia: lançamentos, apartamentos e casas em condomínio prontos para morar. Busque por bairro, condomínio e preço.',
   alternates: { canonical: SITE_URL },
   openGraph: {
-    title: `Imóveis à venda em Goiânia com vídeo | ${SITE_NAME}`,
-    description: 'O feed de imóveis mais bonito de Goiânia: apartamentos, casas em condomínio e lançamentos com vídeo.',
+    title: TITULO_HOME,
+    description: 'Lançamentos, apartamentos e casas em condomínio à venda em Goiânia, com fotos, plantas e atendimento especializado em crédito imobiliário.',
     url: SITE_URL,
     siteName: SITE_NAME,
     locale: 'pt_BR',
@@ -26,7 +27,7 @@ export default async function Page({ searchParams }: { searchParams: { q?: strin
   return (
     <>
       <JsonLd data={buildAgentJsonLd()} />
-      <h1 className="sr-only">Imóveis à venda em Goiânia: apartamentos, casas em condomínio, coberturas e lançamentos com vídeo</h1>
+      <h1 className="sr-only">Os Mais Novos Imóveis à Venda estão aqui: lançamentos, apartamentos e casas em condomínio em Goiânia</h1>
       <Home initialQuery={q} inicial={inicial} />
     </>
   );

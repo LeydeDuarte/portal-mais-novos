@@ -1,3 +1,4 @@
+import { tituloEmpresa } from '@/lib/titulos';
 import { imoveisDaEmpresa, nomeCondominioSeo } from '@/lib/seo';
 import { urlCondominio } from '@/lib/urls';
 import type { Metadata } from 'next';
@@ -65,7 +66,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // Padrão de busca: "Imóveis à venda da Incorporadora X"
   const titulo = imoveisDaEmpresa(nome);
   return {
-    title: `${titulo}: lançamentos, obras e prontos`.slice(0, 95),
+    title: { absolute: tituloEmpresa(titulo) },
     description: `${titulo}. ${desc}`.slice(0, 160),
     alternates: { canonical: `${SITE_URL}/empresa/${e.slug}` },
     openGraph: { title: `${nome} | ${SITE_NAME}`, description: desc.slice(0, 200), url: `${SITE_URL}/empresa/${e.slug}`, siteName: SITE_NAME, locale: 'pt_BR', type: 'website' }
