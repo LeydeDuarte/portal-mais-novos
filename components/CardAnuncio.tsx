@@ -1,3 +1,5 @@
+import { LinhaCaracteristicas } from '@/components/IconesImovel';
+import CorretorSelo from '@/components/CorretorSelo';
 import Link from 'next/link';
 import ImagemCapa from '@/components/ImagemCapa';
 import CondominioTag from '@/components/CondominioTag';
@@ -33,9 +35,14 @@ export default function CardAnuncio({ p, prioridade = false }: { p: PropertyDeta
           </div>
         )}
         <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[p.tipoUnidade]}</div>
-        <div className="font-sans text-base font-bold tabular-nums tracking-tight">{p.price}</div>
+        <div className="font-sans text-[17px] font-bold tabular-nums tracking-tight">{p.price}</div>
         <div className="text-xs text-[var(--text-muted)]">{p.location}</div>
-        <div className="text-xs text-[var(--text-muted)]">{[p.beds !== '-' ? p.beds : null, p.parking !== '-' ? p.parking : null, p.area !== '-' ? p.area : null].filter(Boolean).join(' · ')}</div>
+        <LinhaCaracteristicas beds={p.beds} banheiros={p.banheiros} parking={p.parking} area={p.areaValue} />
+        {p.corretor && (
+          <div className="mt-2">
+            <CorretorSelo c={p.corretor} />
+          </div>
+        )}
       </div>
     </Link>
   );

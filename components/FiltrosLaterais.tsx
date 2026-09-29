@@ -93,9 +93,14 @@ function Localizacao({ filters, onChange }: { filters: FilterState; onChange: (f
   };
   const ufs = Array.from(new Set((indice ?? []).map((l) => l.uf).filter(Boolean))).sort();
   const t = semAcento(q.trim());
-  const sugestoes = t.length >= 2
+  const sugestoes = t.length >= 2 && indice
     ? (indice ?? [])
-        .filter((l) => l.tipo !== 'condominio' && (!uf || l.uf === uf) && semAcento(l.nome).includes(t))
+        // qualquer parte do nome serve: "bueno", "setor", "set bue" acham "Setor Bueno"
+        .filter((l) => {
+          if (l.tipo === 'condominio' || (uf && l.uf !== uf)) return false;
+          const alvo = semAcento(`${l.nome} ${l.cidade} ${l.uf}`);
+          return t.split(/\s+/).every((p) => alvo.includes(p));
+        })
         .sort((a, b) => (a.tipo === b.tipo ? b.total - a.total : a.tipo === 'cidade' ? -1 : 1))
         .slice(0, 8)
     : [];
@@ -115,7 +120,7 @@ function Localizacao({ filters, onChange }: { filters: FilterState; onChange: (f
         </select>
       )}
       <div className="relative">
-        <input className={campo} value={q} onFocus={carregar} onChange={(e) => setQ(e.target.value)} placeholder="Digite a cidade ou o bairro" />
+        <input className={campo} value={q} onFocus={carregar} onChange={(e) => (carregar(), setQ(e.target.value))} placeholder="Digite parte do nome: bueno, marista, goiânia…" />
         {sugestoes.length > 0 && (
           <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)] p-1 shadow-xl">
             {sugestoes.map((l) => (

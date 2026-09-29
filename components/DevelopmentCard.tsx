@@ -87,7 +87,7 @@ export default function DevelopmentCard({ development, prioridade = false, emDes
           {tipos.length > 0 && <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-accent">{tipos.slice(0, 4).join(' · ')}</div>}
           <div className="mt-1 text-xs text-[var(--text-muted)]">
             {development.unitsCount > 0
-              ? [development.minPrice ? `A partir de ${formatBRL(development.minPrice)}` : null, `${development.unitsCount} tipologia(s)`].filter(Boolean).join(' · ')
+              ? [development.minPrice ? `A partir ${formatBRL(development.minPrice)}` : null, `${development.unitsCount} tipologia(s)`].filter(Boolean).join(' · ')
               : 'Sem anúncios no momento. Registre seu interesse'}
           </div>
           <span className="mt-2 inline-block text-xs font-semibold text-accent">Ver condomínio →</span>
@@ -142,8 +142,8 @@ export default function DevelopmentCard({ development, prioridade = false, emDes
           {tipos.length > 0 && (
             <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{tipos.slice(0, 4).join(' · ')}{tipos.length > 4 ? ' +' : ''}</div>
           )}
-          <div className="font-sans tabular-nums text-sm font-bold tracking-tight md:text-base">
-            {development.minPrice ? `A partir de ${formatBRL(development.minPrice)}` : 'Preço sob consulta'}
+          <div className="font-sans tabular-nums text-[17px] font-bold leading-tight tracking-tight md:text-[17px]">
+            {development.minPrice ? `A partir ${formatBRL(development.minPrice)}` : 'Preço sob consulta'}
           </div>
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">{development.location}</div>
           {empresas && <div className="mt-0.5 line-clamp-1 text-[11px] text-[var(--text-faint)]">{empresas}</div>}

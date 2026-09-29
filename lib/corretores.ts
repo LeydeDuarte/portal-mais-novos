@@ -16,3 +16,9 @@ export async function corretoresPublicos(emails: (string | null | undefined)[]):
   for (const r of rows) m.set(r.email.toLowerCase(), { nome: (r.nome_publico || r.name).trim(), foto: r.foto, creci: r.creci });
   return m;
 }
+
+/** Mapeia linhas de anúncios já com o corretor responsável (uma consulta só) */
+export async function comCorretores<R extends { corretor_email?: string | null }, T>(rows: R[], map: (r: R) => T): Promise<(T & { corretor?: CorretorPublico })[]> {
+  const c = await corretoresPublicos(rows.map((r) => r.corretor_email));
+  return rows.map((r) => ({ ...map(r), corretor: c.get((r.corretor_email ?? '').toLowerCase()) }));
+}

@@ -22,7 +22,7 @@ import { depoimentosAtivos, destaquesAtivos, hashTexto } from './especiais';
 import { MESES, FASES_EXIGEM_CONCEPCAO, getStatusBucket } from './classification';
 import { gravarConcepcao, resolverEmpresaImport, acrescentarConcepcao } from './empresas';
 import { gravarProprietariosDoImovel } from './proprietarios';
-import { corretoresPublicos } from './corretores';
+import { corretoresPublicos, comCorretores } from './corretores';
 import type { EmpresaPlanilha } from './planilha-condominios';
 import type { EmpresaNaConcepcao } from './empresas-tipos';
 import type { DepoimentoCard, DestaqueCard } from './especiais-tipos';
@@ -700,7 +700,7 @@ export async function getRelatedListings(target: { propertyId?: string; developm
       order by created_at desc limit 12`,
     [base.id ?? '', base.devId, base.condominio, base.cidade]
   );
-  if (!base.cidade) return { mesmoCondominio: condoRows.map(mapPropertyRow), regiao: [], precoReferencia: base.price };
+  if (!base.cidade) return { mesmoCondominio: await comCorretores(condoRows, mapPropertyRow), regiao: [], precoReferencia: base.price };
 
   const excluir = [base.id ?? '', ...condoRows.map((r) => r.id)];
   const tiposDoGrupo = Object.entries(GRUPO_TIPO)
@@ -738,7 +738,7 @@ export async function getRelatedListings(target: { propertyId?: string; developm
     `select * from properties where ${conds.join(' and ')} order by (${score.join(' + ')}) asc, created_at desc limit 8`,
     params
   );
-  return { mesmoCondominio: condoRows.map(mapPropertyRow), regiao: regiaoRows.map(mapPropertyRow), precoReferencia: base.price };
+  return { mesmoCondominio: await comCorretores(condoRows, mapPropertyRow), regiao: await comCorretores(regiaoRows, mapPropertyRow), precoReferencia: base.price };
 }
 
 // ---------------- Cadastro (painel) — escrita ----------------

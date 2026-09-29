@@ -6,6 +6,7 @@
 import { unstable_cache } from 'next/cache';
 import { query } from './db';
 import { mapPropertyRow, type PropertyRow } from './db-mappers';
+import { comCorretores } from './corretores';
 import { slugify } from './seo';
 import type { TipoUnidade } from './tipologias';
 import type { PropertyDetail } from './property-details';
@@ -104,7 +105,7 @@ export const anunciosDaRegiao = unstable_cache(
     ]);
     const e = est[0];
     return {
-      itens: rows.map(mapPropertyRow),
+      itens: await comCorretores(rows, mapPropertyRow),
       est: {
         n: Number(e?.n) || 0,
         min: e?.min ? Number(e.min) : null,

@@ -65,3 +65,15 @@ export const numeroDe = (s?: string | null) => {
   const n = parseInt(String(s ?? ''), 10);
   return Number.isFinite(n) ? n : null;
 };
+
+/** Linha de características com ícones (igual ao feed): quartos, banheiros, vagas, metragem */
+export function LinhaCaracteristicas({ beds, banheiros, parking, area }: { beds?: string | null; banheiros?: string | null; parking?: string | null; area?: number | null }) {
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-3">
+      <Caracteristica icone={<IconeCama />} valor={numeroDe(beds)} titulo="Quartos" />
+      <Caracteristica icone={<IconeChuveiro />} valor={numeroDe(banheiros)} titulo="Banheiros" />
+      <Caracteristica icone={<IconeCarro />} valor={numeroDe(parking)} titulo="Vagas" />
+      <Caracteristica icone={<IconeMetragem />} valor={area ? `${area.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} m²` : null} titulo="Área privativa" />
+    </div>
+  );
+}
