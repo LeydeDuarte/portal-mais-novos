@@ -11,7 +11,7 @@ import { dentroDoLimite, registrarUso, ipDoVisitante } from './limites';
 import { lerPerfilFeed } from './perfil';
 import { miniaturaDe, processarMiniaturas } from './miniaturas';
 import type { PropertyDetail, Development } from './property-details';
-import type { FilterState } from './filters';
+import { countActiveFilters, type FilterState } from './filters';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from './tipologias';
 import { r2PublicBase, cleanPhotoUrl } from './r2-url';
 import { formatTitulo } from './text';
@@ -201,7 +201,8 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean,
       id: l?.id ? String(l.id).slice(0, 80) : undefined
     }))
   };
-  if (page === 0) await limparVendidos().catch(() => {});
+  // a pessoa está buscando/filtrando? (aí os vendidos aparecem sempre, depois dos disponíveis)
+  const buscando = countActiveFilters(filters) > 0;
   const params: unknown[] = [];
   const p = (value: unknown) => {
     params.push(value);
@@ -210,6 +211,9 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean,
 
   const propConds: string[] = [];
   const devConds: string[] = [];
+  // Vendidos: privados nunca; feed inicial só os vendidos há até 15 dias; buscas sempre
+  if (ocultos) propConds.push('p.vendido_em is null');
+  else if (!buscando) propConds.push(`(p.vendido_em is null or p.vendido_em > now() - interval '${DIAS_VENDIDO_NO_FEED} days')`);
   // Destaques (2 colunas no feed): só os marcados pela equipe, dentro da mesma busca
   if (soDestaques) {
     propConds.push('p.destaque');
@@ -748,7 +752,7 @@ export async function getRelatedListings(target: { propertyId?: string; developm
       where is_tipologia = false and visibilidade = 'publico' and id <> $1
         and (($2::text is not null and empreendimento_id = $2)
           or ($3::text is not null and ${norm('condominio')} = ${norm('$3::text')} and ${norm("coalesce(cidade, '')")} = ${norm("coalesce($4::text, '')")}))
-      order by created_at desc limit 12`,
+      order by (vendido_em is not null), vendido_em desc nulls first, created_at desc limit 12`,
     [base.id ?? '', base.devId, base.condominio, base.cidade]
   );
   if (!base.cidade) return { mesmoCondominio: await comCorretores(condoRows, mapPropertyRow), regiao: [], precoReferencia: base.price };
@@ -771,7 +775,11 @@ export async function getRelatedListings(target: { propertyId?: string; developm
     'finalidade = $4',
     'tipo_unidade = any($5::text[])'
   ];
-  const score: string[] = [`(case when ${norm("coalesce(bairro, '')")} = ${norm("coalesce($3::text, '')")} then 0 else 1 end)`];
+  const score: string[] = [
+    `(case when ${norm("coalesce(bairro, '')")} = ${norm("coalesce($3::text, '')")} then 0 else 1 end)`,
+    // vendidos continuam aparecendo (escassez), mas depois dos disponíveis parecidos
+    '(case when vendido_em is not null then 1.5 else 0 end)'
+  ];
   if (base.price) {
     const pr = p(base.price);
     conds.push(`price_value between ${pr} * ${1 - MARGEM_PRECO} and ${pr} * ${1 + MARGEM_PRECO}`);
@@ -956,7 +964,12 @@ export async function deleteProperty(id: string): Promise<void> {
 }
 
 // Só anúncio avulso pode ser marcado como vendido. Vai para o histórico na hora
-// (conta no Mercado) e, se for público, fica 15 dias no feed com a tag VENDIDO.
+// (conta no Mercado) e CONTINUA no site com a tag VENDIDO (gera escassez/urgência):
+// - feed inicial, sem filtro: aparece só nos primeiros 15 dias depois da venda;
+// - buscas e filtros, página do condomínio/empreendimento, relacionados e páginas de
+//   bairro: aparece sempre, depois dos disponíveis;
+// - a página do próprio anúncio continua no ar (com VENDIDO).
+// Anúncio privado vendido continua privado (nunca aparece para o público).
 const DIAS_VENDIDO_NO_FEED = 15;
 
 // Link de vídeo: só https de YouTube, Instagram, TikTok ou Vimeo (nada de "javascript:")
@@ -971,22 +984,7 @@ export async function marcarComoVendido(id: string, valorVenda?: number): Promis
   if (!r[0] || r[0].is_tipologia) throw new Error('Só anúncio avulso pode ser marcado como vendido.');
   if (r[0].vendido_em) return;
   await arquivarNoHistorico(id, 'vendido', valorVenda ?? null);
-  if (r[0].visibilidade === 'privado') {
-    await query('delete from favorites where property_id = $1', [id]).catch(() => {});
-    await query('delete from properties where id = $1', [id]);
-  } else {
-    await query('update properties set vendido_em = now() where id = $1', [id]);
-  }
-}
-
-// Tira do ar os vendidos há mais de 15 dias (já estão no histórico)
-let ultimaLimpeza = 0;
-async function limparVendidos() {
-  if (Date.now() - ultimaLimpeza < 10 * 60 * 1000) return;
-  ultimaLimpeza = Date.now();
-  const velhos = `select id from properties where vendido_em < now() - interval '${DIAS_VENDIDO_NO_FEED} days'`;
-  await query(`delete from favorites where property_id in (${velhos})`).catch(() => {});
-  await query(`delete from properties where id in (${velhos})`);
+  await query('update properties set vendido_em = now() where id = $1', [id]);
 }
 
 

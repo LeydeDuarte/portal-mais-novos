@@ -26,7 +26,10 @@ export const CATEGORIAS: Record<string, { nome: string; singular: string; tipos:
 };
 export const categoriaDoTipo = (t: string) => Object.entries(CATEGORIAS).find(([, c]) => (c.tipos as string[]).includes(t))?.[0];
 
-const PUBLICO = "p.visibilidade = 'publico' and p.is_tipologia = false and p.vendido_em is null and p.finalidade = 'venda'";
+// Anúncios públicos à venda. Os VENDIDOS continuam na lista das páginas de bairro (escassez),
+// depois dos disponíveis; contagens, preços e m² consideram só os disponíveis.
+const PUBLICO_COM_VENDIDOS = "p.visibilidade = 'publico' and p.is_tipologia = false and p.finalidade = 'venda'";
+const PUBLICO = `${PUBLICO_COM_VENDIDOS} and p.vendido_em is null`;
 
 export type Regiao = { uf: string; cidade: string; bairro: string | null; n: number; categorias: Record<string, number>; condominios: number };
 
@@ -80,7 +83,7 @@ export type Estatisticas = { n: number; min: number | null; max: number | null; 
 export const anunciosDaRegiao = unstable_cache(
   async (cidade: string, bairro: string | null, categoria: string | null, limite = 60): Promise<{ itens: PropertyDetail[]; est: Estatisticas }> => {
     const params: unknown[] = [cidade];
-    let cond = `${PUBLICO} and lower(p.cidade) = lower($1)`;
+    let cond = `lower(p.cidade) = lower($1)`;
     if (bairro) {
       params.push(bairro);
       cond += ` and lower(coalesce(p.bairro, '')) = lower($${params.length})`;
@@ -91,15 +94,16 @@ export const anunciosDaRegiao = unstable_cache(
     }
     const [rows, est] = await Promise.all([
       query<PropertyRow>(
-        `select p.* from properties p where ${cond}
-          order by (case when jsonb_array_length(coalesce(p.photos, '[]'::jsonb)) > 0 then 0 else 1 end), p.created_at desc limit ${Math.min(limite, 120)}`,
+        `select p.* from properties p where ${PUBLICO_COM_VENDIDOS} and ${cond}
+          order by (p.vendido_em is not null), (case when jsonb_array_length(coalesce(p.photos, '[]'::jsonb)) > 0 then 0 else 1 end),
+                   p.vendido_em desc nulls first, p.created_at desc limit ${Math.min(limite, 120)}`,
         params
       ),
       query<{ n: string; min: string | null; max: string | null; m2: string | null; video: string }>(
         `select count(*) as n, min(nullif(p.price_value, 0)) as min, max(p.price_value) as max,
                 avg(p.price_value / nullif(p.area, 0)) filter (where p.price_value > 0 and p.area > 0) as m2,
                 count(*) filter (where coalesce(p.video_url, '') <> '') as video
-           from properties p where ${cond}`,
+           from properties p where ${PUBLICO} and ${cond}`,
         params
       )
     ]);
@@ -159,7 +163,7 @@ export async function urlsParaSitemap(): Promise<{ imoveis: Linha[]; condominios
   const [imoveis, condominios] = await Promise.all([
     query<Linha>(
       `select id, slug, finalidade, uf, cidade, bairro, coalesce(jetimob_atualizado_em, created_at) as em from properties
-        where visibilidade = 'publico' and is_tipologia = false and vendido_em is null`
+        where visibilidade = 'publico' and is_tipologia = false`
     ),
     // condomínio sem anúncio e sem ser lançamento/novo fica de fora do feed, mas a página
     // dele existe e é útil no Google (quem pesquisa pelo nome) — entra no sitemap

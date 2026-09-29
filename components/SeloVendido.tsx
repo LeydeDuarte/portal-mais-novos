@@ -1,5 +1,6 @@
-// Tag VENDIDO no centro da foto (card do feed e página do imóvel) — o imóvel
-// vendido fica 15 dias no feed e depois sai sozinho.
+// Tag VENDIDO no centro da foto (cards e página do imóvel). O vendido continua no
+// site para gerar escassez: nas buscas, relacionados, condomínio e páginas de bairro;
+// no feed inicial (sem filtro), só nos 15 dias depois da venda.
 export default function SeloVendido({ grande = false }: { grande?: boolean }) {
   return (
     <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center bg-black/15">

@@ -1,4 +1,5 @@
 import { LinhaCaracteristicas } from '@/components/IconesImovel';
+import SeloVendido from '@/components/SeloVendido';
 import LinhaCondominioCorretor from '@/components/LinhaCondominioCorretor';
 import Link from 'next/link';
 import ImagemCapa from '@/components/ImagemCapa';
@@ -57,8 +58,9 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
                       p.finalidade === 'aluguel' ? 'bg-sky-700 text-white' : 'bg-white/95 text-ink'
                     }`}
                   >
-                    {p.finalidade === 'aluguel' ? 'Aluguel' : 'À venda'}
+                    {p.vendidoEm ? 'Vendido' : p.finalidade === 'aluguel' ? 'Aluguel' : 'À venda'}
                   </span>
+                  {p.vendidoEm && <SeloVendido />}
                 </div>
                 <div className="pt-2">
                   <LinhaCondominioCorretor condominio={p.condominio ? formatTitulo(p.condominio) : null} corretor={p.corretor} />
