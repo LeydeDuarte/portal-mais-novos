@@ -1,8 +1,7 @@
 import { LinhaCaracteristicas } from '@/components/IconesImovel';
-import CorretorSelo from '@/components/CorretorSelo';
+import LinhaCondominioCorretor from '@/components/LinhaCondominioCorretor';
 import Link from 'next/link';
 import ImagemCapa from '@/components/ImagemCapa';
-import CondominioTag from '@/components/CondominioTag';
 import SeloVendido from '@/components/SeloVendido';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
@@ -29,20 +28,11 @@ export default function CardAnuncio({ p, prioridade = false }: { p: PropertyDeta
         {p.vendidoEm && <SeloVendido />}
       </div>
       <div className="flex flex-col gap-0.5 pt-2">
-        {p.condominio && (
-          <div className="mb-0.5 min-w-0">
-            <CondominioTag nome={p.condominio} />
-          </div>
-        )}
+        <LinhaCondominioCorretor condominio={p.condominio} corretor={p.corretor} />
         <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[p.tipoUnidade]}</div>
         <div className="font-sans text-[17px] font-bold tabular-nums tracking-tight">{p.price}</div>
         <div className="text-xs text-[var(--text-muted)]">{p.location}</div>
         <LinhaCaracteristicas beds={p.beds} banheiros={p.banheiros} parking={p.parking} area={p.areaValue} />
-        {p.corretor && (
-          <div className="mt-2">
-            <CorretorSelo c={p.corretor} />
-          </div>
-        )}
       </div>
     </Link>
   );

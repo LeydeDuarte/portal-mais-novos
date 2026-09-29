@@ -3,12 +3,11 @@
 import TemporadaBadge from '@/components/TemporadaBadge';
 import SeloVendido from '@/components/SeloVendido';
 import Visualizacoes from '@/components/Visualizacoes';
-import CondominioTag from '@/components/CondominioTag';
 import ImagemCapa from '@/components/ImagemCapa';
 import { altFoto } from '@/lib/seo';
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
-import CorretorSelo from './CorretorSelo';
+import LinhaCondominioCorretor from './LinhaCondominioCorretor';
 import { Caracteristica, IconeCama, IconeCarro, IconeChuveiro, IconeMetragem, numeroDe } from './IconesImovel';
 import type { Property } from '@/lib/mock-properties';
 import { useVideoAutoplay } from '@/lib/video-rotation';
@@ -173,22 +172,7 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
         </div>
 
         <div className="flex flex-col gap-0.5 pt-2">
-          {(property.condominio || (emDestaque && property.corretor)) && (
-            <div className="mb-0.5 flex min-w-0 items-center gap-1.5">
-              {/* no destaque: bolinha com a foto do corretor antes da etiqueta do condomínio */}
-              {emDestaque && property.corretor && (
-                <span title={`${property.corretor.nome}${property.corretor.creci ? ` · CRECI ${property.corretor.creci}` : ''}`} className="shrink-0">
-                  {property.corretor.foto ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={property.corretor.foto} alt={property.corretor.nome} className="h-7 w-7 rounded-full object-cover ring-2 ring-[var(--bg)]" />
-                  ) : (
-                    <span className="grid h-7 w-7 place-items-center rounded-full bg-accent/15 text-[11px] font-bold text-accent">{property.corretor.nome.slice(0, 1).toUpperCase()}</span>
-                  )}
-                </span>
-              )}
-              {property.condominio && <CondominioTag nome={property.condominio} />}
-            </div>
-          )}
+          <LinhaCondominioCorretor condominio={property.condominio} corretor={property.corretor} />
           <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[property.tipoUnidade]}</div>
           <div className="font-sans tabular-nums text-[17px] font-bold leading-tight tracking-tight md:text-[17px]">{property.price}</div>
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">
@@ -200,11 +184,6 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
             <Caracteristica icone={<IconeCarro />} valor={numeroDe(property.parking)} titulo="Vagas" />
             <Caracteristica icone={<IconeMetragem />} valor={property.areaValue ? `${property.areaValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} m²` : null} titulo="Área privativa" />
           </div>
-          {property.corretor && (
-            <div className="mt-2">
-              <CorretorSelo c={property.corretor} />
-            </div>
-          )}
         </div>
       </Link>
     </div>

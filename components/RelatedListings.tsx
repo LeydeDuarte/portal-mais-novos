@@ -1,7 +1,6 @@
 import { LinhaCaracteristicas } from '@/components/IconesImovel';
-import CorretorSelo from '@/components/CorretorSelo';
+import LinhaCondominioCorretor from '@/components/LinhaCondominioCorretor';
 import Link from 'next/link';
-import CondominioTag from '@/components/CondominioTag';
 import ImagemCapa from '@/components/ImagemCapa';
 import ScrollRow from './ScrollRow';
 import { formatTitulo } from '@/lib/text';
@@ -62,22 +61,13 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
                   </span>
                 </div>
                 <div className="pt-2">
-                  {p.condominio && (
-                    <div className="mb-1 min-w-0">
-                      <CondominioTag nome={formatTitulo(p.condominio)} />
-                    </div>
-                  )}
+                  <LinhaCondominioCorretor condominio={p.condominio ? formatTitulo(p.condominio) : null} corretor={p.corretor} />
                   <div className="text-[10px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[p.tipoUnidade]}</div>
                   <div className="font-sans tabular-nums text-[17px] font-bold tracking-tight">{p.price}</div>
                   <div className="truncate text-xs text-[var(--text-muted)]">
                     {p.bairro || p.location}
                   </div>
                   <LinhaCaracteristicas beds={p.beds} banheiros={p.banheiros} parking={p.parking} area={p.areaValue} />
-                  {p.corretor && (
-                    <div className="mt-2">
-                      <CorretorSelo c={p.corretor} />
-                    </div>
-                  )}
                 </div>
               </Link>
             );
