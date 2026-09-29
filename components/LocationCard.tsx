@@ -3,21 +3,22 @@ type Props = {
   subtitle: string; // ex: "Jardim Goiás, Goiânia — GO"
   mapsQuery: string; // o que abre no Google Maps ao clicar
   approximate?: boolean; // imóvel de rua: só a região, nunca o endereço exato
+  embutido?: boolean; // dentro de outro cartão (perfil): sem o título e sem margem
 };
 
 // Seção "Localização" no final da página do imóvel/empreendimento.
 // O fundo é uma textura de mapa desenhada aqui mesmo (sem custo de API);
 // o mapa de verdade só abre quando a pessoa clica.
-export default function LocationCard({ title, subtitle, mapsQuery, approximate }: Props) {
+export default function LocationCard({ title, subtitle, mapsQuery, approximate, embutido = false }: Props) {
   const href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
   return (
-    <section className="mt-10" aria-label="Localização">
-      <h2 className="mb-3 text-lg font-bold">Localização</h2>
+    <section className={embutido ? '' : 'mt-10'} aria-label="Localização">
+      {!embutido && <h2 className="mb-3 text-lg font-bold">Localização</h2>}
       <a
         href={href}
         target="_blank"
         rel="noreferrer"
-        className="group relative flex h-[170px] items-center justify-center overflow-hidden rounded-2xl bg-[#f1f3f5] px-5"
+        className={`group relative flex h-[170px] items-center justify-center overflow-hidden bg-[#f1f3f5] px-5 ${embutido ? '' : 'rounded-2xl'}`}
       >
         <svg className="absolute inset-0 h-full w-full opacity-70" viewBox="0 0 600 170" preserveAspectRatio="xMidYMid slice" aria-hidden>
           <rect width="600" height="170" fill="#f1f3f5" />
@@ -56,7 +57,7 @@ export default function LocationCard({ title, subtitle, mapsQuery, approximate }
         </span>
       </a>
       {approximate && (
-        <p className="mt-2 text-xs text-[var(--text-faint)]">
+        <p className={`mt-2 text-xs text-[var(--text-faint)] ${embutido ? "px-4" : ""}`}>
           Por segurança do proprietário, mostramos só a região. O endereço exato é informado pelo corretor.
         </p>
       )}

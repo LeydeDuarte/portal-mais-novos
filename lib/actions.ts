@@ -699,7 +699,12 @@ export async function getAllDevelopmentIds(): Promise<string[]> {
 // quantidade de quartos pesa mais, depois metragem parecida, depois mesmo
 // bairro e preço mais próximo. A idade do imóvel não conta (de propósito:
 // um usado bem parecido pode ser uma ótima sugestão para quem olha um novo).
-export type RelatedListings = { mesmoCondominio: PropertyDetail[]; regiao: PropertyDetail[]; precoReferencia: number | null };
+export type RelatedListings = {
+  mesmoCondominio: PropertyDetail[];
+  regiao: PropertyDetail[]; // similares (mesmo perfil: tipo, preço, quartos, metragem)
+  mesmoBairro?: PropertyDetail[]; // outros à venda no mesmo bairro (qualquer perfil)
+  precoReferencia: number | null;
+};
 
 const GRUPO_TIPO: Record<string, string> = {
   studio: 'vertical', flat: 'vertical', loft: 'vertical', apartamento: 'vertical', apartamento_garden: 'vertical',
@@ -797,7 +802,22 @@ export async function getRelatedListings(target: { propertyId?: string; developm
     `select * from properties where ${conds.join(' and ')} order by (${score.join(' + ')}) asc, created_at desc limit 8`,
     params
   );
-  return { mesmoCondominio: await comCorretores(condoRows, mapPropertyRow), regiao: await comCorretores(regiaoRows, mapPropertyRow), precoReferencia: base.price };
+  // Outros no mesmo bairro (qualquer tipo/preço), sem repetir os anteriores; vendidos depois
+  const bairroRows = base.bairro
+    ? await query<PropertyRow>(
+        `select * from properties
+          where is_tipologia = false and visibilidade = 'publico' and finalidade = $4
+            and not (id = any($1::text[])) and ${norm("coalesce(cidade, '')")} = ${norm('$2::text')} and ${norm("coalesce(bairro, '')")} = ${norm('$3::text')}
+          order by (vendido_em is not null), (jsonb_array_length(coalesce(photos, '[]'::jsonb)) = 0), created_at desc limit 8`,
+        [[...excluir, ...regiaoRows.map((r) => r.id)], base.cidade, base.bairro, base.finalidade]
+      ).catch(() => [])
+    : [];
+  return {
+    mesmoCondominio: await comCorretores(condoRows, mapPropertyRow),
+    regiao: await comCorretores(regiaoRows, mapPropertyRow),
+    mesmoBairro: await comCorretores(bairroRows, mapPropertyRow),
+    precoReferencia: base.price
+  };
 }
 
 // ---------------- Cadastro (painel) — escrita ----------------
@@ -1036,7 +1056,7 @@ export async function getAnunciosOcultos(filters: FilterState): Promise<AnuncioO
 export async function getOcultosDoCondominio(developmentId: string, nome: string, cidade?: string | null): Promise<AnuncioOculto[]> {
   const rows = await query<PropertyRow>(
     `select * from properties
-      where is_tipologia = false and visibilidade = 'privado'
+      where is_tipologia = false and visibilidade = 'privado' and vendido_em is null
         and (empreendimento_id = $1 or (${norm('condominio')} = ${norm('$2::text')} and ${norm("coalesce(cidade, '')")} = ${norm("coalesce($3::text, '')")}))
       order by created_at desc limit 12`,
     [developmentId, nome, cidade ?? null]
@@ -2067,4 +2087,41 @@ export async function empreendimentosDaEmpresa(
   const cards = cardsDesordenados.sort((a, b) => (ordem.get(a.id) ?? 0) - (ordem.get(b.id) ?? 0));
   const uniq = (v: (string | null)[]) => Array.from(new Set(v.filter((x): x is string => !!x))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   return { cards, total: Number(total[0]?.n) || 0, cidades: uniq(locais.map((l) => l.cidade)), bairros: uniq(locais.map((l) => l.bairro)) };
+}
+
+// ---------------- Mercado do bairro (números reais para a página) ----------------
+export type MercadoDoBairro = {
+  bairro: string;
+  m2Anunciado: number | null; // média do R$/m² dos anúncios à venda no bairro
+  anuncios: number;
+  vendidos12m: number; // vendas registradas nos últimos 12 meses
+  m2Vendido: number | null; // média do R$/m² dessas vendas
+};
+
+/** Números do bairro para as páginas de imóvel e condomínio (base da futura valorização). */
+export async function mercadoDoBairro(cidade?: string | null, bairro?: string | null): Promise<MercadoDoBairro | null> {
+  if (!cidade || !bairro) return null;
+  const r = await query<{ m2: string | null; n: string; vendidos: string; m2v: string | null }>(
+    `select
+       (select avg(price_value / nullif(area, 0)) from properties
+         where visibilidade = 'publico' and not is_tipologia and finalidade = 'venda' and vendido_em is null and price_value > 0 and area > 0
+           and lower(cidade) = lower($1) and lower(coalesce(bairro, '')) = lower($2)) as m2,
+       (select count(*) from properties
+         where visibilidade = 'publico' and not is_tipologia and finalidade = 'venda' and vendido_em is null
+           and lower(cidade) = lower($1) and lower(coalesce(bairro, '')) = lower($2)) as n,
+       (select count(*) from imoveis_historico
+         where motivo = 'vendido' and encerrado_em > now() - interval '12 months' and lower(cidade) = lower($1) and lower(coalesce(bairro, '')) = lower($2)) as vendidos,
+       (select avg(valor_m2) from imoveis_historico
+         where motivo = 'vendido' and encerrado_em > now() - interval '12 months' and lower(cidade) = lower($1) and lower(coalesce(bairro, '')) = lower($2)) as m2v`,
+    [cidade, bairro]
+  ).catch(() => []);
+  const x = r[0];
+  if (!x) return null;
+  return {
+    bairro,
+    m2Anunciado: x.m2 ? Math.round(Number(x.m2)) : null,
+    anuncios: Number(x.n) || 0,
+    vendidos12m: Number(x.vendidos) || 0,
+    m2Vendido: x.m2v ? Math.round(Number(x.m2v)) : null
+  };
 }

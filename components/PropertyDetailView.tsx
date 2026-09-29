@@ -2,24 +2,22 @@ import TemporadaBadge from '@/components/TemporadaBadge';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import PhotoGallery, { type GalleryVideo } from '@/components/PhotoGallery';
-import LocationCard from '@/components/LocationCard';
 import RichText from '@/components/RichText';
 import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
 import CorretorSelo from '@/components/CorretorSelo';
-import { Caracteristica, IconeCama, IconeCarro, IconeChuveiro, IconeMetragem, numeroDe } from '@/components/IconesImovel';
+import { numeroDe } from '@/components/IconesImovel';
 import ContarVisita from '@/components/ContarVisita';
 import CondominioTag from '@/components/CondominioTag';
 import Trilha from '@/components/Trilha';
 import BarraEquipe from '@/components/BarraEquipe';
 import { altFoto, nomeCondominioSeo, trilhaDoImovel, tituloSeoImovel } from '@/lib/seo';
-import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getAveragePricePerM2, formatPricePerM2, type PropertyDetail } from '@/lib/property-details';
-import { getDevelopmentById, getRelatedListings } from '@/lib/actions';
+import { getDevelopmentById, getOcultosDoCondominio, getRelatedListings, mercadoDoBairro } from '@/lib/actions';
+import { BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
@@ -85,13 +83,33 @@ export default async function PropertyDetailView({
               </div>
   );
 
+  const [mercado, privados] = await Promise.all([
+    mercadoDoBairro(property.cidade, property.bairro).catch(() => null),
+    nomeCondominio ? getOcultosDoCondominio(development?.id ?? '', nomeCondominio, property.cidade).catch(() => []) : Promise.resolve([])
+  ]);
+  const outrosPrivados = privados.filter((a) => a.id !== property.id);
+  const entrega = textoEntrega(property.deliveryDate);
+  const q = numeroDe(property.beds);
+  const ban = numeroDe(property.banheiros);
+  const vg = numeroDe(property.parking);
+  const chips: Chip[] = [
+    ...(entrega ? [{ texto: entrega, tipo: 'entrega' as const }] : []),
+    { texto: badge.text, tipo: 'fase', bg: badge.bg, cor: badge.color },
+    ...(property.area !== '-' ? [{ texto: `${property.area} privativos` }] : []),
+    ...(q ? [{ texto: `${q} ${q === 1 ? 'quarto' : 'quartos'}` }] : []),
+    ...(ban ? [{ texto: `${ban} ${ban === 1 ? 'banheiro' : 'banheiros'}` }] : []),
+    ...(vg ? [{ texto: `${vg} ${vg === 1 ? 'vaga' : 'vagas'}` }] : []),
+    ...(property.areaTotal ? [{ texto: `${property.areaTotal.toLocaleString('pt-BR')} m² total` }] : []),
+    ...(property.areaLote ? [{ texto: `Lote ${property.areaLote.toLocaleString('pt-BR')} m²` }] : [])
+  ];
+  const aVenda = related.mesmoCondominio.filter((p) => p.finalidade === 'venda');
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <BotaoWhatsapp ctx={whats} variante="flutuante" />
       <ContarVisita tipo="imovel" id={property.id} perfil={{ tipos: [property.tipoUnidade], bairros: property.bairro ? [property.bairro] : [], preco: property.finalidade === 'venda' ? property.priceValue : null }} />
 
-      <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
+      <main className="mx-auto w-full max-w-6xl px-5 pb-10 pt-6 md:px-8">
         <BarraEquipe tipo="imovel" id={property.id} />
         <Trilha itens={trilhaDoImovel({ uf: property.uf, cidade: property.cidade, bairro: property.bairro }, development && development.status !== 'rascunho' ? development : null)} />
 
@@ -112,104 +130,88 @@ export default async function PropertyDetailView({
             </span>
           </div>
         )}
-        <h1 className="font-serif text-2xl font-semibold">{titulo}</h1>
-        {nomeCondominio && (
-          <div className="mt-2">
-            {development ? (
-              <Link href={urlCondominio(development)} className="inline-flex items-center gap-1.5 hover:opacity-80" title="Ver o condomínio">
+
+        <TituloPerfil
+          titulo={titulo}
+          endereco={property.location}
+          extra={
+            nomeCondominio ? (
+              development && development.status !== 'rascunho' ? (
+                <Link href={urlCondominio(development)} className="inline-flex items-center gap-1.5 hover:opacity-80" title="Ver o condomínio">
+                  <CondominioTag nome={nomeCondominio} grande />
+                  <span className="text-sm font-semibold text-accent">Ver condomínio →</span>
+                </Link>
+              ) : (
                 <CondominioTag nome={nomeCondominio} grande />
-                <span className="text-sm font-semibold text-accent">Ver condomínio →</span>
-              </Link>
-            ) : (
-              <CondominioTag nome={nomeCondominio} grande />
-            )}
-          </div>
-        )}
-        <p className="mb-5 mt-1.5 text-sm text-[var(--text-muted)]">{property.location}</p>
+              )
+            ) : null
+          }
+        />
 
         {property.vendidoEm && (
           <p className="mb-4 rounded-xl p-3 text-sm font-semibold text-white" style={{ background: '#e62f2f' }}>
             Este imóvel foi vendido. Veja abaixo opções parecidas na mesma região ou fale conosco que encontramos outro para você.
           </p>
         )}
+
         {hasGallery && (
-          <section aria-label="Fotos e vídeo do imóvel" className="mb-8">
+          <section aria-label="Fotos e vídeo do imóvel">
             <PhotoGallery photos={photos} video={galleryVideo} alt={altFoto(property)} badges={badges} vendido={!!property.vendidoEm} marcaDagua={marcaDagua} />
           </section>
         )}
 
-        {/* Preço e características logo abaixo das fotos (celular e computador):
-            é a primeira coisa que a pessoa procura */}
-        <section aria-label="Preço e características" className="mb-8 flex flex-col gap-1 border-b border-[var(--border)] pb-6">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[property.tipoUnidade]}</div>
-              <div className="font-sans tabular-nums text-[28px] font-bold leading-tight tracking-tight md:text-3xl">{property.price}</div>
-              {precoM2 && <div className="text-sm text-[var(--text-muted)]">{formatPricePerM2(precoM2)}</div>}
-              <div className="mt-1 text-sm text-[var(--text-muted)]">{property.location}</div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-                <Caracteristica icone={<IconeCama size={19} />} valor={numeroDe(property.beds) != null ? `${numeroDe(property.beds)} quartos` : null} titulo="Quartos" />
-                <Caracteristica icone={<IconeChuveiro size={19} />} valor={numeroDe(property.banheiros) != null ? `${numeroDe(property.banheiros)} banheiros` : null} titulo="Banheiros" />
-                <Caracteristica icone={<IconeCarro size={19} />} valor={numeroDe(property.parking) != null ? `${numeroDe(property.parking)} vagas` : null} titulo="Vagas" />
-                <Caracteristica icone={<IconeMetragem size={19} />} valor={property.area !== '-' ? `${property.area} privativos` : null} titulo="Área privativa" />
-                {property.areaTotal ? <Caracteristica icone={<IconeMetragem size={19} />} valor={`${property.areaTotal.toLocaleString('pt-BR')} m² total`} titulo="Área total" /> : null}
-                {property.areaLote ? <Caracteristica icone={<IconeMetragem size={19} />} valor={`Lote ${property.areaLote.toLocaleString('pt-BR')} m²`} titulo="Área do lote" /> : null}
-              </div>
-        </section>
-
-        <div className="grid gap-8 md:grid-cols-[1.3fr_1fr]">
-          <div>
-            {showMediaBlock && (
-            <div
-              className={`relative mx-auto flex w-full items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)] ${
-                property.video && !embed ? 'video-playing' : ''
-              }`}
-              style={{ height: 360 }}
-            >
-              <span className="text-sm text-[var(--text-faint)]">{property.video ? '[CAPA EM VÍDEO]' : '[FOTO]'}</span>
-              {property.videoUrl && !embed && (
-                <a
-                  href={property.videoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="absolute bottom-3 right-3 rounded-md bg-ink/70 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink"
-                >
-                  Assistir vídeo ↗
-                </a>
-              )}
-              <div className="absolute left-3 top-3">{badges}</div>
-            </div>
-            )}
+        <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0">
+            {/* preço primeiro; entrega, metragens e características logo ABAIXO do preço */}
+            <CaixaPreco
+              rotulo={property.vendidoEm ? 'Vendido' : property.finalidade === 'aluguel' ? 'Aluguel' : TIPO_UNIDADE_LABEL[property.tipoUnidade] + ' à venda'}
+              preco={property.priceValue ? property.price : null}
+              apoio={precoM2 ? `${formatPricePerM2(precoM2)} neste imóvel` : null}
+              mercado={property.finalidade === 'venda' ? mercado : null}
+            />
+            <ChipsPerfil chips={chips} />
 
             {property.plantas && property.plantas.length > 0 && (
-              <section className={showMediaBlock ? 'mt-6' : ''} aria-label="Planta do imóvel">
+              <section className="mt-6" aria-label="Planta do imóvel">
                 <h2 className="mb-3 text-lg font-bold">{property.plantas.length > 1 ? 'Plantas' : 'Planta'}</h2>
                 <PlantaViewer plantas={property.plantas} titulo={titulo} />
               </section>
             )}
 
-            <div className={showMediaBlock || property.plantas?.length ? 'mt-6' : ''}>
-              <h2 className="mb-2 text-lg font-bold">Sobre o imóvel</h2>
-              <CollapsibleText>
-                <RichText texto={property.description} />
-              </CollapsibleText>
-            </div>
+            {property.description?.trim() && (
+              <div className="mt-8 rounded-[20px] border border-black/[0.06] p-5 md:p-7">
+                <h2 className="font-serif text-[21px] font-semibold tracking-tight">Sobre o imóvel</h2>
+                <p className="mt-1 text-[13px] font-medium text-[var(--text-muted)]">
+                  {[`${TIPO_UNIDADE_LABEL[property.tipoUnidade]} ${property.finalidade === 'aluguel' ? 'para alugar' : 'à venda'}${nomeCondominio ? ` no ${nomeCondominio}` : ''}`, property.bairro, entrega]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                <div className="mt-4">
+                  <CollapsibleText maxHeight={170}>
+                    <RichText texto={property.description} />
+                  </CollapsibleText>
+                </div>
+              </div>
+            )}
 
-            <div className="mt-6">
-              <h2 className="mb-3 text-lg font-bold">O que tem no condomínio</h2>
-              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {property.amenities.map((a) => (
-                  <li key={a} className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-accent">
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                    {a}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {property.amenities.length > 0 && (
+              <div className="mt-8">
+                <h2 className="mb-3 text-lg font-bold">O que tem no condomínio</h2>
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {property.amenities.map((a) => (
+                    <li key={a} className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-accent">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                      {a}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-            {development && (
-              <div className="mt-6 rounded-xl border border-[var(--border)] p-4">
+            {development && development.status !== 'rascunho' && (
+              <div className="mt-8 rounded-[20px] border border-[var(--border)] p-5">
                 <h2 className="text-base font-bold">Fica no {development.name}</h2>
                 <p className="mt-0.5 text-sm text-[var(--text-muted)]">Veja lazer, tipologias e todos os imóveis disponíveis neste condomínio.</p>
                 <Link href={urlCondominio(development)} className="mt-2 inline-block text-sm font-semibold text-accent hover:underline">
@@ -219,18 +221,20 @@ export default async function PropertyDetailView({
             )}
           </div>
 
-          <aside className="flex flex-col gap-5">
-            <div className="rounded-2xl border border-[var(--border)] p-5">
-              <DetailFavoriteButton propertyId={property.id} />
-            </div>
-
-            <div className="md:sticky md:top-24">
-              {property.corretor && (
-                <div className="mb-4 rounded-2xl border border-[var(--border)] p-4">
-                  <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Corretor responsável</div>
-                  <CorretorSelo c={property.corretor} grande />
-                </div>
-              )}
+          {/* coluna da direita: região, contato e o corretor responsável embaixo */}
+          <aside className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 lg:sticky lg:top-24">
+              <CardRegiao
+                titulo={nomeCondominio || property.bairro || property.location.split(',')[0]}
+                subtitulo={property.location}
+                mapsQuery={nomeCondominio ? `${nomeCondominio}, ${regiao}` : regiao}
+                aproximado={!nomeCondominio}
+                numeros={[
+                  { valor: entrega ? entrega.replace(/^Entrega(ue em)? /, '') : null, rotulo: entrega?.startsWith('Entrega ') ? 'Entrega prevista' : 'Entregue em' },
+                  { valor: mercado?.m2Anunciado ? brl(mercado.m2Anunciado) : null, rotulo: `m² médio no ${property.bairro ?? 'bairro'}` },
+                  { valor: precoM2 ? brl(precoM2) : null, rotulo: 'm² deste imóvel' }
+                ]}
+              />
               <ContatoLateral
                 titulo="Falar com um corretor"
                 condominio={nomeCondominio || titulo}
@@ -239,33 +243,47 @@ export default async function PropertyDetailView({
                 mensagemInicial={`Olá! Tenho interesse neste imóvel: ${titulo}. Ainda está disponível?`}
                 whatsapp={whats}
               />
+              {property.corretor && (
+                <div className="flex justify-end rounded-2xl border border-[var(--border)] p-4">
+                  <div className="flex flex-col items-end text-right">
+                    <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Corretor responsável</div>
+                    <CorretorSelo c={property.corretor} grande />
+                  </div>
+                </div>
+              )}
             </div>
           </aside>
         </div>
+
+        {/* privados do mesmo condomínio PRIMEIRO, antes dos anunciados */}
+        {nomeCondominio && <SecaoPrivados onde={nomeCondominio} itens={outrosPrivados} />}
+
         <RelatedListings
+          grade
+          limite={8}
           title={nomeCondominio ? `Outros imóveis à venda no ${nomeCondominioSeo(nomeCondominio)}` : 'Outros imóveis à venda neste condomínio'}
-          items={related.mesmoCondominio.filter((p) => p.finalidade === 'venda')}
+          items={aVenda}
         />
         <RelatedListings
+          grade
+          limite={8}
           title={nomeCondominio ? `Imóveis para alugar no ${nomeCondominioSeo(nomeCondominio)}` : 'Imóveis para alugar neste condomínio'}
           items={related.mesmoCondominio.filter((p) => p.finalidade === 'aluguel')}
         />
-
-        <RelatedListings
-          title={`Imóveis ${property.finalidade === 'aluguel' ? 'para alugar' : 'à venda'} ${property.bairro ? `no ${property.bairro}` : 'nesta região'}`}
-          subtitle={faixaDePreco(related.precoReferencia)}
-          items={related.regiao}
-        />
-
-        <LocationCard
-          title={nomeCondominio || property.bairro || property.location.split(',')[0]}
-          subtitle={property.location}
-          mapsQuery={nomeCondominio ? `${nomeCondominio}, ${regiao}` : regiao}
-          approximate={!nomeCondominio}
-        />
+        {property.bairro && (
+          <RelatedListings
+            grade
+            limite={8}
+            title={`Imóveis ${property.finalidade === 'aluguel' ? 'para alugar' : 'à venda'} no ${property.bairro}`}
+            items={('mesmoBairro' in related && related.mesmoBairro) || []}
+          />
+        )}
+        <RelatedListings grade limite={8} title="Imóveis similares" subtitle={faixaDePreco(related.precoReferencia)} items={related.regiao} />
       </main>
 
       <Footer />
+      <EspacoBarra />
+      <BarraContatoFixa favoritoId={property.id} whats={whats} />
     </div>
   );
 }

@@ -15,11 +15,14 @@ type Props = {
   subtitle?: string;
   items: PropertyDetail[];
   emptyText?: string; // se vier, mostra a seção mesmo vazia
+  grade?: boolean; // grade (2 colunas no celular, 4 no computador) em vez da faixa que desliza
+  limite?: number;
 };
 
 // Faixa de cards (desliza para o lado) com imóveis relacionados — usada no fim
 // da página do imóvel e do condomínio.
-export default function RelatedListings({ title, subtitle, items, emptyText }: Props) {
+export default function RelatedListings({ title, subtitle, items, emptyText, grade = false, limite }: Props) {
+  items = limite ? items.slice(0, limite) : items;
   if (!items.length && !emptyText) return null;
   return (
     <section className="mt-10">
@@ -28,14 +31,14 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-[var(--text-muted)]">{emptyText}</p>
       ) : (
-        <div className="-mx-5 mt-4 md:mx-0">
-        <ScrollRow className="snap-x gap-4 px-5 pb-2 md:px-0">
+        <div className={grade ? 'mt-4' : '-mx-5 mt-4 md:mx-0'}>
+        <Faixa grade={grade}>
           {items.map((p) => {
             const badge = getStatusBadge(p.deliveryDate);
             const cover = p.photos?.[0];
             return (
-              <Link key={p.id} href={urlImovel(p)} className="group w-[230px] shrink-0 snap-start">
-                <div className="relative h-[160px] overflow-hidden rounded-2xl bg-[var(--card-img-bg)]">
+              <Link key={p.id} href={urlImovel(p)} className={`group ${grade ? 'min-w-0' : 'w-[230px] shrink-0 snap-start'}`}>
+                <div className={`relative overflow-hidden rounded-2xl bg-[var(--card-img-bg)] ${grade ? 'aspect-[4/3]' : 'h-[160px]'}`}>
                   {cover ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <ImagemCapa
@@ -74,10 +77,18 @@ export default function RelatedListings({ title, subtitle, items, emptyText }: P
               </Link>
             );
           })}
-        </ScrollRow>
+        </Faixa>
         </div>
       )}
     </section>
+  );
+}
+
+function Faixa({ grade, children }: { grade: boolean; children: React.ReactNode }) {
+  return grade ? (
+    <div className="grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-4">{children}</div>
+  ) : (
+    <ScrollRow className="snap-x gap-4 px-5 pb-2 md:px-0">{children}</ScrollRow>
   );
 }
 

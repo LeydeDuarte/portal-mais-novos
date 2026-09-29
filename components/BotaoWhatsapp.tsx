@@ -28,7 +28,7 @@ const IconeWhats = ({ size = 20 }: { size?: number }) => (
 // Botão "Falar com Leyde Duarte pelo WhatsApp": abre um balão pedindo o nome
 // (e o telefone, opcional), grava o contato em Painel → Interessados com o link
 // do anúncio e abre o WhatsApp já com a mensagem pronta.
-export default function BotaoWhatsapp({ ctx, variante = 'bloco' }: { ctx: WhatsappContexto; variante?: 'bloco' | 'flutuante' }) {
+export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx: WhatsappContexto; variante?: 'bloco' | 'flutuante' | 'barra'; rotulo?: string }) {
   const [aberto, setAberto] = useState(false);
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -74,7 +74,19 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco' }: { ctx: Whatsa
 
   return (
     <>
-      {variante === 'bloco' ? (
+      {variante === 'barra' ? (
+        // barra fixa do rodapé: "Fale comigo" ocupando o espaço, com o símbolo do WhatsApp
+        <button
+          type="button"
+          onClick={() => setAberto(true)}
+          className="flex h-[52px] flex-1 items-center justify-center gap-2.5 rounded-full bg-accent text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(37,124,255,0.28)] hover:brightness-95"
+        >
+          {rotulo ?? 'Fale comigo'}
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-[#25D366]">
+            <IconeWhats size={17} />
+          </span>
+        </button>
+      ) : variante === 'bloco' ? (
         <button
           type="button"
           onClick={() => setAberto(true)}
