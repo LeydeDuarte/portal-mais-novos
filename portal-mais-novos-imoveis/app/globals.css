@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --text: #14161a;
+  --text-muted: #5f6368;
+  --text-faint: #9aa0a6;
+  --border: #e6e8eb;
+  --pill-bg: #f3f4f6;
+  --pill-bg-hover: #e8eaed;
+  --card-img-bg: #eef0f3;
+  --overlay: rgba(20, 22, 26, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #121212;
+    --surface: #1a1a1a;
+    --text: #f3f4f6;
+    --text-muted: #a8abb1;
+    --text-faint: #75787e;
+    --border: #2a2a2a;
+    --pill-bg: #222222;
+    --pill-bg-hover: #2c2c2c;
+    --card-img-bg: #23252a;
+    --overlay: rgba(0, 0, 0, 0.4);
+  }
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+@keyframes video-sweep {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.video-playing {
+  background: linear-gradient(120deg, var(--card-img-bg) 20%, #dde1e7 45%, var(--card-img-bg) 70%);
+  background-size: 260% 260%;
+  animation: video-sweep 3.4s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.dot-pulse { animation: dot-pulse 1s ease-in-out infinite; }
+
+/* Fotos: sem menu "salvar imagem" no toque longo (iPhone) e sem arrastar */
+img {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Proposta de compra: ao imprimir (ou "Salvar como PDF"), só o documento aparece */
+@media print {
+  body.imprimindo-proposta * { visibility: hidden !important; }
+  body.imprimindo-proposta .documento-proposta,
+  body.imprimindo-proposta .documento-proposta * { visibility: visible !important; }
+  body.imprimindo-proposta .documento-proposta { position: absolute; left: 0; top: 0; width: 100%; max-width: none; padding: 0 !important; }
+  /* margens do PDF: brancas dos dois lados, em todas as páginas */
+  @page { size: A4; margin: 18mm 17mm 16mm 17mm; }
+  body.imprimindo-proposta { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* Feed: formato "alinhado" = todas as fotos no mesmo formato; item largo (2 colunas) = foto deitada */
+.feed-grade[data-modo='alinhado'] .feed-midia { height: auto !important; aspect-ratio: 4 / 5; }
+.feed-grade .feed-largo .feed-midia { height: auto !important; aspect-ratio: 16 / 10; }
+.feed-grade .feed-largo .inline-block { display: block; }
+
+/* Botão de formato do feed: pulsa até a pessoa experimentar pela primeira vez */
+@keyframes feed-pulso { 0% { box-shadow: 0 0 0 0 rgba(37, 124, 255, 0.55); } 70% { box-shadow: 0 0 0 12px rgba(37, 124, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(37, 124, 255, 0); } }
+@keyframes feed-balao { 0% { opacity: 0; transform: translateY(-4px); } 10%, 85% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-4px); } }
+.feed-pulso { animation: feed-pulso 1.8s ease-out 4; }
+.feed-balao { animation: feed-balao 7s ease forwards; }
+@keyframes feed-troca { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: scale(1); } }
+.feed-troca { animation: feed-troca 0.5s ease; }
+
+/* Destaque grande (2 colunas e 2 linhas): foto em pé, quase a tela toda no celular */
+.feed-grade .feed-grande .feed-midia { aspect-ratio: 4 / 5 !important; height: auto !important; }
+
+/* Cards surgem suavemente ao rolar (ativado por SurgirAoRolar) */
+.js-surgir .surgir { transition: opacity 0.5s ease, transform 0.5s ease; }
+.js-surgir .surgir:not(.visto) { opacity: 0; transform: translateY(16px); }
+
+/* Esqueleto enquanto a próxima leva de cards carrega */
+@keyframes brilho { 0% { background-position: -300px 0; } 100% { background-position: 300px 0; } }
+.esqueleto {
+  background: linear-gradient(90deg, var(--pill-bg) 0px, var(--pill-bg-hover) 120px, var(--pill-bg) 240px);
+  background-size: 600px 100%;
+  animation: brilho 1.3s linear infinite;
+}
