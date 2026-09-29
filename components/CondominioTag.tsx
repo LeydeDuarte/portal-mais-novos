@@ -15,10 +15,7 @@ export default function CondominioTag({ nome, grande = false }: { nome: string; 
         <path d="M3 21h18" />
         <path d="M8 7h4M8 11h4M8 15h4" />
       </svg>
-      <span className="truncate">
-        <span className="font-normal text-[var(--text-muted)]">Condomínio </span>
-        {nome}
-      </span>
+      <span className="truncate">{nome}</span>
     </span>
   );
 }
