@@ -2,6 +2,10 @@
 // tudo vem sempre do servidor (anúncios mudam o tempo todo). Sem internet,
 // mostra um aviso simples em vez da tela de erro do navegador.
 self.addEventListener('install', () => self.skipWaiting());
+// o botão "Atualizar versão" pede para a versão nova assumir na hora
+self.addEventListener('message', (e) => {
+  if (e.data === 'pular-espera') self.skipWaiting();
+});
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', (e) => {
   if (e.request.mode !== 'navigate') return;

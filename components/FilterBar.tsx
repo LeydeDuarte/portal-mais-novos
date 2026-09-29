@@ -156,17 +156,27 @@ export default function FilterBar({ filters, onChange }: Props) {
           ))}
         </div>
 
-        {/* Status logo ao lado do primeiro item (Todos / Lançamentos) */}
-        <select className={`${selectClass} ${filters.situacao !== 'todas' ? 'ring-2 ring-ink' : ''}`} style={selectStyle} value={filters.situacao} onChange={(e) => set('situacao', e.target.value as FilterState['situacao'])}>
-          <option value="todas">Status</option>
-          <option value="breve_lancamento">Breve lançamento</option>
-          <option value="lancamento">Lançamento</option>
-          <option value="obras">Obras</option>
-          <option value="novo">Pronto novo (até 5 anos)</option>
-          <option value="seminovo">Seminovo (5 a 15 anos)</option>
-          <option value="usado">Usado (15 a 25 anos)</option>
-          <option value="antigo">Antigo (+25 anos)</option>
-        </select>
+        {/* Tags de status já escritas, ao lado de Todos / Lançamentos */}
+        {(
+          [
+            ['breve_lancamento', 'Breve lançamento'],
+            ['lancamento', 'Lançamento'],
+            ['obras', 'Obras'],
+            ['novo', 'Pronto novo'],
+            ['seminovo', 'Seminovo'],
+            ['usado', 'Usado'],
+            ['antigo', 'Antigo']
+          ] as const
+        ).map(([v, l]) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => set('situacao', filters.situacao === v ? 'todas' : v)}
+            className={`${pillClass} ${filters.situacao === v ? 'bg-ink text-white' : 'bg-[var(--pill-bg)] hover:bg-[var(--pill-bg-hover)]'}`}
+          >
+            {l}
+          </button>
+        ))}
 
         {/* Balões de local (exatos) e de palavra-chave — cada um sai com o seu ✕ */}
         {filters.locais.map((l) => (
@@ -208,60 +218,6 @@ export default function FilterBar({ filters, onChange }: Props) {
           </button>
         )}
 
-        <span className="mx-1 h-6 w-px shrink-0 bg-[var(--border)]" aria-hidden />
-
-        <button type="button" onClick={(e) => abrir('tipo', e)} className={`${pillClass} ${on(filters.tipos.length > 0)}`} aria-expanded={painel === 'tipo'}>
-          {tipoLabel} ▾
-        </button>
-        <button type="button" onClick={(e) => abrir('preco', e)} className={`${pillClass} ${on(!!(filters.precoMin || filters.precoMax))}`} aria-expanded={painel === 'preco'}>
-          {rangeLabel(filters.precoMin, filters.precoMax, fmtPreco, 'Preço')} ▾
-        </button>
-        <button type="button" onClick={(e) => abrir('area', e)} className={`${pillClass} ${on(!!(filters.areaMin || filters.areaMax))}`} aria-expanded={painel === 'area'}>
-          {rangeLabel(filters.areaMin, filters.areaMax, fmtArea, 'Metragem')} ▾
-        </button>
-
-        <select
-          className={selectClass}
-          style={selectStyle}
-          value={String(filters.quartosMin)}
-          onChange={(e) => set('quartosMin', (e.target.value === 'todas' ? 'todas' : Number(e.target.value)) as FilterState['quartosMin'])}
-        >
-          <option value="todas">Quartos</option>
-          <option value="1">1+ quarto</option>
-          <option value="2">2+ quartos</option>
-          <option value="3">3+ quartos</option>
-          <option value="4">4+ quartos</option>
-        </select>
-
-        <select
-          className={selectClass}
-          style={selectStyle}
-          value={String(filters.vagasMin)}
-          onChange={(e) => set('vagasMin', (e.target.value === 'todas' ? 'todas' : Number(e.target.value)) as FilterState['vagasMin'])}
-        >
-          <option value="todas">Vagas</option>
-          <option value="1">1+ vaga</option>
-          <option value="2">2+ vagas</option>
-          <option value="3">3+ vagas</option>
-        </select>
-
-        <button type="button" onClick={(e) => abrir('ano', e)} className={`${pillClass} ${on(!!(filters.anoMin || filters.anoMax))}`} aria-expanded={painel === 'ano'}>
-          {filters.anoMin && filters.anoMax && filters.anoMin === filters.anoMax
-            ? `Entrega em ${filters.anoMin}`
-            : rangeLabel(filters.anoMin, filters.anoMax, fmtAno, 'Ano de entrega').replace('A partir de', 'Entrega desde').replace('Até', 'Entrega até')}{' '}
-          ▾
-        </button>
-
-        <select className={selectClass} style={selectStyle} value={filters.finalidade} onChange={(e) => set('finalidade', e.target.value as FilterState['finalidade'])}>
-          <option value="todas">Comprar ou alugar</option>
-          <option value="venda">Comprar</option>
-          <option value="aluguel">Alugar</option>
-        </select>
-
-        <select className={selectClass} style={selectStyle} value={filters.aceitaTemporada} onChange={(e) => set('aceitaTemporada', e.target.value as FilterState['aceitaTemporada'])}>
-          <option value="todas">Aceita temporada</option>
-          <option value="sim">Só com temporada</option>
-        </select>
       </ScrollRow>
 
       {painel && (

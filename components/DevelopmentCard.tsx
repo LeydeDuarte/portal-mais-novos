@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Caracteristica, IconeCama, IconeMetragem } from './IconesImovel';
 import Visualizacoes from '@/components/Visualizacoes';
 import AnunciosBadge from '@/components/AnunciosBadge';
 import ImagemCapa from '@/components/ImagemCapa';
@@ -41,6 +42,21 @@ export default function DevelopmentCard({ development, prioridade = false }: { d
     development.areaMax != null ? Math.round(development.areaMax) : null,
     ' m²'
   );
+  // Quartos com a caminha: "4", "2 e 3" ou "2 a 4"; metragens com a seta: "50 a 239 m²"
+  const qMin = development.quartosMin;
+  const qMax = development.quartosMax ?? qMin;
+  const quartosTxt = qMin == null ? null : qMin === qMax ? `${qMin}` : qMax === qMin + 1 ? `${qMin} e ${qMax}` : `${qMin} a ${qMax}`;
+  const aMin = development.areaMin != null ? Math.round(development.areaMin) : null;
+  const aMax = development.areaMax != null ? Math.round(development.areaMax) : aMin;
+  const areaTxt = aMin == null ? null : aMin === aMax ? `${aMin} m²` : `${aMin} a ${aMax} m²`;
+  // Concepção: só os nomes, no máximo 2 empresas no card (as demais na página do condomínio)
+  const empresas = (development.concepcao ?? '').split(' · ').filter(Boolean).slice(0, 2).join(' · ');
+  const icones = (quartosTxt || areaTxt) && (
+    <div className="mt-1 flex flex-wrap items-center gap-3">
+      <Caracteristica icone={<IconeCama />} valor={quartosTxt} titulo="Quartos" />
+      <Caracteristica icone={<IconeMetragem />} valor={areaTxt} titulo="Metragens" />
+    </div>
+  );
 
   // Sem foto: card compacto, só com as informações (não mostra espaço de foto vazio)
   if (!cover) {
@@ -59,11 +75,12 @@ export default function DevelopmentCard({ development, prioridade = false }: { d
           </div>
           <div className="mt-2.5 font-serif text-base font-semibold leading-tight md:text-lg">{development.name}</div>
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">{development.location}</div>
-          {development.concepcao && <div className="mt-0.5 line-clamp-1 text-[11px] text-[var(--text-faint)]">Concepção: {development.concepcao}</div>}
+          {empresas && <div className="mt-0.5 line-clamp-1 text-[11px] text-[var(--text-faint)]">{empresas}</div>}
+          {icones}
           {tipos.length > 0 && <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-accent">{tipos.slice(0, 4).join(' · ')}</div>}
           <div className="mt-1 text-xs text-[var(--text-muted)]">
             {development.unitsCount > 0
-              ? [development.minPrice ? `A partir de ${formatBRL(development.minPrice)}` : null, quartos, area].filter(Boolean).join(' · ')
+              ? [development.minPrice ? `A partir de ${formatBRL(development.minPrice)}` : null, `${development.unitsCount} tipologia(s)`].filter(Boolean).join(' · ')
               : 'Sem anúncios no momento. Registre seu interesse'}
           </div>
           <span className="mt-2 inline-block text-xs font-semibold text-accent">Ver condomínio →</span>
@@ -114,12 +131,9 @@ export default function DevelopmentCard({ development, prioridade = false }: { d
             {development.minPrice ? `A partir de ${formatBRL(development.minPrice)}` : 'Preço sob consulta'}
           </div>
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">{development.location}</div>
-          {development.concepcao && <div className="mt-0.5 line-clamp-1 text-[11px] text-[var(--text-faint)]">Concepção: {development.concepcao}</div>}
-          {(quartos || area || development.unitsCount > 0) && (
-            <div className="mt-0.5 text-[11px] text-[var(--text-muted)] md:text-xs">
-              {[quartos, area, development.unitsCount > 0 ? `${development.unitsCount} tipologia(s)` : null].filter(Boolean).join(' · ')}
-            </div>
-          )}
+          {empresas && <div className="mt-0.5 line-clamp-1 text-[11px] text-[var(--text-faint)]">{empresas}</div>}
+          {icones}
+          {development.unitsCount > 0 && <div className="mt-0.5 text-[11px] text-[var(--text-muted)] md:text-xs">{development.unitsCount} tipologia(s)</div>}
         </div>
       </Link>
     </div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Header from './Header';
 import FilterBar from './FilterBar';
+import PainelFiltros from './PainelFiltros';
 import MasonryFeed, { type FeedInicial } from './MasonryFeed';
 import Footer from './Footer';
 import SearchBox from './SearchBox';
@@ -70,7 +71,12 @@ export default function Home({ initialModo = 'todos', initialQuery = '', inicial
         }
       />
       <FilterBar filters={filters} onChange={setFilters} />
-      <MasonryFeed filters={filters} inicial={inicial} />
+      <div className="flex">
+        <PainelFiltros filters={filters} onChange={setFilters} />
+        <div className="min-w-0 flex-1">
+          <MasonryFeed filters={filters} inicial={inicial} />
+        </div>
+      </div>
       <Footer />
     </div>
   );

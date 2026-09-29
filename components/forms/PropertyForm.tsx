@@ -10,6 +10,8 @@ import VideoFormato, { pareceVertical } from '@/components/forms/VideoFormato';
 import DescriptionEditor from '@/components/forms/DescriptionEditor';
 import { listCondominios, type CondominioResumo, type PropertyFields, type PropertyEditData } from '@/lib/actions';
 import ProprietariosPicker from './ProprietariosPicker';
+import { listarCorretoresEquipe } from '@/lib/actions-perfil';
+import { useStaffSession } from '@/lib/use-staff-session';
 import { lerProprietariosDoImovel } from '@/lib/actions-proprietarios';
 import type { ProprietarioDoImovel } from '@/lib/proprietarios';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, ehCasa, type TipoUnidade } from '@/lib/tipologias';
@@ -135,6 +137,13 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [proprietarios, setProprietarios] = useState<ProprietarioDoImovel[]>([]);
+  const { staff } = useStaffSession();
+  const gestor = staff?.role === 'admin' || staff?.role === 'analista';
+  const [corretores, setCorretores] = useState<{ email: string; nome: string }[]>([]);
+  const [responsavelEmail, setResponsavelEmail] = useState(initial?.corretorEmail ?? '');
+  useEffect(() => {
+    if (gestor) listarCorretoresEquipe().then(setCorretores).catch(() => {});
+  }, [gestor]);
   useEffect(() => {
     if (initial?.id) lerProprietariosDoImovel(initial.id).then(setProprietarios).catch(() => {});
   }, [initial?.id]);
@@ -211,7 +220,8 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
         iptuMensal: Number(v.iptuMensal.replace(/\D/g, '')) || undefined,
         complemento: v.complemento || undefined,
         obsInterna: v.obsInterna || undefined,
-        proprietarios: proprietarios.map((p) => ({ proprietarioId: p.id, principal: p.principal }))
+        proprietarios: proprietarios.map((p) => ({ proprietarioId: p.id, principal: p.principal })),
+        corretorResponsavel: gestor && responsavelEmail ? responsavelEmail : undefined
       });
     } catch {
       setErro('Não foi possível salvar agora. Confira sua conexão (e se a sessão do painel não expirou) e tente de novo.');
@@ -342,6 +352,19 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
           <textarea className={`${inputClass} min-h-[70px]`} value={v.obsInterna} onChange={(e) => set('obsInterna', e.target.value)} placeholder="Chaves na portaria, aceita permuta, melhor horário de visita…" />
         </div>
         <ProprietariosPicker value={proprietarios} onChange={setProprietarios} />
+        {gestor && corretores.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-[var(--text-muted)]">Corretor responsável (aparece no anúncio com foto e CRECI)</label>
+            <select className={inputClass} value={responsavelEmail} onChange={(e) => setResponsavelEmail(e.target.value)}>
+              <option value="">Eu mesmo(a)</option>
+              {corretores.map((c) => (
+                <option key={c.email} value={c.email}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <DescriptionEditor

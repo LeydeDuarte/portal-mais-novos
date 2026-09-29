@@ -8,6 +8,7 @@ import ImagemCapa from '@/components/ImagemCapa';
 import { altFoto } from '@/lib/seo';
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
+import CorretorSelo from './CorretorSelo';
 import { Caracteristica, IconeCama, IconeCarro, IconeChuveiro, IconeMetragem, numeroDe } from './IconesImovel';
 import type { Property } from '@/lib/mock-properties';
 import { useVideoAutoplay } from '@/lib/video-rotation';
@@ -187,6 +188,11 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
             <Caracteristica icone={<IconeCarro />} valor={numeroDe(property.parking)} titulo="Vagas" />
             <Caracteristica icone={<IconeMetragem />} valor={property.areaValue ? `${property.areaValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} m²` : null} titulo="Área privativa" />
           </div>
+          {property.corretor && (
+            <div className="mt-2">
+              <CorretorSelo c={property.corretor} />
+            </div>
+          )}
         </div>
       </Link>
     </div>

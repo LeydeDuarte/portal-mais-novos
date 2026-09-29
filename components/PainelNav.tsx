@@ -22,7 +22,8 @@ const LINKS: { href: string; label: string; admin?: boolean; gestor?: boolean }[
   { href: '/dashboard/cadastro-ia', label: 'Cadastro IA' },
   { href: '/dashboard/feed-especiais', label: 'Depoimentos e destaques', gestor: true },
   { href: '/dashboard/jetimob', label: 'Migração Jetimob', admin: true },
-  { href: '/dashboard/equipe', label: 'Equipe', admin: true }
+  { href: '/dashboard/equipe', label: 'Equipe', admin: true },
+  { href: '/dashboard/perfil', label: 'Meu perfil' }
 ];
 
 // Topo do painel (fixo): marca + atalhos à esquerda, pessoa e Sair à direita;
@@ -41,9 +42,13 @@ export default function PainelNav() {
   return (
     <div className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--bg)]/85">
       <div className="mx-auto flex h-16 max-w-[1680px] items-center gap-3 px-4 md:px-6">
-        <Link href="/dashboard" className="flex items-center gap-2.5" aria-label="Início do painel">
-          <Logo tipo="simbolo" altura={28} />
-          <span className="hidden rounded-full bg-[var(--pill-bg)] px-2.5 py-1 text-[11px] font-bold tracking-widest md:inline-flex">PAINEL</span>
+        {/* a logo leva para o SITE; a etiqueta PAINEL leva ao início do painel */}
+        <a href={SITE_URL} className="flex items-center" aria-label="Ir para o site Mais Novos Imóveis">
+          <Logo tipo="simbolo" altura={28} className="md:hidden" />
+          <Logo tipo="completo" altura={34} className="hidden md:block" />
+        </a>
+        <Link href="/dashboard" className="hidden rounded-full bg-[var(--pill-bg)] px-2.5 py-1 text-[11px] font-bold tracking-widest hover:bg-[var(--pill-bg-hover)] md:inline-flex">
+          PAINEL
         </Link>
         <Link
           href="/dashboard/imoveis/novo"
@@ -56,13 +61,13 @@ export default function PainelNav() {
             Ver site ↗
           </a>
           {staff && (
-            <div className="hidden items-center gap-2 rounded-full bg-[var(--pill-bg)] py-1 pl-1 pr-3 sm:flex">
+            <Link href="/dashboard/perfil" title="Meu perfil" className="hidden items-center gap-2 rounded-full bg-[var(--pill-bg)] py-1 pl-1 pr-3 hover:bg-[var(--pill-bg-hover)] sm:flex">
               <span className="grid h-8 w-8 place-items-center rounded-full bg-accent text-[13px] font-bold text-white">{staff.name.slice(0, 1).toUpperCase()}</span>
               <span className="leading-tight">
                 <span className="block max-w-[140px] truncate text-[13px] font-semibold">{staff.name}</span>
-                <span className="block text-[10.5px] text-[var(--text-muted)]">{ROLE_LABEL[staff.role] ?? staff.role}</span>
+                <span className="block text-[10.5px] text-[var(--text-muted)]">{ROLE_LABEL[staff.role] ?? staff.role} · meu perfil</span>
               </span>
-            </div>
+            </Link>
           )}
           {staff && (
             <button

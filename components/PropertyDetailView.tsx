@@ -9,6 +9,7 @@ import RichText from '@/components/RichText';
 import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
+import CorretorSelo from '@/components/CorretorSelo';
 import { Caracteristica, IconeCama, IconeCarro, IconeChuveiro, IconeMetragem, numeroDe } from '@/components/IconesImovel';
 import ContarVisita from '@/components/ContarVisita';
 import CondominioTag from '@/components/CondominioTag';
@@ -222,6 +223,12 @@ export default async function PropertyDetailView({
             </div>
 
             <div className="md:sticky md:top-24">
+              {property.corretor && (
+                <div className="mb-4 rounded-2xl border border-[var(--border)] p-4">
+                  <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[var(--text-faint)]">Corretor responsável</div>
+                  <CorretorSelo c={property.corretor} grande />
+                </div>
+              )}
               <ContatoLateral
                 titulo="Falar com um corretor"
                 condominio={nomeCondominio || titulo}

@@ -57,7 +57,7 @@ export default function FeedGrid({ itens, modo }: { itens: ItemGrade[]; modo: 'm
     <div
       ref={ref}
       data-modo={modo}
-      className={`feed-grade grid grid-flow-row-dense grid-cols-2 gap-x-2.5 px-2.5 pb-16 pt-2.5 sm:grid-cols-3 sm:gap-x-3 sm:px-5 md:grid-cols-4 md:gap-x-4 md:px-7 xl:grid-cols-5 xl:gap-x-[18px] 2xl:grid-cols-6 ${
+      className={`feed-grade grid grid-flow-row-dense grid-cols-2 gap-x-2.5 px-2.5 pb-16 pt-2.5 sm:grid-cols-[repeat(auto-fill,minmax(210px,1fr))] sm:gap-x-3 sm:px-5 md:gap-x-4 md:px-6 xl:gap-x-[18px] ${
         modo === 'masonry' ? 'auto-rows-[8px]' : 'items-start'
       }`}
     >

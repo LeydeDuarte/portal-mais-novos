@@ -31,7 +31,11 @@ const securityHeaders = [
 ];
 
 /** @type {import('next').NextConfig} */
+// Versão desta publicação (o app compara com a do servidor e oferece "Atualizar versão")
+const VERSAO = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || String(Date.now());
+
 const nextConfig = {
+  env: { NEXT_PUBLIC_VERSAO: VERSAO },
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
@@ -45,6 +49,9 @@ const nextConfig = {
       // painel e APIs nunca em cache compartilhado nem no Google
       { source: '/dashboard/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }, { key: 'Cache-Control', value: 'private, no-store' }] },
       { source: '/api/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex' }] },
+      // o app sempre pega o service worker e o manifesto mais novos
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache, max-age=0' }] },
+      { source: '/manifest.webmanifest', headers: [{ key: 'Cache-Control', value: 'no-cache, max-age=0' }] },
       { source: '/icons/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
       { source: '/pdfjs/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] }
     ];

@@ -34,6 +34,7 @@ export type Property = {
   bairro?: string;
   uf?: string;
   slug?: string;
+  corretor?: { nome: string; foto: string | null; creci: string | null }; // responsável (público)
   areaTotal?: number;
   areaLote?: number;
   valorCondominio?: number;

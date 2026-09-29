@@ -7,6 +7,7 @@ import { Poppins, Inter } from 'next/font/google';
 import './globals.css';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
 import ProtecaoImagens from '@/components/ProtecaoImagens';
+import AtualizarVersao from '@/components/AtualizarVersao';
 import { GtmHead, GtmBody } from '@/components/GoogleTagManager';
 
 // Nunca reaproveitar respostas antigas do banco em nenhuma página
@@ -70,6 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans antialiased">
         {!equipe && <GtmBody />}
         <ProtecaoImagens />
+        <AtualizarVersao />
         {equipe && <RegistrarApp />}
         {children}
       </body>

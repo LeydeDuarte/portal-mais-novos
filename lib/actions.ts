@@ -22,6 +22,7 @@ import { depoimentosAtivos, destaquesAtivos, hashTexto } from './especiais';
 import { MESES, FASES_EXIGEM_CONCEPCAO, getStatusBucket } from './classification';
 import { gravarConcepcao, resolverEmpresaImport, acrescentarConcepcao } from './empresas';
 import { gravarProprietariosDoImovel } from './proprietarios';
+import { corretoresPublicos } from './corretores';
 import type { EmpresaPlanilha } from './planilha-condominios';
 import type { EmpresaNaConcepcao } from './empresas-tipos';
 import type { DepoimentoCard, DestaqueCard } from './especiais-tipos';
@@ -427,7 +428,9 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean,
     propIds.length ? query<PropertyRow>('select * from properties where id = any($1::text[])', [propIds]) : Promise.resolve([]),
     devIds.length ? getDevelopmentCards(devIds) : Promise.resolve([])
   ]);
-  const propMap = new Map(propRows.map((r) => [r.id, mapPropertyRow(r)]));
+  // corretor responsável no card: foto, nome e CRECI (nunca o e-mail)
+  const corretores = await corretoresPublicos(propRows.map((r) => r.corretor_email));
+  const propMap = new Map(propRows.map((r) => [r.id, { ...mapPropertyRow(r), corretor: corretores.get((r.corretor_email ?? '').toLowerCase()) }]));
   const devMap = new Map(devCards.map((d) => [d.id, d]));
 
   const items: FeedItem[] = [];
@@ -589,7 +592,8 @@ export async function getPropertyById(id: string): Promise<PropertyDetail | null
   const r = rows[0];
   if (!r) return null;
   if (r.visibilidade === 'privado' && !await currentStaff()) return null;
-  return mapPropertyRow(r);
+  const c = await corretoresPublicos([r.corretor_email]);
+  return { ...mapPropertyRow(r), corretor: c.get((r.corretor_email ?? '').toLowerCase()) };
 }
 
 // Condomínio em rascunho só aparece para quem está logado no painel
@@ -773,6 +777,7 @@ export type CreatePropertyInput = {
   complemento?: string; // nº da unidade/apto: nunca aparece no site
   obsInterna?: string; // observação só do painel
   proprietarios?: { proprietarioId: string; principal: boolean }[]; // undefined = não mexe
+  corretorResponsavel?: string; // e-mail: admin/analista escolhe quem aparece no anúncio
 };
 export type PropertyFields = Omit<CreatePropertyInput, 'id' | 'corretorEmail' | 'isTipologia'>;
 
@@ -830,13 +835,20 @@ const PROPERTY_COLS =
   'titulo, tipo_unidade, finalidade, delivery_date, price_value, price_period, location, quartos, vagas, banheiros, escaninhos, area, video, video_url, aceita_temporada, description, amenities, empreendimento_id, photos, cep, logradouro, bairro, cidade, uf, condominio, video_vertical, plantas, visibilidade, area_lote, valor_condominio, iptu_mensal, complemento, obs_interna, area_total';
 const PROPERTY_CASTS = ['', '', '', '::date', '', '', '', '', '', '', '', '', '', '', '', '', '::jsonb', '', '::jsonb', '', '', '', '', '', '', '', '::jsonb', '', '', '', '', '', '', ''];
 
+/** Corretor responsável: admin/analista pode escolher alguém da equipe; os demais ficam como responsáveis */
+async function responsavel(staff: StaffSessionPayload, escolhido?: string): Promise<string> {
+  if (!escolhido || !veTudo(staff.role)) return staff.email;
+  const r = await query<{ email: string }>('select email from staff_users where lower(email) = lower($1)', [escolhido]);
+  return r[0]?.email ?? staff.email;
+}
+
 export async function createProperty(input: CreatePropertyInput): Promise<void> {
   const staff = await requireStaff();
   const values = propertyValues(input);
   const placeholders = values.map((_, i) => `$${i + 4}${PROPERTY_CASTS[i]}`).join(',');
   await query(
     `insert into properties (id, corretor_email, is_tipologia, match_score, ${PROPERTY_COLS}) values ($1, $2, $3, 50, ${placeholders})`,
-    [input.id, staff.email, !!input.isTipologia, ...values]
+    [input.id, await responsavel(staff, input.corretorResponsavel), !!input.isTipologia, ...values]
   );
   if (input.proprietarios) await gravarProprietariosDoImovel(input.id, input.proprietarios);
   if (!input.isTipologia) await avisarInteressados(input.id).catch((err) => console.error('Aviso a interessados falhou', err));
@@ -851,6 +863,7 @@ export async function updateProperty(id: string, input: PropertyFields): Promise
     .map((col, i) => `${col} = $${i + 2}${PROPERTY_CASTS[i]}`)
     .join(', ');
   await query(`update properties set ${sets} where id = $1`, [id, ...values]);
+  if (input.corretorResponsavel && veTudo(staff.role)) await query('update properties set corretor_email = $2 where id = $1', [id, await responsavel(staff, input.corretorResponsavel)]);
   if (input.proprietarios) await gravarProprietariosDoImovel(id, input.proprietarios);
   await miniaturaDe('properties', id).catch(() => {});
 }
