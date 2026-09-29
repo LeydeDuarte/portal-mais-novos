@@ -15,7 +15,7 @@ import ContarVisita from '@/components/ContarVisita';
 import CondominioTag from '@/components/CondominioTag';
 import Trilha from '@/components/Trilha';
 import BarraEquipe from '@/components/BarraEquipe';
-import { altFoto, trilhaDoImovel, tituloSeoImovel } from '@/lib/seo';
+import { altFoto, nomeCondominioSeo, trilhaDoImovel, tituloSeoImovel } from '@/lib/seo';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getAveragePricePerM2, formatPricePerM2, type PropertyDetail } from '@/lib/property-details';
@@ -93,7 +93,7 @@ export default async function PropertyDetailView({
 
       <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
         <BarraEquipe tipo="imovel" id={property.id} />
-        <Trilha itens={trilhaDoImovel({ uf: property.uf, cidade: property.cidade, bairro: property.bairro })} />
+        <Trilha itens={trilhaDoImovel({ uf: property.uf, cidade: property.cidade, bairro: property.bairro }, development && development.status !== 'rascunho' ? development : null)} />
 
         {avisoPrivado && (
           <div className="mb-5 flex items-start gap-2 rounded-xl border border-[var(--border)] bg-[var(--pill-bg)] p-4 text-sm">
@@ -243,16 +243,16 @@ export default async function PropertyDetailView({
           </aside>
         </div>
         <RelatedListings
-          title={nomeCondominio ? `Outros à venda no ${nomeCondominio}` : 'Outros à venda neste condomínio'}
+          title={nomeCondominio ? `Outros imóveis à venda no ${nomeCondominioSeo(nomeCondominio)}` : 'Outros imóveis à venda neste condomínio'}
           items={related.mesmoCondominio.filter((p) => p.finalidade === 'venda')}
         />
         <RelatedListings
-          title={nomeCondominio ? `Para alugar no ${nomeCondominio}` : 'Para alugar neste condomínio'}
+          title={nomeCondominio ? `Imóveis para alugar no ${nomeCondominioSeo(nomeCondominio)}` : 'Imóveis para alugar neste condomínio'}
           items={related.mesmoCondominio.filter((p) => p.finalidade === 'aluguel')}
         />
 
         <RelatedListings
-          title={`Imóveis ${property.finalidade === 'aluguel' ? 'para alugar' : 'à venda'} nesta região`}
+          title={`Imóveis ${property.finalidade === 'aluguel' ? 'para alugar' : 'à venda'} ${property.bairro ? `no ${property.bairro}` : 'nesta região'}`}
           subtitle={faixaDePreco(related.precoReferencia)}
           items={related.regiao}
         />

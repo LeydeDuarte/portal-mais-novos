@@ -1,3 +1,5 @@
+import { imoveisDaEmpresa, nomeCondominioSeo } from '@/lib/seo';
+import { urlCondominio } from '@/lib/urls';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -60,9 +62,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const desc = `${nome}: ${e.totalEmpreendimentos ?? 0} empreendimento(s)${e.municipio ? `, sede em ${e.municipio}/${e.uf}` : ''}. ${
     idade ? `Empresa com ${idade.texto} de mercado` : 'Construtora e incorporadora'
   }. Veja lançamentos, obras e prontos do portfólio.`;
+  // Padrão de busca: "Imóveis à venda da Incorporadora X"
+  const titulo = imoveisDaEmpresa(nome);
   return {
-    title: `${nome}: empreendimentos e condomínios`,
-    description: desc.slice(0, 160),
+    title: `${titulo}: lançamentos, obras e prontos`.slice(0, 95),
+    description: `${titulo}. ${desc}`.slice(0, 160),
     alternates: { canonical: `${SITE_URL}/empresa/${e.slug}` },
     openGraph: { title: `${nome} | ${SITE_NAME}`, description: desc.slice(0, 200), url: `${SITE_URL}/empresa/${e.slug}`, siteName: SITE_NAME, locale: 'pt_BR', type: 'website' }
   };
@@ -95,15 +99,48 @@ export default async function EmpresaPage({ params, searchParams }: Props) {
       <JsonLd
         data={{
           '@context': 'https://schema.org',
-          '@type': 'Organization',
-          name: nome,
-          ...(e.anoFundacao ? { foundingDate: String(e.anoFundacao) } : e.dataInicio ? { foundingDate: e.dataInicio } : {}),
-          ...(e.municipio ? { address: { '@type': 'PostalAddress', addressLocality: e.municipio, addressRegion: e.uf, addressCountry: 'BR' } } : {}),
-          url: `${SITE_URL}/empresa/${e.slug}`
+          '@graph': [
+            {
+              '@type': 'Organization',
+              '@id': `${SITE_URL}/empresa/${e.slug}#empresa`,
+              name: nome,
+              ...(e.anoFundacao ? { foundingDate: String(e.anoFundacao) } : e.dataInicio ? { foundingDate: e.dataInicio } : {}),
+              ...(e.municipio ? { address: { '@type': 'PostalAddress', addressLocality: e.municipio, addressRegion: e.uf, addressCountry: 'BR' } } : {}),
+              url: `${SITE_URL}/empresa/${e.slug}`
+            },
+            {
+              // a página: "Imóveis à venda da Incorporadora X", com a lista dos empreendimentos
+              '@type': 'CollectionPage',
+              '@id': `${SITE_URL}/empresa/${e.slug}#pagina`,
+              name: imoveisDaEmpresa(nome),
+              url: `${SITE_URL}/empresa/${e.slug}`,
+              inLanguage: 'pt-BR',
+              about: { '@id': `${SITE_URL}/empresa/${e.slug}#empresa` },
+              mainEntity: {
+                '@type': 'ItemList',
+                name: imoveisDaEmpresa(nome),
+                numberOfItems: total,
+                itemListElement: cards.map((c, i) => ({
+                  '@type': 'ListItem',
+                  position: (pagina - 1) * POR_PAGINA + i + 1,
+                  url: `${SITE_URL}${urlCondominio(c)}`,
+                  name: `Imóveis à venda no ${nomeCondominioSeo(c.name)}`
+                }))
+              }
+            },
+            {
+              '@type': 'BreadcrumbList',
+              itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'Início', item: SITE_URL },
+                { '@type': 'ListItem', position: 2, name: 'Construtoras e incorporadoras', item: `${SITE_URL}/empresas` },
+                { '@type': 'ListItem', position: 3, name: imoveisDaEmpresa(nome), item: `${SITE_URL}/empresa/${e.slug}` }
+              ]
+            }
+          ]
         }}
       />
       <main className="mx-auto w-full max-w-6xl px-5 py-8 md:px-8">
-        <Trilha itens={[{ nome: 'Início', url: SITE_URL }, { nome: 'Construtoras e incorporadoras', url: `${SITE_URL}/empresas` }, { nome, url: `${SITE_URL}/empresa/${e.slug}` }]} />
+        <Trilha itens={[{ nome: 'Início', url: SITE_URL }, { nome: 'Construtoras e incorporadoras', url: `${SITE_URL}/empresas` }, { nome: imoveisDaEmpresa(nome), url: `${SITE_URL}/empresa/${e.slug}` }]} />
 
         <section className="mt-4 rounded-2xl border border-[var(--border)] p-6">
           <h1 className={`font-serif text-3xl font-semibold ${ativa ? '' : 'text-[var(--text-faint)]'}`}>{nome}</h1>
@@ -156,7 +193,7 @@ export default async function EmpresaPage({ params, searchParams }: Props) {
           )}
         </section>
 
-        <h2 className="mt-10 font-serif text-2xl font-semibold">Empreendimentos e condomínios</h2>
+        <h2 className="mt-10 font-serif text-2xl font-semibold">{imoveisDaEmpresa(nome)}</h2>
         <form method="get" className="mt-4 flex flex-wrap items-center gap-2">
           <input name="q" defaultValue={filtros.q ?? ''} placeholder="Nome do empreendimento" className={`${sel} min-w-[200px] flex-1`} />
           {cidades.length > 1 && (

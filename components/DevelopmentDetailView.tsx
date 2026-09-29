@@ -24,7 +24,7 @@ import { Caracteristica, IconeCama, IconeMetragem } from '@/components/IconesImo
 import ConcepcaoBloco from '@/components/ConcepcaoBloco';
 import { concepcaoDe } from '@/lib/empresas';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
-import { trilhaDoImovel } from '@/lib/seo';
+import { nomeCondominioSeo, trilhaDoImovel } from '@/lib/seo';
 import { urlImovel, urlCondominio } from '@/lib/urls';
 
 function formatBRL(v: number): string {
@@ -87,7 +87,7 @@ export default async function DevelopmentDetailView({ development }: { developme
 
       <main className="mx-auto w-full max-w-5xl px-5 py-8 md:px-8">
         <BarraEquipe tipo="condominio" id={development.id} />
-        <Trilha itens={trilhaDoImovel({ uf: development.uf, cidade: development.cidade, bairro: development.bairro })} />
+        <Trilha itens={trilhaDoImovel({ uf: development.uf, cidade: development.cidade, bairro: development.bairro }, development)} />
 
         {development.status === 'rascunho' && (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
@@ -289,9 +289,9 @@ export default async function DevelopmentDetailView({ development }: { developme
         )}
 
         <RelatedListings
-          title={`À venda no ${development.name}`}
+          title={`Imóveis à venda no ${nomeCondominioSeo(development.name)}`}
           items={related.mesmoCondominio.filter((p) => p.finalidade === 'venda')}
-          emptyText={vendaDireta ? `Nenhum anúncio particular no ${development.name} no momento. Fale conosco para ver as unidades direto com a incorporadora.` : `Nenhum imóvel à venda no ${development.name} no momento — registre seu interesse abaixo e avisamos quando surgir uma oportunidade.`}
+          emptyText={vendaDireta ? `Nenhum anúncio particular no ${development.name} no momento. Fale conosco para ver as unidades direto com a incorporadora.` : `Nenhum imóvel à venda no ${development.name} no momento. Registre seu interesse abaixo e avisamos quando surgir uma oportunidade.`}
         />
         {reservados.length > 0 && (
           <section className="mt-10">

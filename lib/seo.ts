@@ -111,14 +111,27 @@ export function urlRegiao(r: { uf?: string | null; cidade?: string | null; bairr
   return u;
 }
 
-export function trilhaDoImovel(p: { uf?: string; cidade?: string; bairro?: string }): { nome: string; url: string }[] {
+/** "Marista 262" → "Condomínio Marista 262"; nomes que já dizem o que são ficam como estão */
+export function nomeCondominioSeo(nome: string): string {
+  return /^(condom[ií]nio|edif[ií]cio|residencial|resid[eê]ncia|conjunto|loteamento)\b/i.test(nome.trim()) ? nome.trim() : `Condomínio ${nome.trim()}`;
+}
+
+/**
+ * Trilha (visível e no schema), sempre no padrão de busca:
+ *   Início › Imóveis à venda em Goiânia › Imóveis à venda no Setor Bueno › Imóveis à venda no Condomínio X
+ */
+export function trilhaDoImovel(
+  p: { uf?: string; cidade?: string; bairro?: string },
+  condominio?: { name: string; slug?: string | null; id: string; uf?: string; cidade?: string; bairro?: string } | null
+): { nome: string; url: string }[] {
   const t = [{ nome: 'Início', url: SITE_URL }];
-  if (p.cidade) t.push({ nome: `Imóveis em ${p.cidade}`, url: `${SITE_URL}${urlRegiao({ uf: p.uf, cidade: p.cidade })}` });
-  if (p.cidade && p.bairro) t.push({ nome: p.bairro, url: `${SITE_URL}${urlRegiao({ uf: p.uf, cidade: p.cidade, bairro: p.bairro })}` });
+  if (p.cidade) t.push({ nome: `Imóveis à venda em ${p.cidade}`, url: `${SITE_URL}${urlRegiao({ uf: p.uf, cidade: p.cidade })}` });
+  if (p.cidade && p.bairro) t.push({ nome: `Imóveis à venda no ${p.bairro}`, url: `${SITE_URL}${urlRegiao({ uf: p.uf, cidade: p.cidade, bairro: p.bairro })}` });
+  if (condominio) t.push({ nome: `Imóveis à venda no ${nomeCondominioSeo(condominio.name)}`, url: `${SITE_URL}${urlCondominio(condominio)}` });
   return t;
 }
 
-export function buildPropertyJsonLd(property: PropertyDetail) {
+export function buildPropertyJsonLd(property: PropertyDetail, condominio?: Parameters<typeof trilhaDoImovel>[1]) {
   const url = `${SITE_URL}${urlImovel(property)}`;
   const nome = property.titulo || tituloSeoImovel(property);
   const quartos = num(property.beds);
@@ -155,7 +168,7 @@ export function buildPropertyJsonLd(property: PropertyDetail) {
             }
           : undefined
       },
-      trilha([...trilhaDoImovel(property), { nome, url }])
+      trilha([...trilhaDoImovel(property, condominio), { nome, url }])
     ]
   };
 }
@@ -208,10 +221,13 @@ export function buildDevelopmentMetadata(development: Development): Metadata {
   const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
   const onde = [development.bairro, development.cidade].filter(Boolean).join(', ') || development.location;
   const tipoTxt = development.tipo === 'horizontal' ? 'Condomínio de casas' : 'Edifício';
-  const title = `${development.name}: ${tipoTxt} ${badge.label && development.tipo !== 'horizontal' ? `${badge.label.toLowerCase()} ` : ''}no ${onde}`.slice(0, 95);
-  const desc =
-    descricaoTextoPuro(development.description) ||
-    `${development.name}, ${tipoTxt.toLowerCase()} em ${onde}. Veja imóveis à venda, fotos, lazer, plantas e valores na Mais Novos Imóveis.`;
+  // Padrão de busca: "Imóveis à venda no Condomínio X, Bairro, Cidade"
+  const nomeSeo = nomeCondominioSeo(development.name);
+  const title = `Imóveis à venda no ${nomeSeo}, ${onde}`.slice(0, 95);
+  const fase = badge.label && development.tipo !== 'horizontal' ? ` ${badge.label}.` : '';
+  const abertura = `Imóveis à venda no ${nomeSeo}, ${tipoTxt.toLowerCase()} no ${onde}.${fase}`;
+  const texto = descricaoTextoPuro(development.description);
+  const desc = texto ? `${abertura} ${texto}` : `${abertura} Veja unidades, fotos, lazer, plantas e valores na Mais Novos Imóveis.`;
   const description = desc.length > 158 ? `${desc.slice(0, 155).replace(/\s+\S*$/, '')}…` : desc;
   const url = `${SITE_URL}${urlCondominio(development)}`;
   const imagem = development.photos?.[0];
@@ -250,13 +266,28 @@ export function buildDevelopmentJsonLd(development: Development) {
           '@type': 'PostalAddress',
           addressLocality: development.cidade || undefined,
           addressRegion: 'GO',
-          addressCountry: 'BR',
-          streetAddress: development.bairro || undefined
+          addressCountry: 'BR'
         },
+        containedInPlace: development.bairro ? { '@type': 'Place', name: `${development.bairro}, ${development.cidade ?? ''}`.replace(/, $/, '') } : undefined,
         amenityFeature: development.amenities.map((a) => ({ '@type': 'LocationFeatureSpecification', name: a, value: true })),
         containsPlace: anuncios.slice(0, 20).map((u) => ({ '@type': TIPO_UNIDADE_SCHEMA_ORG[u.tipoUnidade], url: `${SITE_URL}${urlImovel(u)}`, name: tituloSeoImovel(u) }))
       },
-      trilha([...trilhaDoImovel({ uf: development.uf, cidade: development.cidade, bairro: development.bairro }), { nome: development.name, url }])
+      {
+        // a página em si: a lista de imóveis à venda dentro do condomínio
+        '@type': 'CollectionPage',
+        '@id': `${url}#pagina`,
+        name: `Imóveis à venda no ${nomeCondominioSeo(development.name)}`,
+        url,
+        inLanguage: 'pt-BR',
+        about: { '@id': `${url}#condominio` },
+        mainEntity: {
+          '@type': 'ItemList',
+          name: `Imóveis à venda no ${nomeCondominioSeo(development.name)}`,
+          numberOfItems: anuncios.length,
+          itemListElement: anuncios.slice(0, 30).map((u, i) => ({ '@type': 'ListItem', position: i + 1, url: `${SITE_URL}${urlImovel(u)}`, name: tituloSeoImovel(u) }))
+        }
+      },
+      trilha(trilhaDoImovel({ uf: development.uf, cidade: development.cidade, bairro: development.bairro }, development))
     ]
   };
 }
@@ -269,4 +300,14 @@ export function jsonLdSeguro(data: unknown): string {
     .replace(/&/g, '\\u0026')
     .replace(new RegExp(String.fromCharCode(0x2028), 'g'), '\\u2028')
     .replace(new RegExp(String.fromCharCode(0x2029), 'g'), '\\u2029');
+}
+
+/**
+ * "Imóveis à venda da Incorporadora X" (padrão de busca das páginas de empresa).
+ * Se o nome já diz o que a empresa é (Construtora, Engenharia, Urbanismo, Inc...), não repete.
+ */
+export function imoveisDaEmpresa(nome: string): string {
+  const n = nome.trim();
+  const jaDiz = /(construtora|incorporadora|incorpora[çc][õo]es|engenharia|urbanismo|desenvolvimento imobili|solu[çc][õo]es urbanas|empreendimentos|constru[çc][õo]es|\binc\b)/i.test(n);
+  return `Imóveis à venda da ${jaDiz ? n : `Incorporadora ${n}`}`;
 }

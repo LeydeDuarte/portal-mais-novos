@@ -8,7 +8,7 @@ import OcultoView from '@/components/OcultoView';
 import AtivarLinkPrivado from '@/components/AtivarLinkPrivado';
 import ProtecaoTela from '@/components/ProtecaoTela';
 import { cache } from 'react';
-import { getPropertyById as buscarImovel, getResumoOculto as buscarResumo, getStaffSession } from '@/lib/actions';
+import { getPropertyById as buscarImovel, getResumoOculto as buscarResumo, getStaffSession, getDevelopmentById as buscarCondominio } from '@/lib/actions';
 
 // Uma consulta só por página (os metadados e a página usam o mesmo resultado)
 // o endereço pode ser o nome (slug) ou o código antigo: tudo vira o id aqui
@@ -100,7 +100,9 @@ export default async function ImovelPage({ params: { partes }, searchParams }: P
     return <PropertyDetailView property={property} avisoPrivado={staff ? 'completo' : 'link'} />;
   }
 
-  const jsonLd = buildPropertyJsonLd(property);
+  // trilha do schema passa pelo condomínio ("Imóveis à venda no Condomínio X") quando o anúncio é de um publicado
+  const cond = property.empreendimentoId ? await buscarCondominio(property.empreendimentoId).catch(() => null) : null;
+  const jsonLd = buildPropertyJsonLd(property, cond && cond.status !== 'rascunho' ? cond : null);
   return (
     <>
       <JsonLd data={jsonLd} />
