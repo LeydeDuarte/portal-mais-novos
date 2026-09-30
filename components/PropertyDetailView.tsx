@@ -16,7 +16,7 @@ import BarraEquipe from '@/components/BarraEquipe';
 import { altFoto, nomeCondominioSeo, trilhaDoImovel, tituloSeoImovel } from '@/lib/seo';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getAveragePricePerM2, formatPricePerM2, type PropertyDetail } from '@/lib/property-details';
-import { getDevelopmentById, getOcultosDoCondominio, getRelatedListings, mercadoDoBairro } from '@/lib/actions';
+import { getDevelopmentById, getOcultosDoCondominio, getRelatedListings, lancamentosProximos, mercadoDoBairro } from '@/lib/actions';
 import BannerFundadora from '@/components/news/BannerFundadora';
 import VitrineNews from '@/components/news/VitrineNews';
 import { SITE_URL } from '@/lib/seo';
@@ -24,7 +24,7 @@ import BotaoCompartilhar from '@/components/BotaoCompartilhar';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import { Banner } from '@/components/news/Pecas';
 import { bannersAtivos } from '@/lib/news/dados';
-import { BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
+import { SecaoCondominios, BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
@@ -90,10 +90,11 @@ export default async function PropertyDetailView({
               </div>
   );
 
-  const [mercado, privados, banners] = await Promise.all([
+  const [mercado, privados, banners, novosPerto] = await Promise.all([
     mercadoDoBairro(property.cidade, property.bairro).catch(() => null),
     nomeCondominio ? getOcultosDoCondominio(development?.id ?? '', nomeCondominio, property.cidade).catch(() => []) : Promise.resolve([]),
-    bannersAtivos()
+    bannersAtivos(),
+    property.finalidade === 'venda' ? lancamentosProximos({ propertyId: property.id }, 8).catch(() => []) : Promise.resolve([])
   ]);
   const outrosPrivados = privados.filter((a) => a.id !== property.id);
   const entrega = textoEntrega(property.deliveryDate);
@@ -295,6 +296,13 @@ export default async function PropertyDetailView({
           />
         )}
         <RelatedListings grade limite={8} title="Imóveis similares" subtitle={faixaDePreco(related.precoReferencia)} items={related.regiao} />
+
+        {/* lançamentos e novos por perto: venda direta com a incorporadora */}
+        <SecaoCondominios
+          titulo={`Lançamentos e imóveis novos perto ${property.bairro ? `do ${property.bairro}` : 'daqui'}`}
+          subtitulo="Venda direta com a incorporadora, mesmo sem anúncio: fale com a gente e receba tabela e disponibilidade."
+          itens={novosPerto.filter((c) => c.id !== property.empreendimentoId)}
+        />
 
         <VitrineNews bairro={property.bairro} cidade={property.cidade} />
       </main>

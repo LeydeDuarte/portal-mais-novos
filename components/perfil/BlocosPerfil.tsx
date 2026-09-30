@@ -10,7 +10,8 @@ import OcultoCard from '@/components/OcultoCard';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import BotaoCompartilhar from '@/components/BotaoCompartilhar';
 import BotaoWhatsapp, { type WhatsappContexto } from '@/components/BotaoWhatsapp';
-import type { AnuncioOculto, MercadoDoBairro } from '@/lib/actions';
+import type { AnuncioOculto, DevelopmentCardData, MercadoDoBairro } from '@/lib/actions';
+import DevelopmentCard from '@/components/DevelopmentCard';
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 export const brl = (v: number) => `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
@@ -219,3 +220,19 @@ export function BarraContatoFixa({ favoritoId, whats, rotulo, compartilhar }: { 
 
 /** espaço no fim da página para a barra fixa não cobrir o rodapé */
 export const EspacoBarra = () => <div className="h-24" aria-hidden />;
+
+// ---------- condomínios em grade (lançamentos próximos, vizinhos) ----------
+export function SecaoCondominios({ titulo, subtitulo, itens }: { titulo: string; subtitulo?: string; itens: DevelopmentCardData[] }) {
+  if (!itens.length) return null;
+  return (
+    <section className="mt-10">
+      <h2 className="text-lg font-bold">{titulo}</h2>
+      {subtitulo && <p className="mt-0.5 text-sm text-[var(--text-muted)]">{subtitulo}</p>}
+      <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-4">
+        {itens.map((c) => (
+          <DevelopmentCard key={c.id} development={c} />
+        ))}
+      </div>
+    </section>
+  );
+}

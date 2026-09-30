@@ -2192,32 +2192,53 @@ export async function mercadoDoBairro(cidade?: string | null, bairro?: string | 
   };
 }
 
-// ---------------- condomínios próximos (seção de último caso) ----------------
-/** Condomínios publicados perto de um condomínio (mesmo tipo: horizontal ou vertical),
- *  do mais perto para o mais longe: até 2 km, depois até 5 km; sem coordenada, o mesmo bairro.
- *  Usado quando a região tem poucos anúncios: "pode ser que tenha imóvel à venda nesses". */
-export async function condominiosProximos(developmentId: string, limite = 8): Promise<DevelopmentCardData[]> {
-  const b = await query<{ id: string; tipo: string | null; bairro: string | null; cidade: string | null; lat: string | null; lng: string | null }>(
-    `select d.id, d.tipo, d.bairro, d.cidade,
-            coalesce(d.lat, (select avg(x.lat) from developments x where x.lat is not null and lower(x.bairro) = lower(d.bairro) and lower(x.cidade) = lower(d.cidade))) lat,
-            coalesce(d.lng, (select avg(x.lng) from developments x where x.lng is not null and lower(x.bairro) = lower(d.bairro) and lower(x.cidade) = lower(d.cidade))) lng
-       from developments d where d.id = $1`,
-    [developmentId]
-  ).catch(() => []);
-  const base = b[0];
-  if (!base) return [];
-  const tipo = base.tipo === 'horizontal' ? 'horizontal' : 'vertical';
+// ---------------- condomínios próximos ----------------
+type BaseProx = { devId: string | null; tipo: 'horizontal' | 'vertical'; bairro: string | null; cidade: string | null; lat: number | null; lng: number | null };
+
+/** Ponto de partida: um condomínio ou um anúncio (coordenada própria, do condomínio ou o centro do bairro) */
+async function baseProximidade(alvo: { developmentId?: string; propertyId?: string }): Promise<BaseProx | null> {
+  const centro = (col: 'lat' | 'lng', t: string) =>
+    `(select avg(x.${col}) from developments x where x.${col} is not null and lower(x.bairro) = lower(${t}.bairro) and lower(x.cidade) = lower(${t}.cidade))`;
+  if (alvo.developmentId) {
+    const r = await query<{ id: string; tipo: string | null; bairro: string | null; cidade: string | null; lat: string | null; lng: string | null }>(
+      `select d.id, d.tipo, d.bairro, d.cidade, coalesce(d.lat, ${centro('lat', 'd')}) lat, coalesce(d.lng, ${centro('lng', 'd')}) lng from developments d where d.id = $1`,
+      [alvo.developmentId]
+    ).catch(() => []);
+    const b = r[0];
+    return b ? { devId: b.id, tipo: b.tipo === 'horizontal' ? 'horizontal' : 'vertical', bairro: b.bairro, cidade: b.cidade, lat: b.lat != null ? Number(b.lat) : null, lng: b.lng != null ? Number(b.lng) : null } : null;
+  }
+  if (alvo.propertyId) {
+    const r = await query<{ empreendimento_id: string | null; tipo_unidade: string; bairro: string | null; cidade: string | null; lat: string | null; lng: string | null }>(
+      `select p.empreendimento_id, p.tipo_unidade, p.bairro, p.cidade, coalesce(p.lat, d.lat, ${centro('lat', 'p')}) lat, coalesce(p.lng, d.lng, ${centro('lng', 'p')}) lng
+         from properties p left join developments d on d.id = p.empreendimento_id where p.id = $1`,
+      [alvo.propertyId]
+    ).catch(() => []);
+    const b = r[0];
+    return b
+      ? { devId: b.empreendimento_id, tipo: GRUPO_TIPO[b.tipo_unidade] === 'casa' || GRUPO_TIPO[b.tipo_unidade] === 'terra' ? 'horizontal' : 'vertical', bairro: b.bairro, cidade: b.cidade, lat: b.lat != null ? Number(b.lat) : null, lng: b.lng != null ? Number(b.lng) : null }
+      : null;
+  }
+  return null;
+}
+
+/** Condomínios publicados perto (mesmo tipo: horizontal ou vertical), do mais perto para o mais longe.
+ *  "novos": só lançamentos, obras, breve lançamento e entregues há até 36 meses (venda direta
+ *  com a incorporadora). Raios: 2 km, 5 km (e 10 km para os novos); sem coordenada, o mesmo bairro. */
+async function proximos(base: BaseProx, opts: { novos: boolean; excluir?: string[]; limite: number }): Promise<string[]> {
+  const excl = [base.devId ?? '', ...(opts.excluir ?? [])];
+  const filtroNovos = opts.novos ? "and x.delivery_date is not null and x.delivery_date >= (current_date - interval '36 months')" : '';
+  // novos: lançamento/obra primeiro? não: o mais perto primeiro, com foto na frente
   let ids: string[] = [];
   if (base.lat != null && base.lng != null) {
-    for (const raio of [2, 5]) {
+    for (const raio of opts.novos ? [2, 5, 10] : [2, 5]) {
       const r = await query<{ id: string }>(
         `select id from (
            select x.id, x.photos, 111.2 * sqrt(power(x.lat - $2, 2) + power((x.lng - $3) * cos(radians($2)), 2)) dist
              from developments x
-            where x.status = 'publicado' and x.id <> $1 and x.lat is not null and coalesce(x.tipo, 'vertical') = $4) q
+            where x.status = 'publicado' and not (x.id = any($1::text[])) and x.lat is not null and coalesce(x.tipo, 'vertical') = $4 ${filtroNovos}) q
           where q.dist <= $5
           order by (jsonb_array_length(coalesce(q.photos, '[]'::jsonb)) = 0), q.dist limit $6`,
-        [developmentId, Number(base.lat), Number(base.lng), tipo, raio, limite]
+        [excl, base.lat, base.lng, base.tipo, raio, opts.limite]
       ).catch(() => []);
       ids = r.map((x) => x.id);
       if (ids.length >= 4) break;
@@ -2225,12 +2246,28 @@ export async function condominiosProximos(developmentId: string, limite = 8): Pr
   }
   if (ids.length < 4 && base.bairro) {
     const r = await query<{ id: string }>(
-      `select id from developments where status = 'publicado' and id <> $1 and not (id = any($5::text[]))
-          and lower(bairro) = lower($2) and lower(coalesce(cidade, '')) = lower(coalesce($3, '')) and coalesce(tipo, 'vertical') = $4
-        order by (jsonb_array_length(coalesce(photos, '[]'::jsonb)) = 0), name limit $6`,
-      [developmentId, base.bairro, base.cidade, tipo, ids, limite - ids.length]
+      `select x.id from developments x where x.status = 'publicado' and not (x.id = any($1::text[]))
+          and lower(x.bairro) = lower($2) and lower(coalesce(x.cidade, '')) = lower(coalesce($3, '')) and coalesce(x.tipo, 'vertical') = $4 ${filtroNovos}
+        order by (jsonb_array_length(coalesce(x.photos, '[]'::jsonb)) = 0), x.name limit $5`,
+      [[...excl, ...ids], base.bairro, base.cidade, base.tipo, opts.limite - ids.length]
     ).catch(() => []);
     ids = [...ids, ...r.map((x) => x.id)];
   }
+  return ids;
+}
+
+/** Lançamentos, obras e novos perto de um condomínio ou anúncio (venda direta com a incorporadora) */
+export async function lancamentosProximos(alvo: { developmentId?: string; propertyId?: string }, limite = 8): Promise<DevelopmentCardData[]> {
+  const base = await baseProximidade(alvo);
+  if (!base) return [];
+  const ids = await proximos(base, { novos: true, limite });
+  return ids.length ? cardsDeCondominios(ids) : [];
+}
+
+/** Último caso: condomínios vizinhos (qualquer idade), sem repetir os informados */
+export async function condominiosProximos(developmentId: string, limite = 8, excluir: string[] = []): Promise<DevelopmentCardData[]> {
+  const base = await baseProximidade({ developmentId });
+  if (!base) return [];
+  const ids = await proximos(base, { novos: false, excluir, limite });
   return ids.length ? cardsDeCondominios(ids) : [];
 }

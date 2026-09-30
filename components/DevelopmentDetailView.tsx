@@ -10,16 +10,15 @@ import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
-import { getRelatedListings, getOcultosDoCondominio, mercadoDoBairro, condominiosProximos } from '@/lib/actions';
+import { getRelatedListings, getOcultosDoCondominio, mercadoDoBairro, condominiosProximos, lancamentosProximos } from '@/lib/actions';
 import BannerFundadora from '@/components/news/BannerFundadora';
 import VitrineNews from '@/components/news/VitrineNews';
-import DevelopmentCard from '@/components/DevelopmentCard';
 import { SITE_URL } from '@/lib/seo';
 import BotaoCompartilhar from '@/components/BotaoCompartilhar';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import { Banner } from '@/components/news/Pecas';
 import { bannersAtivos } from '@/lib/news/dados';
-import { BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
+import { SecaoCondominios, BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
 import { FASES_EXIGEM_CONCEPCAO, ehFutura, getBadgeCondominio, getStatusBucket } from '@/lib/classification';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
@@ -94,7 +93,10 @@ export default async function DevelopmentDetailView({ development }: { developme
   const [mercado, banners] = await Promise.all([mercadoDoBairro(development.cidade, development.bairro).catch(() => null), bannersAtivos()]);
   // último caso: poucos anúncios por perto → condomínios vizinhos (pode ter unidade à venda lá)
   const anunciosPerto = new Set([...(('mesmoBairro' in related && related.mesmoBairro) || []), ...related.regiao].filter((x) => !x.vendidoEm).map((x) => x.id)).size;
-  const vizinhos = anunciosPerto < 4 && development.status !== 'rascunho' ? await condominiosProximos(development.id, 8).catch(() => []) : [];
+  // lançamentos, obras e novos por perto: vendidos direto com a incorporadora, mesmo sem anúncio
+  const novosPerto = development.status !== 'rascunho' ? await lancamentosProximos({ developmentId: development.id }, 8).catch(() => []) : [];
+  const vizinhos =
+    anunciosPerto < 4 && development.status !== 'rascunho' ? await condominiosProximos(development.id, 8, novosPerto.map((c) => c.id)).catch(() => []) : [];
   const tipoPlural = development.tipo === 'horizontal' ? 'Casas' : tipos.includes('apartamento') || !tipos.length ? 'Apartamentos' : TIPO_UNIDADE_LABEL[tipos[0]] ?? 'Imóveis';
   const ondeBairro = [development.bairro, development.cidade].filter(Boolean).join(', ') || development.location;
   const entrega = textoEntrega(development.deliveryDate);
@@ -116,19 +118,16 @@ export default async function DevelopmentDetailView({ development }: { developme
         <RelatedListings grade limite={8} title={`Imóveis à venda no ${development.bairro}`} items={('mesmoBairro' in related && related.mesmoBairro) || []} />
       )}
       <RelatedListings grade limite={8} title={`Imóveis similares perto do ${development.name}`} subtitle={faixaDePreco(related.precoReferencia)} items={related.regiao} />
-      {vizinhos.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-lg font-bold">Pode ser que tenha imóveis à venda nesses condomínios próximos</h2>
-          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
-            {development.tipo === 'horizontal' ? 'Condomínios de casas' : 'Condomínios'} perto do {development.name}. Muitas unidades são vendidas sem anúncio: fale com a gente e verificamos.
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-4">
-            {vizinhos.map((c) => (
-              <DevelopmentCard key={c.id} development={c} />
-            ))}
-          </div>
-        </section>
-      )}
+      <SecaoCondominios
+        titulo={`Lançamentos e imóveis novos perto do ${development.name}`}
+        subtitulo="Venda direta com a incorporadora, mesmo sem anúncio: fale com a gente e receba tabela e disponibilidade."
+        itens={novosPerto}
+      />
+      <SecaoCondominios
+        titulo="Pode ser que tenha imóveis à venda nesses condomínios próximos"
+        subtitulo={`${development.tipo === 'horizontal' ? 'Condomínios de casas' : 'Condomínios'} perto do ${development.name}. Muitas unidades são vendidas sem anúncio: fale com a gente e verificamos.`}
+        itens={vizinhos}
+      />
     </div>
   );
 
