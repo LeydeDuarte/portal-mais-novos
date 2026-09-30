@@ -6,7 +6,7 @@ type Props = {
   photos: string[]; // URLs públicas já salvas no R2 — a primeira é a capa
   onChange: (urls: string[]) => void;
   onUploadingChange?: (uploading: boolean) => void;
-  folder?: 'imoveis' | 'empreendimentos' | 'plantas' | 'site';
+  folder?: 'imoveis' | 'empreendimentos' | 'plantas' | 'site' | 'noticias';
   label?: string;
   // Plantas: fundo branco, imagem inteira (sem cortar) e um pouco mais de resolução
   modo?: 'fotos' | 'plantas';

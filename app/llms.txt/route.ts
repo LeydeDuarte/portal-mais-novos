@@ -1,5 +1,7 @@
 import { EMPRESA, SITE_NAME, SITE_URL, urlRegiao } from '@/lib/seo';
 import { CATEGORIAS, listarRegioes } from '@/lib/landing';
+import { noticiasPublicadas } from '@/lib/news/dados';
+import { urlNoticia } from '@/lib/news/base';
 
 // /llms.txt — resumo do site em texto para assistentes de IA (ChatGPT, Perplexity,
 // Gemini, Claude…), no formato proposto em llmstxt.org: quem somos, o que há no
@@ -7,7 +9,7 @@ import { CATEGORIAS, listarRegioes } from '@/lib/landing';
 export const revalidate = 3600;
 
 export async function GET() {
-  const regioes = await listarRegioes().catch(() => []);
+  const [regioes, noticias] = await Promise.all([listarRegioes().catch(() => []), noticiasPublicadas({ limite: 15 })]);
   const cidades = regioes.filter((r) => !r.bairro).slice(0, 10);
   const bairros = regioes.filter((r) => r.bairro).slice(0, 60);
   const linhas = [
@@ -26,6 +28,11 @@ export async function GET() {
     `- [Venda seu imóvel](${SITE_URL}/vender): proprietário cadastra o imóvel para a Mais Novos vender`,
     `- [Quem somos](${SITE_URL}/quem-somos)`,
     `- [Financiamento](${SITE_URL}/financiamento)`,
+    `- [Mais Novos News](${SITE_URL}/news): notícias do mercado imobiliário de Goiânia e região, com preço do m² por bairro calculado com os anúncios do portal`,
+    `- [Indicadores: Selic, IPCA, INCC-DI, INCC-M e IGP-M](${SITE_URL}/news/indicadores): valores atualizados com dados do Banco Central, com gráfico`,
+    '',
+    '## Notícias recentes',
+    ...noticias.map((n) => `- [${n.titulo}](${SITE_URL}${urlNoticia(n)})${n.linhaFina ? `: ${n.linhaFina}` : ''}`),
     '',
     '## Imóveis à venda por cidade',
     ...cidades.map((c) => `- [Imóveis à venda em ${c.cidade}](${SITE_URL}${urlRegiao({ uf: c.uf, cidade: c.cidade })}): ${c.n} anúncios`),

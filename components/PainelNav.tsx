@@ -21,6 +21,7 @@ const LINKS: { href: string; label: string; admin?: boolean; gestor?: boolean }[
   { href: '/dashboard/monitoramento', label: 'Monitoramento' },
   { href: '/dashboard/importar-pdf', label: 'Importar PDFs' },
   { href: '/dashboard/cadastro-ia', label: 'Cadastro IA' },
+  { href: '/dashboard/news', label: 'News', gestor: true },
   { href: '/dashboard/feed-especiais', label: 'Depoimentos e destaques', gestor: true },
   { href: '/dashboard/jetimob', label: 'Migração Jetimob', admin: true },
   { href: '/dashboard/equipe', label: 'Equipe', admin: true },

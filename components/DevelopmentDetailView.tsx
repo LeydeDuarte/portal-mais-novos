@@ -96,6 +96,17 @@ export default async function DevelopmentDetailView({ development }: { developme
     ...(development.pavimentos ? [{ texto: `${development.pavimentos} pavimentos` }] : [])
   ];
   const aVenda = related.mesmoCondominio.filter((p) => p.finalidade === 'venda');
+  // Novo/seminovo/usado sem nenhuma unidade à venda e sem preço: avisa de leve e sobe os
+  // imóveis do bairro e os similares para logo abaixo do condomínio (antes do cadastro)
+  const semUnidade = !futuro && !precoInicial && aVenda.filter((x) => !x.vendidoEm).length === 0;
+  const secoesParecidos = (
+    <div id="parecidos" className="scroll-mt-24">
+      {development.bairro && (
+        <RelatedListings grade limite={8} title={`Imóveis à venda no ${development.bairro}`} items={('mesmoBairro' in related && related.mesmoBairro) || []} />
+      )}
+      <RelatedListings grade limite={8} title={`Imóveis similares perto do ${development.name}`} subtitle={faixaDePreco(related.precoReferencia)} items={related.regiao} />
+    </div>
+  );
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -151,6 +162,14 @@ export default async function DevelopmentDetailView({ development }: { developme
               mercado={mercado}
             />
             <ChipsPerfil chips={chips} />
+            {semUnidade && (
+              <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-[var(--pill-bg)] px-4 py-2.5 text-[13px]">
+                <span className="font-semibold">Por enquanto, nenhuma unidade à venda neste condomínio.</span>
+                <a href="#parecidos" className="font-semibold text-accent hover:underline">
+                  Ver imóveis parecidos na região ↓
+                </a>
+              </p>
+            )}
 
             {(tipologias.length > 0 || futuro) && (
               <div className="mt-6">
@@ -253,9 +272,13 @@ export default async function DevelopmentDetailView({ development }: { developme
           </aside>
         </div>
 
+        {/* sem unidade à venda: parecidos logo abaixo do condomínio */}
+        {semUnidade && secoesParecidos}
+
         {/* privados PRIMEIRO, antes dos anunciados */}
         <SecaoPrivados onde={development.name} itens={reservados} />
 
+        {!semUnidade && (
         <RelatedListings
           grade
           limite={8}
@@ -268,6 +291,7 @@ export default async function DevelopmentDetailView({ development }: { developme
               : `Nenhum imóvel à venda no ${development.name} no momento. Registre seu interesse abaixo e avisamos quando surgir uma oportunidade.`
           }
         />
+        )}
         <RelatedListings grade limite={8} title={`Para alugar no ${development.name}`} items={related.mesmoCondominio.filter((p) => p.finalidade === 'aluguel')} />
 
         {vendaDireta ? (
@@ -282,8 +306,7 @@ export default async function DevelopmentDetailView({ development }: { developme
           <InterestForm developmentId={development.id} condominio={development.name} destaque={related.mesmoCondominio.length === 0} />
         )}
 
-        {development.bairro && <RelatedListings grade limite={8} title={`Imóveis à venda no ${development.bairro}`} items={('mesmoBairro' in related && related.mesmoBairro) || []} />}
-        <RelatedListings grade limite={8} title="Imóveis similares nesta região" subtitle={faixaDePreco(related.precoReferencia)} items={related.regiao} />
+        {!semUnidade && secoesParecidos}
       </main>
 
       <Footer />

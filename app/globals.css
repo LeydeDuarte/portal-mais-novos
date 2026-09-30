@@ -97,3 +97,28 @@ img {
   background-size: 600px 100%;
   animation: brilho 1.3s linear infinite;
 }
+
+/* Banner "Conheça a fundadora" (News): anel do Instagram girando, foto respirando,
+   brilho atravessando o cartão e seta chamando para o clique. */
+.fundadora-card { animation: fundadora-entra 0.7s ease-out both; }
+.fundadora-anel {
+  background: conic-gradient(from 0deg, #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5, #feda75);
+  animation: fundadora-gira 6s linear infinite;
+}
+.fundadora-foto { animation: fundadora-respira 7s ease-in-out infinite alternate; }
+.fundadora-brilho {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(37, 124, 255, 0.10) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: fundadora-brilho 7s ease-in-out 1.5s infinite;
+}
+.fundadora-seta { display: inline-block; animation: fundadora-seta 2.4s ease-in-out infinite; }
+.fundadora-card:hover .fundadora-seta { animation-duration: 0.9s; }
+@keyframes fundadora-entra { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fundadora-gira { to { transform: rotate(360deg); } }
+@keyframes fundadora-respira { from { transform: scale(1); } to { transform: scale(1.07); } }
+@keyframes fundadora-brilho { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@keyframes fundadora-seta { 0%, 60%, 100% { transform: translateX(0); } 30% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .fundadora-card, .fundadora-anel, .fundadora-foto, .fundadora-brilho, .fundadora-seta { animation: none !important; }
+}
