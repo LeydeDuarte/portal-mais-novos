@@ -6,6 +6,7 @@ import { query } from '../db';
 import { exigirEquipe } from '../staff-auth';
 import { veTudo } from '../papeis';
 import { atualizarIndicadores } from '../indicadores';
+import { gerarCapasPendentes } from './capa';
 import { mapNoticia } from './dados';
 import { gravarNoticia, type NoticiaEntrada } from './gravar';
 import { videoEmbed, type Noticia } from './base';
@@ -106,4 +107,9 @@ export async function revogarChave(id: string): Promise<void> {
 export async function atualizarIndicadoresAgora() {
   await exigirEditor();
   return atualizarIndicadores();
+}
+
+export async function gerarCapasDiscover(): Promise<number> {
+  await exigirEditor();
+  return gerarCapasPendentes(30);
 }

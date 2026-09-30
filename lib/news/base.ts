@@ -41,6 +41,7 @@ export type Noticia = {
   faq: { p: string; r: string }[];
   capa: string | null;
   capaAlt: string | null;
+  capa16x9: string | null;
   videoUrl: string | null;
   topico: string;
   tags: string[];

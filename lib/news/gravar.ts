@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { query } from '../db';
 import { slugNews, topicoValido, UFS, type Noticia } from './base';
 import { mapNoticia } from './dados';
+import { gerarCapa16x9 } from './capa';
 
 export type NoticiaEntrada = {
   id?: string;
@@ -91,6 +92,7 @@ export async function gravarNoticia(e: NoticiaEntrada, quem: { email?: string | 
         `update noticias set slug=$2, titulo=$3, linha_fina=$4, corpo=$5, resumo=$6::jsonb, faq=$7::jsonb, capa=$8, capa_alt=$9, video_url=$10,
            topico=$11, tags=$12::jsonb, uf=$13, cidade=$14, bairro=$15, empreendimento_id=$16, autor=$17, status=$18, principal=$19,
            seo_titulo=$20, seo_descricao=$21, fontes=$22::jsonb, agendado_para=$23, foco_imoveis=$24,
+           capa_16x9 = case when capa is distinct from $8 then null else capa_16x9 end,
            publicado_em = case when $18 = 'publicada' then coalesce(publicado_em, now()) when $18 = 'agendada' then $23::timestamptz else publicado_em end,
            updated_at = now()
          where id = $1 returning *`,
@@ -105,6 +107,10 @@ export async function gravarNoticia(e: NoticiaEntrada, quem: { email?: string | 
         [`not-${randomBytes(6).toString('hex')}`, ...vals, quem.email ?? null, quem.origem]
       );
   if (!r[0]) return { ok: false, erro: 'Notícia não encontrada.' };
+  if (r[0].capa && (!r[0].capa_16x9 || String(r[0].capa_16x9) === '' || !String(r[0].capa_16x9).includes(String(r[0].slug)))) {
+    const nova = await gerarCapa16x9(String(r[0].id)).catch(() => null);
+    if (nova) r[0].capa_16x9 = nova;
+  }
   // só uma principal por vez
   if (e.principal) await query('update noticias set principal = false where id <> $1 and principal', [r[0].id]);
   return { ok: true, noticia: mapNoticia(r[0]) };

@@ -9,6 +9,7 @@ import { TituloPainel, Vazio, campoPainel } from '@/components/painel/ui';
 import { useStaffSession } from '@/lib/use-staff-session';
 import {
   atualizarIndicadoresAgora,
+  gerarCapasDiscover,
   excluirBanner,
   excluirNoticia,
   gerarChave,
@@ -301,6 +302,21 @@ function AbaIA({ onMsg }: { onMsg: (m: string) => void }) {
           Atualizar indicadores agora
         </button>
         {ind && <p className="text-sm">{ind}</p>}
+        <div className="mt-2 border-t border-[var(--border)] pt-3">
+          <h3 className="text-sm font-bold">Capas para o Google Discover</h3>
+          <p className="text-sm text-[var(--text-muted)]">Gera a versão 1200×675 em WebP das capas que ainda não têm. As notícias novas já ganham ao salvar.</p>
+          <button
+            type="button"
+            onClick={async () => {
+              setInd('Gerando capas…');
+              const n = await gerarCapasDiscover().catch(() => 0);
+              setInd(`${n} capa(s) gerada(s).`);
+            }}
+            className="mt-2 h-11 w-full rounded-full border border-[var(--border)] text-sm font-bold"
+          >
+            Gerar capas que faltam
+          </button>
+        </div>
       </section>
     </div>
   );

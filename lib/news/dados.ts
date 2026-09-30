@@ -17,6 +17,7 @@ export function mapNoticia(r: Row): Noticia {
     faq: arr<{ p: string; r: string }>(r.faq),
     capa: (r.capa as string) ?? null,
     capaAlt: (r.capa_alt as string) ?? null,
+    capa16x9: (r.capa_16x9 as string) ?? null,
     videoUrl: (r.video_url as string) ?? null,
     topico: String(r.topico ?? 'mercado'),
     tags: arr<string>(r.tags),

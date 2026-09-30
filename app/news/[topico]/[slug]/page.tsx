@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const url = `${SITE_URL}${urlNoticia(c)}`;
   const titulo = c.seoTitulo || caber([c.titulo]);
   const desc = (c.seoDescricao || c.linhaFina || textoPuro(c.corpo)).slice(0, 160);
-  const img = c.capa ?? undefined;
+  const img = c.capa16x9 ?? c.capa ?? undefined;
   return {
     title: { absolute: titulo },
     description: desc,
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       publishedTime: c.publicadoEm ?? undefined,
       modifiedTime: c.atualizadoEm,
       section: nomeTopico(c.topico),
-      images: img ? [{ url: img }] : undefined
+      images: img ? [c.capa16x9 ? { url: img, width: 1200, height: 675, alt: c.capaAlt ?? c.titulo } : { url: img }] : undefined
     },
     twitter: { card: 'summary_large_image', title: c.titulo, description: desc, images: img ? [img] : undefined }
   };
