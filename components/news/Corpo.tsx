@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { blocosDoTexto, urlNoticia, videoEmbed, type Bloco } from '@/lib/news/base';
-import { noticiaPorSlug } from '@/lib/news/dados';
+import { condominiosParaLink, noticiaPorSlug } from '@/lib/news/dados';
 import { imoveisDoBairro } from '@/lib/news/imoveis';
 import { mercadoDoBairro } from '@/lib/actions';
 import RelatedListings from '@/components/RelatedListings';
@@ -103,8 +103,32 @@ async function BlocoEspecial({ b, banners, foco }: { b: Bloco; banners: Paramete
   return null;
 }
 
+/** Transforma a 1ª menção de cada condomínio cadastrado em link para a página dele */
+function linkarCondominios(texto: string, condos: { nome: string; url: string }[], usados: Set<string>): string {
+  let out = texto;
+  for (const c of condos) {
+    if (usados.has(c.url) || !out.includes(c.nome)) continue;
+    if (out.includes(`[${c.nome}](`)) {
+      usados.add(c.url); // já tem link escrito à mão
+      continue;
+    }
+    // ignora se o nome já está dentro de um link [..](..)
+    const esc = c.nome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(^|[^\\[\\p{L}])(${esc})(?![\\p{L}\\]])(?![^\\[]*\\]\\()`, 'u');
+    if (re.test(out)) {
+      out = out.replace(re, `$1[$2](${c.url})`);
+      usados.add(c.url);
+    }
+  }
+  return out;
+}
+
 export default async function Corpo({ corpo, banners, foco }: { corpo: string; banners: Parameters<typeof Banner>[0]['banners']; foco?: FocoFixo }) {
-  const blocos = blocosDoTexto(corpo);
+  const condos = await condominiosParaLink();
+  const usados = new Set<string>(Array.from(corpo.matchAll(/\]\((\/empreendimento\/[^)]+)\)/g)).map((m) => m[1]));
+  const blocos = blocosDoTexto(corpo).map((b) =>
+    b.t === 'p' || b.t === 'citacao' ? { ...b, texto: linkarCondominios(b.texto, condos, usados) } : b.t === 'lista' ? { ...b, itens: b.itens.map((i) => linkarCondominios(i, condos, usados)) } : b
+  );
   return (
     <div className="flex flex-col gap-5 text-[17.5px] leading-[1.75] text-[#22262E] md:text-[18px]">
       {blocos.map((b, i) => {

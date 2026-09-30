@@ -151,3 +151,22 @@ export async function noticiasParaLugar(bairro?: string | null, cidade?: string 
   ).catch(() => []);
   return rows.map(mapNoticia);
 }
+
+/** Condomínios publicados para o link automático no texto (nome → endereço). Só nomes
+ *  distintivos: 2+ palavras ou 8+ letras, sem nomes genéricos repetidos na base. */
+let cacheCondos: { em: number; lista: { nome: string; url: string }[] } | null = null;
+export async function condominiosParaLink(): Promise<{ nome: string; url: string }[]> {
+  if (cacheCondos && Date.now() - cacheCondos.em < 10 * 60 * 1000) return cacheCondos.lista;
+  const rows = await query<{ name: string; slug: string; bairro: string | null; cidade: string | null; uf: string | null }>(
+    `select name, slug, bairro, cidade, uf from developments d
+      where status = 'publicado' and slug is not null and length(name) >= 8
+        and (select count(*) from developments x where lower(x.name) = lower(d.name) and x.status = 'publicado') = 1`
+  ).catch(() => []);
+  const s = (t: string) => slugNews(t);
+  const lista = rows
+    .filter((r) => r.name.trim().includes(' ') || r.name.length >= 10)
+    .map((r) => ({ nome: r.name.trim(), url: `/empreendimento/${(r.uf ?? 'go').toLowerCase()}/${s(r.cidade ?? 'goiania')}/${s(r.bairro ?? '')}/${r.slug}` }))
+    .sort((a, b) => b.nome.length - a.nome.length); // nomes maiores primeiro ("Jardins Valência" antes de "Valência")
+  cacheCondos = { em: Date.now(), lista };
+  return lista;
+}

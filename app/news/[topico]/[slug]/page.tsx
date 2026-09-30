@@ -20,6 +20,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: { absolute: titulo },
     description: desc,
     alternates: { canonical: url },
+    // Google Discover: permite a imagem grande da capa
+    robots: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
     authors: [{ name: c.autor }],
     openGraph: {
       type: 'article',
