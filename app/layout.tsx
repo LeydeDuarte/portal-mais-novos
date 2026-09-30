@@ -10,6 +10,7 @@ import ProtecaoImagens from '@/components/ProtecaoImagens';
 import AtualizarVersao from '@/components/AtualizarVersao';
 import SurgirAoRolar from '@/components/SurgirAoRolar';
 import { GtmHead, GtmBody } from '@/components/GoogleTagManager';
+import Rastreador from '@/components/Rastreador';
 
 // Nunca reaproveitar respostas antigas do banco em nenhuma página
 export const fetchCache = 'default-no-store';
@@ -71,6 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="font-sans antialiased">
         {!equipe && <GtmBody />}
+        {!equipe && <Rastreador />}
         <ProtecaoImagens />
         <AtualizarVersao />
         <SurgirAoRolar />

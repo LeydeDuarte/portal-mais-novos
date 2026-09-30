@@ -40,7 +40,7 @@ export async function TopoNews({ ativo, q, regiaoAtual }: { ativo?: string; q?: 
           {/* Canal do WhatsApp (variável NEXT_PUBLIC_WHATSAPP_CANAL) quando existir; até lá,
               pede o nome, grava em Interessados e abre a conversa com a Leyde */}
           {process.env.NEXT_PUBLIC_WHATSAPP_CANAL ? (
-            <a href={process.env.NEXT_PUBLIC_WHATSAPP_CANAL} target="_blank" rel="noopener" className="flex h-11 items-center rounded-full bg-[#25D366] px-4 text-sm font-semibold text-white">
+            <a href={process.env.NEXT_PUBLIC_WHATSAPP_CANAL} target="_blank" rel="noopener" data-rastro="canal" className="flex h-11 items-center rounded-full bg-[#25D366] px-4 text-sm font-semibold text-white">
               Seguir no WhatsApp
             </a>
           ) : (
@@ -207,6 +207,7 @@ export function Banner({ banners, posicao, className = '' }: { banners: BannerAt
         href={`https://wa.me/${WHATSAPP_ATENDIMENTO}?text=${encodeURIComponent('Olá! Quero anunciar no portal Mais Novos Imóveis.')}`}
         target="_blank"
         rel="noopener"
+        data-rastro="anuncie"
         className={`flex flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-[#C9CED6] bg-[#F6F7F9] p-4 text-center text-[13px] text-[var(--text-muted)] ${posicao === 'perfil' ? 'aspect-[4/3]' : formato} ${className}`}
       >
         <span className="text-[10px] font-bold tracking-[0.12em]">PUBLICIDADE</span>
@@ -235,7 +236,7 @@ export function Banner({ banners, posicao, className = '' }: { banners: BannerAt
     <div className={className}>
       <span className="mb-1 block text-center text-[10px] font-bold tracking-[0.12em] text-[var(--text-faint)]">PUBLICIDADE</span>
       {b.link ? (
-        <a href={b.link} target="_blank" rel="noopener sponsored" className="block">
+        <a href={b.link} target="_blank" rel="noopener sponsored" className="block" data-rastro="banner" data-rastro-ref={b.id}>
           {conteudo}
         </a>
       ) : (

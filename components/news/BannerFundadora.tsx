@@ -8,6 +8,7 @@ export default function BannerFundadora({ className = '', perfil = false }: { cl
       href={INSTAGRAM}
       target="_blank"
       rel="noopener"
+      data-rastro="fundadora"
       aria-label="Conheça a fundadora do Portal Mais Novos, Leyde Duarte, no Instagram @leydeduarte.br"
       className={`fundadora-card group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4 transition-shadow hover:shadow-[0_10px_30px_rgba(20,22,26,0.10)] ${className}`}
     >

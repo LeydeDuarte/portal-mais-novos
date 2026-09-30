@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { registrarLeadWhatsapp } from '@/lib/actions';
+import { rastrear } from '@/lib/rastro';
 import { WHATSAPP_ATENDIMENTO } from '@/lib/marca';
 import { SITE_URL } from '@/lib/seo';
 
@@ -69,6 +70,7 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
     } catch {
       /* ok */
     }
+    rastrear('whatsapp_lead', ctx.developmentId ?? ctx.caminho);
     await registrarLeadWhatsapp({ nome: n, telefone, titulo: ctx.titulo, caminho: ctx.caminho, condominio: ctx.condominio, developmentId: ctx.developmentId }).catch(() => null);
     if (janela) janela.location.href = url;
     else window.location.href = url;
@@ -82,7 +84,10 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
         // botão arredondado dentro de um bloco (ex.: "Quer comprar uma unidade?" → Fale conosco)
         <button
           type="button"
-          onClick={() => setAberto(true)}
+          onClick={() => {
+            rastrear('whatsapp', ctx.developmentId ?? ctx.caminho);
+            setAberto(true);
+          }}
           className="flex shrink-0 items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:opacity-90"
         >
           <IconeWhats size={17} />
@@ -92,7 +97,10 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
         // barra fixa do rodapé: "Fale comigo" ocupando o espaço, com o símbolo do WhatsApp
         <button
           type="button"
-          onClick={() => setAberto(true)}
+          onClick={() => {
+            rastrear('whatsapp', ctx.developmentId ?? ctx.caminho);
+            setAberto(true);
+          }}
           className="flex h-[52px] flex-1 items-center justify-center gap-2.5 rounded-full bg-accent text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(37,124,255,0.28)] hover:brightness-95"
         >
           {rotulo ?? 'Fale comigo'}
@@ -103,7 +111,10 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
       ) : variante === 'bloco' ? (
         <button
           type="button"
-          onClick={() => setAberto(true)}
+          onClick={() => {
+            rastrear('whatsapp', ctx.developmentId ?? ctx.caminho);
+            setAberto(true);
+          }}
           className="flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-bold text-white shadow-sm hover:brightness-95"
         >
           <IconeWhats />
@@ -112,7 +123,10 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
       ) : (
         <button
           type="button"
-          onClick={() => setAberto(true)}
+          onClick={() => {
+            rastrear('whatsapp', ctx.developmentId ?? ctx.caminho);
+            setAberto(true);
+          }}
           aria-label="Falar com Leyde Duarte pelo WhatsApp"
           className="fixed bottom-5 right-5 z-[90] flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg hover:brightness-95 md:bottom-7 md:right-7"
         >

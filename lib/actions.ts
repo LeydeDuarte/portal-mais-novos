@@ -2024,7 +2024,7 @@ export async function registrarLeadWhatsapp(input: {
   const nome = String(input.nome ?? '').trim().slice(0, 120);
   if (nome.length < 2) return { ok: false, erro: 'Digite seu nome.' };
   const telefone = String(input.telefone ?? '').replace(/[^\d]/g, '').slice(0, 13);
-  const caminho = /^\/(imovel|empreendimento)\/[\w-]{1,80}$/.test(String(input.caminho)) ? String(input.caminho) : '';
+  const caminho = /^\/(imovel|empreendimento|news)(\/[\w-]{1,100}){1,6}$/.test(String(input.caminho)) ? String(input.caminho) : '';
   const titulo = String(input.titulo ?? '').slice(0, 200);
   const devId = input.developmentId && /^[\w-]{1,80}$/.test(input.developmentId) ? input.developmentId : null;
   const ip = ipDoVisitante();
