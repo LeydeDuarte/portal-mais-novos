@@ -278,6 +278,30 @@ export default function EditorNoticia() {
                 Situação: <strong>{f.status === 'publicada' ? 'publicada' : f.status === 'agendada' ? 'agendada' : 'rascunho'}</strong>
               </p>
               {msg && <p className={`rounded-lg p-2 text-sm font-semibold ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{msg.t}</p>}
+              {f.status === 'publicada' && url && (
+                // O WhatsApp não deixa sites postarem em canal: a mensagem vai pronta para colar
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const site = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+                    const resumo = f.resumo.split('\n').map((x) => x.replace(/^[-›•]\s*/, '').replace(/\*\*/g, '*').trim()).filter(Boolean);
+                    const texto = [`*${f.titulo.trim()}*`, f.linhaFina.trim(), resumo.length ? resumo.map((r) => `› ${r}`).join('\n') : '', `Leia a notícia completa: ${site}${url}`]
+                      .filter(Boolean)
+                      .join('\n\n');
+                    try {
+                      await navigator.clipboard.writeText(texto);
+                      setMsg({ ok: true, t: 'Mensagem copiada. No canal, é só colar e enviar.' });
+                    } catch {
+                      window.prompt('Copie a mensagem para o canal:', texto);
+                    }
+                    const canal = process.env.NEXT_PUBLIC_WHATSAPP_CANAL;
+                    if (canal) window.open(canal, '_blank');
+                  }}
+                  className="h-11 rounded-full bg-[#25D366] text-sm font-bold text-white"
+                >
+                  Enviar para o Canal do WhatsApp
+                </button>
+              )}
             </div>
 
             <div className="flex flex-col gap-2.5 rounded-2xl border border-[var(--border)] p-4">
