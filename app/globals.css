@@ -122,3 +122,36 @@ img {
 @media (prefers-reduced-motion: reduce) {
   .fundadora-card, .fundadora-anel, .fundadora-foto, .fundadora-brilho, .fundadora-seta { animation: none !important; }
 }
+
+/* Modo escuro (celular à noite): o que era preto fixo some no fundo escuro.
+   Botões e selecionados pretos viram azul; textos e bordas pretos viram claros. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bg-ink { background-color: #257cff !important; }
+  :root:not([data-theme='light']) .text-ink { color: var(--text, #f3f4f6) !important; }
+  :root:not([data-theme='light']) .border-ink { border-color: #257cff !important; }
+}
+
+/* ===== Modo escuro (celular/computador com tema noturno) =====
+   Cores fixas claras dos componentes viram superfícies escuras (com um toque da mesma
+   cor) e os textos escuros viram claros. Assim nada fica "branco no branco". */
+:root { color-scheme: light; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { color-scheme: dark; }
+  :root:not([data-theme='light']) .bg-white, :root:not([data-theme='light']) .bg-white\/90, :root:not([data-theme='light']) .bg-\[\#F6F7F9\], :root:not([data-theme='light']) .bg-\[\#F6F6F7\], :root:not([data-theme='light']) .bg-\[\#F4F6F9\], :root:not([data-theme='light']) .bg-\[\#E9ECF1\], :root:not([data-theme='light']) .bg-\[\#DDE2E9\], :root:not([data-theme='light']) .bg-\[\#D8DCE3\] { background-color: var(--surface) !important; }
+  :root:not([data-theme='light']) .bg-\[\#F3F7FF\], :root:not([data-theme='light']) .bg-\[\#f5f8ff\], :root:not([data-theme='light']) .bg-\[\#eef4ff\], :root:not([data-theme='light']) .bg-\[\#E8F0FF\], :root:not([data-theme='light']) .bg-sky-100, :root:not([data-theme='light']) .bg-sky-50, :root:not([data-theme='light']) .bg-blue-50 { background-color: rgba(37,124,255,.16) !important; }
+  :root:not([data-theme='light']) .bg-red-50, :root:not([data-theme='light']) .bg-red-100, :root:not([data-theme='light']) .bg-rose-50 { background-color: rgba(239,68,68,.16) !important; }
+  :root:not([data-theme='light']) .bg-emerald-50, :root:not([data-theme='light']) .bg-emerald-100, :root:not([data-theme='light']) .bg-green-50, :root:not([data-theme='light']) .bg-green-100, :root:not([data-theme='light']) .bg-\[\#DCFCE7\] { background-color: rgba(16,185,129,.16) !important; }
+  :root:not([data-theme='light']) .bg-amber-50, :root:not([data-theme='light']) .bg-amber-100, :root:not([data-theme='light']) .bg-yellow-50, :root:not([data-theme='light']) .bg-orange-50 { background-color: rgba(245,158,11,.16) !important; }
+  :root:not([data-theme='light']) .text-\[\#14161A\], :root:not([data-theme='light']) .text-\[\#22262E\], :root:not([data-theme='light']) .text-\[\#3A404C\], :root:not([data-theme='light']) .text-gray-900, :root:not([data-theme='light']) .text-gray-800, :root:not([data-theme='light']) .text-black { color: var(--text) !important; }
+  :root:not([data-theme='light']) .text-\[\#5B6270\], :root:not([data-theme='light']) .text-\[\#6B7280\], :root:not([data-theme='light']) .text-\[\#4D5156\], :root:not([data-theme='light']) .text-gray-700, :root:not([data-theme='light']) .text-gray-600 { color: var(--text-muted) !important; }
+  :root:not([data-theme='light']) .text-red-600, :root:not([data-theme='light']) .text-red-700, :root:not([data-theme='light']) .text-red-800, :root:not([data-theme='light']) .text-\[\#B42318\] { color: #f87171 !important; }
+  :root:not([data-theme='light']) .text-emerald-700, :root:not([data-theme='light']) .text-emerald-800, :root:not([data-theme='light']) .text-emerald-900, :root:not([data-theme='light']) .text-green-700, :root:not([data-theme='light']) .text-green-800, :root:not([data-theme='light']) .text-\[\#1A7F37\], :root:not([data-theme='light']) .text-\[\#166534\] { color: #34d399 !important; }
+  :root:not([data-theme='light']) .text-amber-700, :root:not([data-theme='light']) .text-amber-800, :root:not([data-theme='light']) .text-amber-900, :root:not([data-theme='light']) .text-\[\#B45309\] { color: #fbbf24 !important; }
+  :root:not([data-theme='light']) .text-sky-800, :root:not([data-theme='light']) .text-sky-700, :root:not([data-theme='light']) .text-\[\#1F5FD1\], :root:not([data-theme='light']) .text-\[\#1B5FCC\] { color: #7dd3fc !important; }
+  :root:not([data-theme='light']) .border-black, :root:not([data-theme='light']) .border-\[\#e6e8eb\], :root:not([data-theme='light']) .border-\[\#E3E6EB\], :root:not([data-theme='light']) .border-\[\#C9CED6\], :root:not([data-theme='light']) .border-white { border-color: var(--border) !important; }
+  :root:not([data-theme='light']) .border-red-200, :root:not([data-theme='light']) .border-red-300 { border-color: rgba(239,68,68,.45) !important; }
+  :root:not([data-theme='light']) .border-emerald-200, :root:not([data-theme='light']) .border-emerald-300 { border-color: rgba(16,185,129,.45) !important; }
+  :root:not([data-theme='light']) .border-amber-200, :root:not([data-theme='light']) .border-amber-300 { border-color: rgba(245,158,11,.45) !important; }
+  /* campos de formulário e listas */
+  :root:not([data-theme='light']) input, :root:not([data-theme='light']) select, :root:not([data-theme='light']) textarea { background-color: var(--surface); color: var(--text); }
+}

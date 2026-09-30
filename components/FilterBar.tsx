@@ -138,7 +138,7 @@ export default function FilterBar({ filters, onChange }: Props) {
       : filters.tipos.length === 1
         ? TIPO_UNIDADE_LABEL[filters.tipos[0]]
         : `${TIPO_UNIDADE_LABEL[filters.tipos[0]]} +${filters.tipos.length - 1}`;
-  const on = (ativo: boolean) => (ativo ? 'bg-ink text-white' : 'bg-[var(--pill-bg)] hover:bg-[var(--pill-bg-hover)]');
+  const on = (ativo: boolean) => (ativo ? 'bg-accent text-white' : 'bg-[var(--pill-bg)] hover:bg-[var(--pill-bg-hover)]');
 
   return (
     <div ref={wrapRef} className="relative border-b border-[var(--border)]">
@@ -149,7 +149,7 @@ export default function FilterBar({ filters, onChange }: Props) {
               key={m}
               type="button"
               onClick={() => set('modo', m)}
-              className={`rounded-full px-3.5 py-1.5 text-[13px] font-bold whitespace-nowrap ${filters.modo === m ? 'bg-ink text-white' : 'text-[var(--text-muted)]'}`}
+              className={`rounded-full px-3.5 py-1.5 text-[13px] font-bold whitespace-nowrap ${filters.modo === m ? 'bg-accent text-white' : 'text-[var(--text-muted)]'}`}
             >
               {m === 'todos' ? 'Todos' : 'Lançamentos e empreendimentos'}
             </button>
@@ -173,51 +173,13 @@ export default function FilterBar({ filters, onChange }: Props) {
             type="button"
             onClick={() => set('situacao', filters.situacao.includes(v) ? filters.situacao.filter((x) => x !== v) : [...filters.situacao, v])}
             aria-pressed={filters.situacao.includes(v)}
-            className={`${pillClass} ${filters.situacao.includes(v) ? 'bg-ink text-white' : 'bg-[var(--pill-bg)] hover:bg-[var(--pill-bg-hover)]'}`}
+            className={`${pillClass} ${filters.situacao.includes(v) ? 'bg-accent text-white' : 'bg-[var(--pill-bg)] hover:bg-[var(--pill-bg-hover)]'}`}
           >
             {l}
           </button>
         ))}
 
-        {/* Balões de local (exatos) e de palavra-chave — cada um sai com o seu ✕ */}
-        {filters.locais.map((l) => (
-          <button
-            key={`${l.tipo}-${l.id ?? ''}-${l.nome}-${l.cidade}`}
-            type="button"
-            onClick={() => set('locais', filters.locais.filter((x) => x !== l))}
-            className={`${pillClass} flex items-center gap-1.5 bg-ink text-white`}
-            title={`Tirar ${l.nome} da busca`}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-              <path d="M12 21s-7-7.2-7-12a7 7 0 1 1 14 0c0 4.8-7 12-7 12z" />
-              <circle cx="12" cy="9" r="2.5" />
-            </svg>
-            {l.nome}
-            {l.tipo !== 'cidade' && <span className="font-normal opacity-70">· {l.cidade}</span>}
-            <span aria-hidden>✕</span>
-          </button>
-        ))}
-        {filters.termos.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => set('termos', filters.termos.filter((x) => x !== t))}
-            className={`${pillClass} flex items-center gap-1.5 bg-accent text-white`}
-            title={`Tirar "${t}" da busca`}
-          >
-            {t} <span aria-hidden>✕</span>
-          </button>
-        ))}
-
-        {ativos > 0 && (
-          <button
-            type="button"
-            onClick={() => onChange({ ...DEFAULT_FILTERS, modo: filters.modo })}
-            className={`${pillClass} border border-ink text-ink hover:bg-ink hover:text-white`}
-          >
-            Limpar tudo ✕
-          </button>
-        )}
+        {/* locais, buscas e "limpar" ficam só no painel lateral (Filtrando por) */}
 
       </ScrollRow>
 
@@ -257,7 +219,7 @@ export default function FilterBar({ filters, onChange }: Props) {
                             key={t}
                             type="button"
                             onClick={() => setTiposTmp((prev) => (sel ? prev.filter((x) => x !== t) : [...prev, t]))}
-                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${sel ? 'border-ink bg-ink text-white' : 'border-[var(--border)] hover:bg-[var(--pill-bg)]'}`}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${sel ? 'border-accent bg-accent text-white' : 'border-[var(--border)] hover:bg-[var(--pill-bg)]'}`}
                           >
                             {sel ? '✓ ' : ''}
                             {TIPO_UNIDADE_LABEL[t]}

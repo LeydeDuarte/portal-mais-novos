@@ -128,7 +128,8 @@ export default async function NewsCapa({ searchParams }: { searchParams: { q?: s
               )}
             </div>
             <aside className="flex flex-col gap-6">
-              <Banner banners={banners} posicao="lateral-grande" className="lg:sticky lg:top-24" />
+              {/* com poucas notícias, o banner alto deixava buraco: só usa o alto quando a coluna é comprida */}
+              <Banner banners={banners} posicao={demais.length + porTopico.length * 4 >= 8 ? 'lateral-grande' : 'lateral'} className="lg:sticky lg:top-24" />
             </aside>
           </section>
         )}

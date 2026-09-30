@@ -170,7 +170,7 @@ export default function PainelDados() {
             <Cartao rotulo="Acessos ao site" valor={d.acessos} detalhe="páginas abertas" />
             <Cartao rotulo="Visitantes" valor={d.visitantes} detalhe={`${num(d.novos)} novos (primeira visita)`} />
             <Cartao rotulo="Cliques no WhatsApp" valor={d.cliquesWhatsapp} detalhe="botões Falar com a Leyde / Fale comigo" />
-            <Cartao rotulo="Conheça a fundadora" valor={d.cliquesFundadora} detalhe="cliques que foram para o Instagram" />
+            <Cartao rotulo="Instagram da Leyde" valor={d.cliquesFundadora} detalhe="cliques no Conheça a fundadora e no Direct" />
             <Cartao rotulo="Cliques em banners" valor={d.cliquesBanner} detalhe={`${num(d.cliquesAnuncie)} no "Anuncie aqui"`} />
             <Cartao rotulo="Canal do WhatsApp" valor={d.cliquesCanal} detalhe="cliques em Seguir no WhatsApp" />
             <Cartao rotulo="Leituras no News" valor={d.leiturasNews} detalhe="páginas de notícia abertas" />

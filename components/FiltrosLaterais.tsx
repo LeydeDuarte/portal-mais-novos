@@ -10,7 +10,7 @@ import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib
 // Lançamentos e as tags de status. Tudo aqui aplica na hora, sem botão "Aplicar"
 // (preço, área e ano aplicam ao sair do campo ou apertar Enter).
 const chip = (on: boolean) =>
-  `rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition ${on ? 'border-ink bg-ink text-white' : 'border-[var(--border)] hover:bg-[var(--pill-bg)]'}`;
+  `rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition ${on ? 'border-accent bg-accent text-white' : 'border-[var(--border)] hover:bg-[var(--pill-bg)]'}`;
 // Aluguel escondido por enquanto (só venda no portal). Para voltar, trocar para true.
 const MOSTRAR_ALUGUEL = false;
 const campo = 'w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-[13px] outline-none focus:border-ink';
@@ -134,23 +134,6 @@ function Localizacao({ filters, onChange }: { filters: FilterState; onChange: (f
           </div>
         )}
       </div>
-      {filters.locais.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {filters.locais.map((l) => (
-            <span key={localKey(l)} className="flex items-center gap-1 rounded-full bg-ink py-1 pl-3 pr-1 text-[12px] font-medium text-white">
-              {l.tipo === 'cidade' ? `${l.nome} - ${l.uf}` : l.nome}
-              <button
-                type="button"
-                aria-label={`Tirar ${l.nome}`}
-                onClick={() => onChange({ ...filters, locais: filters.locais.filter((x) => localKey(x) !== localKey(l)) })}
-                className="grid h-5 w-5 place-items-center rounded-full bg-white/20"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -161,6 +144,23 @@ export default function FiltrosLaterais({ filters, onChange }: { filters: Filter
   const ano = new Date().getFullYear();
   const ativos = countActiveFilters({ ...filters, situacao: [], termos: [], locais: [] });
   const total = countActiveFilters(filters);
+  const brlCurto = (v: number) => (v >= 1_000_000 ? `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi` : `R$ ${Math.round(v / 1000)} mil`);
+  const faixa = (a: number | null, b: number | null, f: (v: number) => string) => (a && b ? `${f(a)} a ${f(b)}` : a ? `a partir de ${f(a)}` : b ? `até ${f(b)}` : '');
+  const nums = (arr: number[] | undefined, nome: string) => (arr?.length ? `${arr.map((x) => rotuloNumero(x)).join(', ')} ${nome}` : '');
+  const itensAtivos: { k: string; rotulo: string; tirar: () => void }[] = [
+    ...filters.locais.map((l) => ({ k: `l-${localKey(l)}`, rotulo: l.tipo === 'cidade' ? l.nome : `${l.nome} · ${l.cidade}`, tirar: () => set('locais', filters.locais.filter((x) => localKey(x) !== localKey(l))) })),
+    ...filters.termos.map((t) => ({ k: `t-${t}`, rotulo: `“${t}”`, tirar: () => set('termos', filters.termos.filter((x) => x !== t)) })),
+    ...filters.situacao.map((v) => ({ k: `s-${v}`, rotulo: BUCKET_LABEL[v] ?? v, tirar: () => set('situacao', filters.situacao.filter((x) => x !== v)) })),
+    ...(filters.finalidade !== 'todas' ? [{ k: 'fin', rotulo: filters.finalidade === 'venda' ? 'Comprar' : 'Alugar', tirar: () => set('finalidade', 'todas') }] : []),
+    ...filters.tipos.map((t) => ({ k: `tp-${t}`, rotulo: TIPO_UNIDADE_LABEL[t], tirar: () => set('tipos', filters.tipos.filter((x) => x !== t)) })),
+    ...(filters.precoMin || filters.precoMax ? [{ k: 'preco', rotulo: faixa(filters.precoMin, filters.precoMax, brlCurto), tirar: () => onChange({ ...filters, precoMin: null, precoMax: null }) }] : []),
+    ...(filters.areaMin || filters.areaMax ? [{ k: 'area', rotulo: faixa(filters.areaMin, filters.areaMax, (v) => `${v} m²`), tirar: () => onChange({ ...filters, areaMin: null, areaMax: null }) }] : []),
+    ...(filters.quartos?.length ? [{ k: 'q', rotulo: nums(filters.quartos, 'quartos'), tirar: () => set('quartos', []) }] : []),
+    ...(filters.banheiros?.length ? [{ k: 'b', rotulo: nums(filters.banheiros, 'banheiros'), tirar: () => set('banheiros', []) }] : []),
+    ...(filters.vagas?.length ? [{ k: 'v', rotulo: nums(filters.vagas, 'vagas'), tirar: () => set('vagas', []) }] : []),
+    ...(filters.anoMin || filters.anoMax ? [{ k: 'ano', rotulo: `Entrega ${faixa(filters.anoMin, filters.anoMax, String)}`, tirar: () => onChange({ ...filters, anoMin: null, anoMax: null }) }] : []),
+    ...(filters.aceitaTemporada !== 'todas' ? [{ k: 'temp', rotulo: 'Aceita temporada', tirar: () => set('aceitaTemporada', 'todas') }] : [])
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -174,24 +174,11 @@ export default function FiltrosLaterais({ filters, onChange }: { filters: Filter
             </button>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {filters.termos.map((t) => (
-              <button key={`t-${t}`} type="button" onClick={() => set('termos', filters.termos.filter((x) => x !== t))} className="flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold text-white">
-                “{t}” <span aria-hidden>✕</span>
-                <span className="sr-only">Remover busca</span>
+            {itensAtivos.map((it) => (
+              <button key={it.k} type="button" onClick={it.tirar} title={`Tirar ${it.rotulo}`} className="flex items-center gap-1 rounded-full bg-accent px-3 py-1.5 text-[12px] font-semibold text-white">
+                {it.rotulo} <span aria-hidden>✕</span>
               </button>
             ))}
-            {filters.locais.map((l) => (
-              <button key={`l-${localKey(l)}`} type="button" onClick={() => set('locais', filters.locais.filter((x) => localKey(x) !== localKey(l)))} className="flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold text-white">
-                {l.nome} <span aria-hidden>✕</span>
-                <span className="sr-only">Remover local</span>
-              </button>
-            ))}
-            {filters.situacao.map((s) => (
-              <button key={`s-${s}`} type="button" onClick={() => set('situacao', filters.situacao.filter((x) => x !== s))} className="flex items-center gap-1 rounded-full bg-accent px-3 py-1.5 text-[12px] font-semibold text-white">
-                {BUCKET_LABEL[s] ?? s} <span aria-hidden>✕</span>
-              </button>
-            ))}
-            {ativos > 0 && <span className="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-[var(--text-muted)]">+ {ativos} filtro(s) abaixo</span>}
           </div>
         </div>
       )}

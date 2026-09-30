@@ -3,12 +3,12 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { TOPICOS, nomeTopico, urlNoticia, urlRegiao, UFS, videoEmbed, miniaturaVideo, minutosLeitura, textoPuro, type Noticia } from '@/lib/news/base';
 import { mesAno, pct, type Indicador } from '@/lib/indicadores';
-import { WHATSAPP_ATENDIMENTO } from '@/lib/marca';
+import { INSTAGRAM_DIRECT } from '@/lib/marca';
 import { regioesComNoticias, type BannerAtivo } from '@/lib/news/dados';
 import { mercadoPorBairro } from '@/lib/news/mercado';
 import { lerIndicadores } from '@/lib/indicadores';
 import { SeletorRegiao } from './SeletorRegiao';
-import BotaoWhatsapp from '@/components/BotaoWhatsapp';
+import BotaoInstagram from './BotaoInstagram';
 
 export const dataCurta = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Sao_Paulo' }).replace('.', '') : '';
@@ -65,11 +65,7 @@ export async function TopoNews({ ativo, q, regiaoAtual }: { ativo?: string; q?: 
               Seguir no WhatsApp
             </a>
           ) : (
-            <BotaoWhatsapp
-              ctx={{ titulo: 'Quero receber as notícias do Mais Novos News no WhatsApp', caminho: '/news', condominio: 'Mais Novos News (WhatsApp)' }}
-              variante="pilula"
-              rotulo="Receber no WhatsApp"
-            />
+            <BotaoInstagram rotulo="Seguir no Instagram" />
           )}
         </div>
       </div>
@@ -138,9 +134,11 @@ export function CardNoticia({ n, variante = 'medio' }: { n: Noticia; variante?: 
   if (variante === 'principal')
     return (
       <article className="flex flex-col gap-4">
-        <Link href={urlNoticia(n)}>
+        <div className="relative">
           <Midia n={n} grande className="aspect-[4/5] rounded-[20px] md:aspect-[16/9]" />
-        </Link>
+          {/* a foto/vídeo inteiro abre a notícia */}
+          <Link href={urlNoticia(n)} aria-label={n.titulo} className="absolute inset-0 z-20 rounded-[20px]" />
+        </div>
         <Rotulo n={n} />
         <Link href={urlNoticia(n)}>
           <h2 className="font-serif text-[30px] font-semibold leading-[1.06] tracking-tight md:text-[46px]">{n.titulo}</h2>
@@ -226,7 +224,7 @@ export function Banner({ banners, posicao, className = '' }: { banners: BannerAt
   if (!b)
     return (
       <a
-        href={`https://wa.me/${WHATSAPP_ATENDIMENTO}?text=${encodeURIComponent('Olá! Quero anunciar no portal Mais Novos Imóveis.')}`}
+        href={INSTAGRAM_DIRECT}
         target="_blank"
         rel="noopener"
         data-rastro="anuncie"
@@ -234,7 +232,7 @@ export function Banner({ banners, posicao, className = '' }: { banners: BannerAt
       >
         <span className="text-[10px] font-bold tracking-[0.12em]">PUBLICIDADE</span>
         <span className="font-semibold text-ink">Anuncie aqui</span>
-        <span>Fale com a gente pelo WhatsApp</span>
+        <span>Fale com a gente no Instagram</span>
       </a>
     );
   const video = videoEmbed(b.video_url);

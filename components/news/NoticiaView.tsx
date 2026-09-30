@@ -4,7 +4,6 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import JsonLd from '@/components/JsonLd';
 import RelatedListings from '@/components/RelatedListings';
-import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import Corpo, { Inline } from '@/components/news/Corpo';
 import BannerFundadora from '@/components/news/BannerFundadora';
 import { Banner, CardNoticia, Midia, dataCurta } from '@/components/news/Pecas';
@@ -13,7 +12,8 @@ import { relacionadas, bannersAtivos } from '@/lib/news/dados';
 import { imoveisParaNoticia } from '@/lib/news/imoveis';
 import { blocosDoTexto, slugNews, focoDaNoticia, minutosLeitura, nomeTopico, textoPuro, urlNoticia, urlRegiao, UFS, type Noticia } from '@/lib/news/base';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
-import { MAIS_VALOR_URL } from '@/lib/marca';
+import { INSTAGRAM_DIRECT, LEYDE_CARGO } from '@/lib/marca';
+import BotaoInstagram from '@/components/news/BotaoInstagram';
 
 export default async function NoticiaView({ n, previa = false }: { n: Noticia; previa?: boolean }) {
   const url = `${SITE_URL}${urlNoticia(n)}`;
@@ -71,7 +71,7 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
               articleSection: nomeTopico(n.topico),
               keywords: [nomeTopico(n.topico), n.bairro, n.cidade, ...n.tags].filter(Boolean).join(', '),
               wordCount: texto.split(/\s+/).length,
-              author: { '@type': 'Person', name: n.autor, jobTitle: 'Corretora de imóveis e especialista em crédito imobiliário', identifier: n.autor === 'Leyde Duarte' ? 'CRECI 17586' : undefined, url: `${SITE_URL}/quem-somos` },
+              author: { '@type': 'Person', name: n.autor, jobTitle: LEYDE_CARGO, identifier: n.autor === 'Leyde Duarte' ? 'CRECI 17586' : undefined, url: `${SITE_URL}/quem-somos` },
               publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL, logo: { '@type': 'ImageObject', url: `${SITE_URL}/icon.png` } },
               mainEntityOfPage: url,
               contentLocation: n.cidade ? { '@type': 'Place', name: [n.bairro, n.cidade, n.uf].filter(Boolean).join(', ') } : undefined,
@@ -119,7 +119,7 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
                 <Link href="/quem-somos" className="font-bold text-ink">
                   {n.autor}
                 </Link>
-                <span>{n.autor === 'Leyde Duarte' ? 'Corretora e especialista em crédito · CRECI 17586' : 'Mais Novos News'}</span>
+                <span>{n.autor === 'Leyde Duarte' ? LEYDE_CARGO : 'Mais Novos News'}</span>
               </span>
             </div>
             <div className="flex items-center gap-3 text-[13px] text-[var(--text-muted)]">
@@ -193,14 +193,14 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
           {(() => {
             const cta =
               n.topico === 'financiamento'
-                ? { t: 'Quer entender a matemática do seu crédito sem amadorismo?', s: 'Faça uma simulação técnica com a nossa equipe de estruturação: financiamento, portabilidade ou crédito com garantia do imóvel.', b: 'Simular com a equipe', href: MAIS_VALOR_URL }
+                ? { t: 'Quer entender a matemática do seu crédito sem amadorismo?', s: 'Faça uma simulação técnica com a nossa equipe de estruturação: financiamento, portabilidade ou crédito com garantia do imóvel.', b: 'Chamar no Instagram', href: INSTAGRAM_DIRECT }
                 : n.topico === 'lancamentos' || n.empreendimentoId
                   ? { t: 'Procurando uma unidade específica?', s: 'Acesse o portfólio completo de lançamentos e condomínios cadastrados na Mais Novos, com tabela, planta e disponibilidade.', b: 'Ver lançamentos', href: '/lancamentos' }
                   : n.topico === 'direito-imobiliario' || n.topico === 'comprar-e-vender'
-                    ? { t: 'Documento, ITBI e cartório sem susto', s: 'Antes de assinar, a gente revisa o que costuma dar problema: matrícula, certidões, memorial descritivo e custos reais da compra.', b: 'Falar com a equipe', href: `https://wa.me/5562999817077?text=${encodeURIComponent('Olá! Li a notícia "' + n.titulo + '" e quero ajuda com a documentação da compra.')}` }
+                    ? { t: 'Documento, ITBI e cartório sem susto', s: 'Antes de assinar, a gente revisa o que costuma dar problema: matrícula, certidões, memorial descritivo e custos reais da compra.', b: 'Chamar no Instagram', href: INSTAGRAM_DIRECT }
                     : n.bairro
                       ? { t: `Quer morar ou investir no ${n.bairro}?`, s: `Veja todos os imóveis e condomínios do ${n.bairro}, com preço, fotos e o que está disponível agora.`, b: `Imóveis no ${n.bairro}`, href: `/imoveis-a-venda/${(n.uf ?? 'go').toLowerCase()}/${slugNews(n.cidade ?? 'Goiânia')}/${slugNews(n.bairro)}` }
-                      : { t: 'Quanto vale o seu imóvel hoje?', s: 'Comparamos com os anúncios e as vendas da região e te dizemos um preço que vende, não um preço que só enfeita anúncio.', b: 'Avaliar meu imóvel', href: '/vender' };
+                      : { t: 'Quanto vale o seu imóvel hoje?', s: 'Comparamos com os anúncios e as vendas da região e te dizemos um preço que vende, não um preço que só enfeita anúncio.', b: 'Avaliar meu imóvel', href: '/avaliar' };
             return (
               <div className="rounded-2xl border-2 border-accent/30 bg-[#F3F7FF] p-5">
                 <p className="font-serif text-[21px] font-semibold leading-snug">{cta.t}</p>
@@ -214,12 +214,13 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
 
           <div className="flex flex-col gap-4 rounded-2xl bg-[var(--pill-bg)] p-5 sm:flex-row sm:items-center">
             <div className="flex-1">
-              <strong className="text-[16px]">{n.autor}</strong>
-              <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
-                Corretora desde 2010 e especialista em crédito imobiliário. Escreve aqui o que costuma dizer no café com cliente, só que com fonte.
+              <strong className="block text-[16px]">{n.autor}</strong>
+              {n.autor === 'Leyde Duarte' && <span className="block text-[13px] font-semibold text-accent">{LEYDE_CARGO}</span>}
+              <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">
+                Corretora desde 2010, especialista em desenvolvimento imobiliário e estruturação de crédito para aquisição de imóveis. Publica aqui o que costuma dizer no café com clientes, só que com fontes.
               </p>
             </div>
-            <BotaoWhatsapp ctx={whats} variante="pilula" rotulo="Falar com a Leyde" />
+            <BotaoInstagram />
           </div>
 
           <BannerFundadora className="lg:hidden" />

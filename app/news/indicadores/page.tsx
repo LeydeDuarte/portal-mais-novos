@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import JsonLd from '@/components/JsonLd';
-import BotaoWhatsapp from '@/components/BotaoWhatsapp';
+import BotaoInstagram from '@/components/news/BotaoInstagram';
 import { Banner, TopoNews } from '@/components/news/Pecas';
 import { lerIndicadores, mesAno, pct, serieValida, SERIES } from '@/lib/indicadores';
 import { bannersAtivos } from '@/lib/news/dados';
@@ -130,7 +130,7 @@ export default async function IndicadoresPage({ searchParams }: { searchParams: 
               <h2 className="font-serif text-lg font-semibold">Quer saber quanto isso pesa na sua parcela?</h2>
               <p className="mt-1.5 text-sm text-[#C5CAD3]">A Leyde faz a conta com você: financiamento, parcela na planta ou reajuste de aluguel.</p>
               <div className="mt-3">
-                <BotaoWhatsapp ctx={{ titulo: `Indicadores: ${cfg.nome}`, caminho: '/news/indicadores', condominio: 'Mais Novos News' }} variante="pilula" rotulo="Simular com a Leyde" />
+<BotaoInstagram rotulo="Simular com a Leyde no Instagram" />
               </div>
             </div>
           </div>

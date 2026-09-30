@@ -115,7 +115,7 @@ export async function dadosDoPainel(periodo: Periodo = 'mes', de?: string, ate?:
               count(distinct visitante) filter (where tipo = 'visita') visitantes,
               count(*) filter (where tipo = 'visita' and novo) novos,
               count(*) filter (where tipo = 'whatsapp') whatsapp,
-              count(*) filter (where tipo = 'fundadora') fundadora,
+              count(*) filter (where tipo in ('fundadora', 'instagram')) fundadora,
               count(*) filter (where tipo = 'banner') banner,
               count(*) filter (where tipo = 'canal') canal,
               count(*) filter (where tipo = 'anuncie') anuncie,
