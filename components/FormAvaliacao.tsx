@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import LoginModal from '@/components/LoginModal';
 import { useSession } from '@/lib/use-session';
 import { getLocationIndex, type LocalSugestao } from '@/lib/actions';
-import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import { avaliarImovel, type ResultadoAvaliacao } from '@/lib/avaliacao';
 
 const TIPOS: [string, string][] = [
@@ -197,11 +196,11 @@ export default function FormAvaliacao() {
               </div>
             )}
             <div className="rounded-2xl bg-[var(--pill-bg)] p-5">
-              <p className="font-serif text-lg font-semibold">Quer vender por esse valor, ou saber o valor exato?</p>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">A Leyde visita o imóvel e faz a avaliação completa, com estratégia de venda.</p>
-              <div className="mt-3">
-                <BotaoWhatsapp ctx={{ titulo: `Avaliação: ${f.tipo} de ${f.area} m² no ${f.bairro} (estimativa ${brl(r.valor)})`, caminho: '/avaliar', condominio: 'Avaliação de imóvel' }} variante="pilula" rotulo="Quero a avaliação completa" />
-              </div>
+              <p className="font-serif text-lg font-semibold">Quer anunciar seu imóvel conosco?</p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">Anuncie no Mais Novos e fale com quem está procurando imóvel na sua região.</p>
+              <a href="/vender" className="mt-3 inline-flex h-11 items-center rounded-full bg-accent px-5 text-sm font-bold text-white hover:brightness-95">
+                Anunciar meu imóvel →
+              </a>
             </div>
           </div>
         )}
