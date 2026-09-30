@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Logo from './Logo';
 import LoginModal from './LoginModal';
 import { useSession } from '@/lib/use-session';
+import { useStaffSession } from '@/lib/use-staff-session';
 import type { Cliente } from '@/lib/cliente-auth';
 
 // Campo de busca do topo.
@@ -25,6 +26,7 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
   const pathname = usePathname();
   const [q, setQ] = useState('');
   const { session, signIn, signOut } = useSession();
+  const { staff } = useStaffSession();
   const [login, setLogin] = useState<null | 'favoritos' | 'entrar'>(null);
   const [menu, setMenu] = useState(false);
   const [menuCel, setMenuCel] = useState(false);
@@ -58,6 +60,22 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
         <Logo tipo="simbolo" altura={30} className="md:hidden" />
         <Logo tipo="completo" altura={40} className="hidden md:block" />
       </a>
+      {/* só para a equipe logada: volta para o painel (o endereço /dashboard leva ao app) */}
+      {staff && (
+        <a
+          href="/dashboard"
+          title={`Voltar ao painel (${staff.name})`}
+          className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-ink px-3 text-[12px] font-bold text-white hover:opacity-90"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect x="3" y="3" width="7" height="9" rx="1" />
+            <rect x="14" y="3" width="7" height="5" rx="1" />
+            <rect x="14" y="12" width="7" height="9" rx="1" />
+            <rect x="3" y="16" width="7" height="5" rx="1" />
+          </svg>
+          Painel
+        </a>
+      )}
 
       <nav className="hidden items-center gap-1 md:flex">
         {NAV.map(({ label, href }) => (
