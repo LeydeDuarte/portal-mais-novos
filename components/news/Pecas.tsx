@@ -286,7 +286,7 @@ export function FaixaIndicadores({ lista }: { lista: Indicador[] }) {
     <section aria-label="Indicadores do mês">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <h2 className="font-serif text-[26px] font-semibold md:text-[30px]">Indicadores do mês</h2>
-        <span className="text-[13px] text-[var(--text-muted)]">Fonte: Banco Central (SGS), IBGE e FGV · atualiza sozinho</span>
+        <span className="text-[13px] text-[var(--text-muted)]">Fonte: Banco Central, IBGE e FGV</span>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         {com.map((i) => (

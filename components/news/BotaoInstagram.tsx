@@ -1,10 +1,10 @@
 // Botão do Direct do Instagram (no News, o contato é sempre por aqui, nunca WhatsApp direto)
-import { INSTAGRAM_DIRECT } from '@/lib/marca';
+import { INSTAGRAM_URL } from '@/lib/marca';
 
-export default function BotaoInstagram({ rotulo = 'Falar com a Leyde no Instagram', className = '' }: { rotulo?: string; className?: string }) {
+export default function BotaoInstagram({ rotulo = 'Conhecer a Leyde nas redes sociais', className = '', href = INSTAGRAM_URL }: { rotulo?: string; className?: string; href?: string }) {
   return (
     <a
-      href={INSTAGRAM_DIRECT}
+      href={href}
       target="_blank"
       rel="noopener"
       data-rastro="instagram"

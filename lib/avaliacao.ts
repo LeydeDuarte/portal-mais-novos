@@ -9,6 +9,7 @@
 // 4) média ponderada pela semelhança (distância, mesmo bairro, área parecida) e intervalo
 //    de confiança de 80% (t de Student). É uma estimativa estatística, não um laudo.
 import { query } from './db';
+import { getCliente } from './cliente-auth';
 // grupos de tipo (mesma divisão usada nos similares)
 const GRUPO_TIPO: Record<string, string> = {
   studio: 'vertical', flat: 'vertical', loft: 'vertical', apartamento: 'vertical', apartamento_garden: 'vertical',
@@ -44,9 +45,17 @@ const t80 = (gl: number) => {
 };
 
 export async function avaliarImovel(e: EntradaAvaliacao): Promise<ResultadoAvaliacao> {
+  const cliente = await getCliente().catch(() => null);
+  if (!cliente) return { ok: false, erro: 'Entre com a sua conta para ver a avaliação.' };
   const area = Number(e.area);
-  if (!e.cidade?.trim() || !e.bairro?.trim()) return { ok: false, erro: 'Informe a cidade e o bairro.' };
+  if (!e.cidade?.trim() || !e.bairro?.trim()) return { ok: false, erro: 'Escolha o bairro na lista.' };
   if (!(area >= 15 && area <= 5000)) return { ok: false, erro: 'Informe a área privativa em m² (entre 15 e 5.000).' };
+  const registrar = (resumo: string) =>
+    query(
+      `insert into interest_leads (nome, email, condominio, mensagem, finalidade, area_min, quartos, aceita_contato)
+       values ($1, $2, 'Avaliação de imóvel', $3, 'venda', $4, $5, true)`,
+      [cliente.nome || cliente.email, cliente.email, `Avaliação: ${e.tipo} de ${area} m² no ${e.bairro} (${e.cidade}). ${resumo}`, area, e.quartos ? Math.round(e.quartos) : null]
+    ).catch(() => {});
   const grupo = GRUPO_TIPO[e.tipo] ?? 'vertical';
   const tipos = Object.entries(GRUPO_TIPO).filter(([, g]) => g === grupo).map(([t]) => t);
 
@@ -74,7 +83,10 @@ export async function avaliarImovel(e: EntradaAvaliacao): Promise<ResultadoAvali
       order by q.mesmo desc, q.dist nulls last limit 40`,
     [tipos, e.cidade.trim(), e.bairro.trim(), area]
   ).catch(() => []);
-  if (rows.length < 3) return { ok: false, erro: 'Ainda não temos anúncios suficientes parecidos com o seu nessa região para uma estimativa confiável. Fale com a gente para uma avaliação feita por um corretor.' };
+  if (rows.length < 3) {
+    await registrar('Sem amostras suficientes: enviar avaliação por e-mail.');
+    return { ok: false, erro: 'Ainda não temos anúncios suficientes parecidos com o seu nessa região para uma estimativa confiável. Recebemos o seu pedido e vamos te enviar a avaliação por e-mail.' };
+  }
 
   const anoAval = e.ano && e.ano > 1950 ? e.ano : null;
   const brutas: Amostra[] = rows.map((r) => {
@@ -96,7 +108,10 @@ export async function avaliarImovel(e: EntradaAvaliacao): Promise<ResultadoAvali
   const ord = [...brutas].map((x) => x.m2Homog).sort((a, b) => a - b);
   const mediana = ord[Math.floor(ord.length / 2)];
   const amostras = brutas.filter((x) => x.m2Homog >= mediana * 0.65 && x.m2Homog <= mediana * 1.35);
-  if (amostras.length < 3) return { ok: false, erro: 'As amostras da região variam demais para uma estimativa segura. Fale com a gente para uma avaliação feita por um corretor.' };
+  if (amostras.length < 3) {
+    await registrar('Amostras dispersas: enviar avaliação por e-mail.');
+    return { ok: false, erro: 'As amostras da região variam demais para uma estimativa segura. Recebemos o seu pedido e vamos te enviar a avaliação por e-mail.' };
+  }
 
   const somaP = amostras.reduce((s, x) => s + x.peso, 0);
   const media = amostras.reduce((s, x) => s + x.m2Homog * x.peso, 0) / somaP;
@@ -107,6 +122,7 @@ export async function avaliarImovel(e: EntradaAvaliacao): Promise<ResultadoAvali
   const minimo = Math.round(((media - meio) * area) / 1000) * 1000;
   const maximo = Math.round(((media + meio) * area) / 1000) * 1000;
   const amplitudePct = Math.round(((maximo - minimo) / valor) * 1000) / 10;
+  await registrar(`Estimativa: R$ ${valor.toLocaleString('pt-BR')} (faixa R$ ${minimo.toLocaleString('pt-BR')} a R$ ${maximo.toLocaleString('pt-BR')}).`);
   const grau = amplitudePct <= 30 ? 'III' : amplitudePct <= 40 ? 'II' : amplitudePct <= 50 ? 'I' : 'Fora da norma';
   return {
     ok: true,

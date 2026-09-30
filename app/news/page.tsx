@@ -75,6 +75,12 @@ export default async function NewsCapa({ searchParams }: { searchParams: { q?: s
             <CardNoticia n={principal} variante="principal" />
             <aside className="flex flex-col gap-6">
               <MaisLidas itens={lidas.length ? lidas : resto.slice(0, 5)} />
+              <Link href="/avaliar" className="group flex flex-col gap-1.5 rounded-2xl border-2 border-accent/30 bg-[#F3F7FF] p-4 hover:border-accent">
+                <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-accent">Grátis e na hora</span>
+                <span className="font-serif text-[20px] font-semibold leading-snug">Quanto vale o seu imóvel hoje?</span>
+                <span className="text-[13px] leading-snug text-[var(--text-muted)]">Avaliação pelo método comparativo da NBR 14653, com os anúncios da sua região.</span>
+                <span className="mt-1 inline-flex h-10 w-fit items-center rounded-full bg-accent px-4 text-sm font-bold text-white">Avaliar meu imóvel →</span>
+              </Link>
               <BannerFundadora />
               <Regioes lista={regioes} />
               <Banner banners={banners} posicao="lateral" />
@@ -138,7 +144,7 @@ export default async function NewsCapa({ searchParams }: { searchParams: { q?: s
           <section className="border-t border-[var(--border)] pt-8">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
               <h2 className="font-serif text-[26px] font-semibold md:text-[30px]">Preço do m² por bairro</h2>
-              <span className="text-[13px] text-[var(--text-muted)]">Fonte: anúncios à venda e vendas registradas no Mais Novos Imóveis · atualiza sozinho</span>
+              <span className="text-[13px] text-[var(--text-muted)]">Fonte: Mais Novos Imóveis</span>
             </div>
             <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
               <table className="w-full min-w-[560px] text-sm">
@@ -169,7 +175,7 @@ export default async function NewsCapa({ searchParams }: { searchParams: { q?: s
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-xs text-[var(--text-muted)]">Só entram bairros com pelo menos 4 anúncios. A variação em 12 meses aparece quando o bairro tem vendas registradas nos dois períodos.</p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">Informações coletadas e tratadas em nosso banco de dados próprio.</p>
           </section>
         )}
       </main>

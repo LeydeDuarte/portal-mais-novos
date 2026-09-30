@@ -155,3 +155,39 @@ img {
   /* campos de formulário e listas */
   :root:not([data-theme='light']) input, :root:not([data-theme='light']) select, :root:not([data-theme='light']) textarea { background-color: var(--surface); color: var(--text); }
 }
+
+/* Modo escuro: varredura completa das cores fixas (etiquetas de condomínio, venda, caixas) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bg-\[\#DCFCE7\] { background-color: rgba(16,185,129,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#E7FBEF\] { background-color: rgba(16,185,129,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#EAF2FF\] { background-color: rgba(37,124,255,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#EEF1F4\] { background-color: var(--pill-bg) !important; }
+  :root:not([data-theme='light']) .bg-\[\#EFEFEF\] { background-color: var(--pill-bg) !important; }
+  :root:not([data-theme='light']) .bg-\[\#F2F7FF\] { background-color: rgba(37,124,255,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#F3F7FF\] { background-color: rgba(37,124,255,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#F6F6F7\] { background-color: var(--pill-bg) !important; }
+  :root:not([data-theme='light']) .bg-\[\#F6F7F9\] { background-color: var(--pill-bg) !important; }
+  :root:not([data-theme='light']) .bg-\[\#eef4ff\] { background-color: rgba(37,124,255,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#f1f3f5\] { background-color: var(--pill-bg) !important; }
+  :root:not([data-theme='light']) .bg-\[\#f5f8ff\] { background-color: rgba(37,124,255,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#fff5f5\] { background-color: rgba(239,68,68,.18) !important; }
+  :root:not([data-theme='light']) .text-\[\#0F1E3D\] { color: var(--text) !important; }
+  :root:not([data-theme='light']) .text-\[\#14161A\] { color: var(--text) !important; }
+  :root:not([data-theme='light']) .text-\[\#14161a\] { color: var(--text) !important; }
+  :root:not([data-theme='light']) .text-\[\#166534\] { color: #34d399 !important; }
+  :root:not([data-theme='light']) .text-\[\#1A0DAB\] { color: #93c5fd !important; }
+  :root:not([data-theme='light']) .text-\[\#1B5FCC\] { color: #93c5fd !important; }
+  :root:not([data-theme='light']) .text-\[\#22262E\] { color: var(--text) !important; }
+  :root:not([data-theme='light']) .text-\[\#3c4043\] { color: var(--text-muted) !important; }
+  :root:not([data-theme='light']) .text-\[\#4D5156\] { color: var(--text-muted) !important; }
+  :root:not([data-theme='light']) .text-\[\#B42318\] { color: #f87171 !important; }
+  :root:not([data-theme='light']) .text-\[\#D6246E\] { color: #f472b6 !important; }
+  :root:not([data-theme='light']) .text-\[\#e62f2f\] { color: #f87171 !important; }
+  :root:not([data-theme='light']) .border-\[\#C9CED6\] { border-color: var(--border) !important; }
+  :root:not([data-theme='light']) .border-\[\#E7EAEE\] { border-color: var(--border) !important; }
+  :root:not([data-theme='light']) .border-\[\#e6e8eb\] { border-color: var(--border) !important; }
+}
+
+/* Nada pode deixar a página mais larga que a tela (no celular isso aparecia como
+   faixas brancas dos lados). "clip" não atrapalha os elementos fixos/grudados. */
+html, body { overflow-x: clip; max-width: 100%; }

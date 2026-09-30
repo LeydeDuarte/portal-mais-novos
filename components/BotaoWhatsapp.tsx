@@ -101,12 +101,10 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
             rastrear('whatsapp', ctx.developmentId ?? ctx.caminho);
             setAberto(true);
           }}
-          className="flex h-[52px] flex-1 items-center justify-center gap-2.5 rounded-full bg-accent text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(37,124,255,0.28)] hover:brightness-95"
+          className="flex h-[52px] flex-1 items-center justify-center gap-2.5 rounded-full bg-[#25D366] text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(37,211,102,0.30)] hover:brightness-95"
         >
+          <IconeWhats size={20} />
           {rotulo ?? 'Fale comigo'}
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-[#25D366]">
-            <IconeWhats size={17} />
-          </span>
         </button>
       ) : variante === 'bloco' ? (
         <button

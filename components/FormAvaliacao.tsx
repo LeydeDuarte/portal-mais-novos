@@ -1,6 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import LoginModal from '@/components/LoginModal';
+import { useSession } from '@/lib/use-session';
+import { getLocationIndex, type LocalSugestao } from '@/lib/actions';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import { avaliarImovel, type ResultadoAvaliacao } from '@/lib/avaliacao';
 
@@ -15,12 +18,32 @@ const TIPOS: [string, string][] = [
   ['sala_comercial', 'Sala comercial']
 ];
 const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR')}`;
+const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const campo = 'h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-[15px] outline-none focus:border-accent';
 
 export default function FormAvaliacao() {
-  const [f, setF] = useState({ cidade: 'Goiânia', bairro: '', tipo: 'apartamento', area: '', quartos: '', vagas: '', ano: '' });
+  const [f, setF] = useState({ cidade: '', bairro: '', tipo: 'apartamento', area: '', quartos: '', vagas: '', ano: '' });
   const [r, setR] = useState<ResultadoAvaliacao | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const { session, signIn } = useSession();
+  const [login, setLogin] = useState(false);
+  // bairro: a pessoa digita e CONFIRMA na lista (mesmo índice dos filtros do site)
+  const [indice, setIndice] = useState<LocalSugestao[]>([]);
+  const [busca, setBusca] = useState('');
+  const [aberta, setAberta] = useState(false);
+  useEffect(() => {
+    getLocationIndex().then(setIndice).catch(() => {});
+  }, []);
+  const sugestoes = useMemo(() => {
+    const t = semAcento(busca.trim());
+    if (t.length < 2) return [];
+    return indice.filter((l) => l.tipo === 'bairro' && semAcento(`${l.nome} ${l.cidade}`).includes(t)).slice(0, 8);
+  }, [busca, indice]);
+  const avaliar = async () => {
+    setCarregando(true);
+    setR(await avaliarImovel({ cidade: f.cidade, bairro: f.bairro, tipo: f.tipo, area: num(f.area) ?? 0, quartos: num(f.quartos), vagas: num(f.vagas), ano: num(f.ano) }).catch(() => ({ ok: false as const, erro: 'Não foi possível calcular agora.' })));
+    setCarregando(false);
+  };
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }));
   const num = (v: string) => (v.trim() ? Number(v.replace(',', '.')) : null);
 
@@ -30,9 +53,9 @@ export default function FormAvaliacao() {
         className="flex flex-col gap-3 rounded-2xl border border-[var(--border)] p-5"
         onSubmit={async (e) => {
           e.preventDefault();
-          setCarregando(true);
-          setR(await avaliarImovel({ cidade: f.cidade, bairro: f.bairro, tipo: f.tipo, area: num(f.area) ?? 0, quartos: num(f.quartos), vagas: num(f.vagas), ano: num(f.ano) }).catch(() => ({ ok: false as const, erro: 'Não foi possível calcular agora.' })));
-          setCarregando(false);
+          if (!f.bairro) return setR({ ok: false, erro: 'Escolha o bairro na lista.' });
+          if (!session.cliente) return setLogin(true); // entra com a conta e a avaliação sai em seguida
+          await avaliar();
         }}
       >
         <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
@@ -45,15 +68,50 @@ export default function FormAvaliacao() {
             ))}
           </select>
         </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
-            Cidade
-            <input className={campo} value={f.cidade} onChange={(e) => set('cidade', e.target.value)} required />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
-            Bairro
-            <input className={campo} value={f.bairro} onChange={(e) => set('bairro', e.target.value)} placeholder="Ex.: Setor Bueno" required />
-          </label>
+        <div className="relative flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
+          Bairro
+          {f.bairro ? (
+            <div className="flex h-12 items-center justify-between rounded-xl border border-accent bg-[#F3F7FF] px-3 text-[15px] font-semibold text-[var(--text)]">
+              <span className="truncate">
+                {f.bairro} · {f.cidade}
+              </span>
+              <button type="button" onClick={() => { setF((x) => ({ ...x, bairro: '', cidade: '' })); setBusca(''); }} className="text-sm font-bold text-accent">
+                Trocar
+              </button>
+            </div>
+          ) : (
+            <input
+              className={campo}
+              value={busca}
+              onChange={(e) => {
+                setBusca(e.target.value);
+                setAberta(true);
+              }}
+              onFocus={() => setAberta(true)}
+              placeholder="Digite o bairro: bueno, marista…"
+              autoComplete="off"
+            />
+          )}
+          {!f.bairro && aberta && sugestoes.length > 0 && (
+            <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--bg)] p-1 shadow-xl">
+              {sugestoes.map((l) => (
+                <li key={`${l.nome}-${l.cidade}`}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setF((x) => ({ ...x, bairro: l.nome, cidade: l.cidade }));
+                      setAberta(false);
+                    }}
+                    className="flex w-full justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-[var(--text)] hover:bg-[var(--pill-bg)]"
+                  >
+                    <span>{l.nome}</span>
+                    <span className="text-xs text-[var(--text-muted)]">{l.cidade}/{l.uf}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!f.bairro && busca.trim().length >= 2 && sugestoes.length === 0 && <span className="font-normal">Nenhum bairro encontrado com esse nome.</span>}
         </div>
         <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
           Área privativa (m²)
@@ -76,8 +134,21 @@ export default function FormAvaliacao() {
         <button type="submit" disabled={carregando} className="mt-1 h-12 rounded-full bg-accent text-[15px] font-bold text-white disabled:opacity-60">
           {carregando ? 'Calculando…' : 'Avaliar meu imóvel'}
         </button>
-        <p className="text-[11px] leading-snug text-[var(--text-faint)]">Estimativa estatística com base em anúncios. Não substitui o laudo de avaliação exigido por bancos e cartórios.</p>
+        <p className="text-[11px] leading-snug text-[var(--text-faint)]">
+          {session.cliente ? 'Estimativa estatística com base em anúncios.' : 'Para ver a avaliação, entre com a sua conta (leva 5 segundos).'} Não substitui o laudo exigido por bancos e cartórios.
+        </p>
       </form>
+      <LoginModal
+        open={login}
+        onClose={() => setLogin(false)}
+        titulo="Entre para ver a avaliação"
+        texto="Entrando, você recebe a avaliação na hora e pode receber o estudo completo por e-mail."
+        onSignIn={async (c) => {
+          signIn(c);
+          setLogin(false);
+          await avaliar();
+        }}
+      />
 
       <div>
         {!r ? (

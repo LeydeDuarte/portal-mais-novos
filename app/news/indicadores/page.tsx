@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import JsonLd from '@/components/JsonLd';
-import BotaoInstagram from '@/components/news/BotaoInstagram';
+import CalculadoraIndice from '@/components/news/CalculadoraIndice';
 import { Banner, TopoNews } from '@/components/news/Pecas';
 import { lerIndicadores, mesAno, pct, serieValida, SERIES } from '@/lib/indicadores';
 import { bannersAtivos } from '@/lib/news/dados';
@@ -87,7 +87,7 @@ export default async function IndicadoresPage({ searchParams }: { searchParams: 
         <section className="flex min-w-0 flex-col gap-5">
           <h1 className="font-serif text-[30px] font-semibold leading-tight md:text-[42px]">Selic, IPCA e INCC: os números que mexem no preço do seu imóvel</h1>
           <p className="text-[17px] leading-relaxed text-[var(--text-muted)]">
-            Atualizados sozinhos, direto do Banco Central, todo mês. Sem abrir planilha nem ligar para o gerente do banco.
+            Os índices que mexem no financiamento, nas parcelas na planta e no aluguel, com o histórico em gráfico.
           </p>
           <div className="flex flex-wrap gap-2">
             {SERIES.map((s) => (
@@ -126,13 +126,14 @@ export default async function IndicadoresPage({ searchParams }: { searchParams: 
               <h2 className="text-sm font-bold">Para que serve o {cfg.nome}</h2>
               <p className="mt-1.5 text-[15px] leading-relaxed text-[var(--text-muted)]">{cfg.explica}</p>
             </div>
-            <div className="rounded-2xl bg-ink p-5 text-white">
-              <h2 className="font-serif text-lg font-semibold">Quer saber quanto isso pesa na sua parcela?</h2>
-              <p className="mt-1.5 text-sm text-[#C5CAD3]">A Leyde faz a conta com você: financiamento, parcela na planta ou reajuste de aluguel.</p>
-              <div className="mt-3">
-<BotaoInstagram rotulo="Simular com a Leyde no Instagram" />
+            {cfg.tipo === 'mensal' ? (
+              <CalculadoraIndice nome={cfg.nome} historico={atual.historico} />
+            ) : (
+              <div className="rounded-2xl bg-ink p-5 text-white">
+                <h2 className="font-serif text-lg font-semibold">Selic não corrige valor</h2>
+                <p className="mt-1.5 text-sm text-[#C5CAD3]">Ela define o custo do dinheiro. Para corrigir parcela ou aluguel, escolha IPCA, INCC ou IGP-M acima.</p>
               </div>
-            </div>
+            )}
           </div>
         </section>
         <aside className="flex flex-col gap-3">
