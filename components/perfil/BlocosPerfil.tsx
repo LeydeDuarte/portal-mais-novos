@@ -147,10 +147,10 @@ const Cadeado = () => (
 );
 
 // ---------- anúncios privados (vêm ANTES dos anunciados: valorizam o site) ----------
-export function SecaoPrivados({ onde, itens }: { onde: string; itens: AnuncioOculto[] }) {
+export function SecaoPrivados({ onde, itens, perto = false }: { onde: string; itens: AnuncioOculto[]; perto?: boolean }) {
   if (!itens.length) return null;
   return (
-    <SecaoPerfil titulo={`Anúncios privados no ${onde}`} subtitulo="Imóveis da nossa carteira que não estão públicos a pedido do proprietário. Peça para ver e verificamos a disponibilidade." icone={<Cadeado />}>
+    <SecaoPerfil titulo={perto ? `Anúncios privados perto ${onde}` : `Anúncios privados no ${onde}`} subtitulo="Imóveis da nossa carteira que não estão públicos a pedido do proprietário. Peça para ver e verificamos a disponibilidade." icone={<Cadeado />}>
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
         {itens.map((a) => (
           <OcultoCard key={a.id} a={a} />

@@ -2271,3 +2271,37 @@ export async function condominiosProximos(developmentId: string, limite = 8, exc
   const ids = await proximos(base, { novos: false, excluir, limite });
   return ids.length ? cardsDeCondominios(ids) : [];
 }
+
+/** Anúncios privados perto (mesmo bairro ou até 2 km), do mesmo tipo (casa x apartamento x comercial).
+ *  Aparecem antes dos similares: são exclusividade nossa na região. */
+export async function getOcultosPerto(alvo: { developmentId?: string; propertyId?: string }, excluir: string[] = [], limite = 8): Promise<AnuncioOculto[]> {
+  const b = await query<{ bairro: string | null; cidade: string | null; lat: string | null; lng: string | null; tipos: string[] | null }>(
+    alvo.developmentId
+      ? `select d.bairro, d.cidade, d.lat, d.lng,
+                coalesce((select array_agg(distinct tipo_unidade) from properties where empreendimento_id = d.id),
+                         case when d.tipo = 'horizontal' then array['casa_condominio'] else array['apartamento'] end) tipos
+           from developments d where d.id = $1`
+      : `select p.bairro, p.cidade, coalesce(p.lat, d.lat) lat, coalesce(p.lng, d.lng) lng, array[p.tipo_unidade] tipos
+           from properties p left join developments d on d.id = p.empreendimento_id where p.id = $1`,
+    [alvo.developmentId ?? alvo.propertyId]
+  ).catch(() => []);
+  const base = b[0];
+  if (!base?.cidade) return [];
+  const grupos = new Set((base.tipos ?? []).map((t) => GRUPO_TIPO[t] ?? 'vertical'));
+  const tipos = Object.entries(GRUPO_TIPO).filter(([, g]) => grupos.has(g)).map(([t]) => t);
+  const dist =
+    base.lat != null && base.lng != null
+      ? `111.2 * sqrt(power(coalesce(p.lat, d.lat) - ${Number(base.lat)}, 2) + power((coalesce(p.lng, d.lng) - ${Number(base.lng)}) * cos(radians(${Number(base.lat)})), 2))`
+      : null;
+  const perto = dist ? `or ${dist} <= 2` : '';
+  const rows = await query<PropertyRow>(
+    `select p.* from properties p left join developments d on d.id = p.empreendimento_id
+      where not p.is_tipologia and p.visibilidade = 'privado' and p.vendido_em is null
+        and not (p.id = any($1::text[])) and ($2::text is null or p.empreendimento_id is null or p.empreendimento_id <> $2)
+        and p.tipo_unidade = any($3::text[]) and ${norm("coalesce(p.cidade, '')")} = ${norm('$4::text')}
+        and ((${norm("coalesce(p.bairro, '')")} = ${norm("coalesce($5::text, '')")}) ${perto})
+      order by ${dist ? `coalesce(${dist}, 99)` : '0'}, p.created_at desc limit ${Math.min(limite, 12)}`,
+    [[alvo.propertyId ?? '', ...excluir], alvo.developmentId ?? null, tipos, base.cidade, base.bairro]
+  ).catch(() => []);
+  return rows.map((r) => mascarar(r, true));
+}

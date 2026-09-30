@@ -10,7 +10,7 @@ import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
-import { getRelatedListings, getOcultosDoCondominio, mercadoDoBairro, condominiosProximos, lancamentosProximos } from '@/lib/actions';
+import { getRelatedListings, getOcultosDoCondominio, getOcultosPerto, mercadoDoBairro, condominiosProximos, lancamentosProximos } from '@/lib/actions';
 import BannerFundadora from '@/components/news/BannerFundadora';
 import VitrineNews from '@/components/news/VitrineNews';
 import { SITE_URL } from '@/lib/seo';
@@ -43,6 +43,8 @@ export default async function DevelopmentDetailView({ development }: { developme
   const futuro = !!development.deliveryDate && ehFutura(badge.bucket);
   const concepcao = await concepcaoDe(development.id);
   const reservados = await getOcultosDoCondominio(development.id, development.name, development.cidade).catch(() => []);
+  // privados da região (mesmo bairro ou até 2 km, mesmo tipo): também antes dos similares
+  const reservadosPerto = development.status !== 'rascunho' ? await getOcultosPerto({ developmentId: development.id }, reservados.map((r) => r.id), 6).catch(() => []) : [];
   const embed = development.videoUrl ? getEmbedInfo(development.videoUrl) : null;
   // Preço médio do m² vem só da tabela de vendas (tipologias), não dos imóveis de revenda
   const avgPricePerM2 = getAveragePricePerM2(development.units.filter((u) => u.isTipologia));
@@ -305,11 +307,12 @@ export default async function DevelopmentDetailView({ development }: { developme
           </aside>
         </div>
 
-        {/* sem unidade à venda: parecidos logo abaixo do condomínio */}
-        {semUnidade && secoesParecidos}
-
-        {/* privados PRIMEIRO, antes dos anunciados */}
+        {/* privados PRIMEIRO: do condomínio e da região, antes de anunciados e similares */}
         <SecaoPrivados onde={development.name} itens={reservados} />
+        <SecaoPrivados onde={`do ${development.name}`} itens={reservadosPerto} perto />
+
+        {/* sem unidade à venda: parecidos logo abaixo dos privados */}
+        {semUnidade && secoesParecidos}
 
         {!semUnidade && (
         <RelatedListings

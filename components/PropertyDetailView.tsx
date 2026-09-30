@@ -16,7 +16,7 @@ import BarraEquipe from '@/components/BarraEquipe';
 import { altFoto, nomeCondominioSeo, trilhaDoImovel, tituloSeoImovel } from '@/lib/seo';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getAveragePricePerM2, formatPricePerM2, type PropertyDetail } from '@/lib/property-details';
-import { getDevelopmentById, getOcultosDoCondominio, getRelatedListings, lancamentosProximos, mercadoDoBairro } from '@/lib/actions';
+import { getDevelopmentById, getOcultosDoCondominio, getOcultosPerto, getRelatedListings, lancamentosProximos, mercadoDoBairro } from '@/lib/actions';
 import BannerFundadora from '@/components/news/BannerFundadora';
 import VitrineNews from '@/components/news/VitrineNews';
 import { SITE_URL } from '@/lib/seo';
@@ -97,6 +97,7 @@ export default async function PropertyDetailView({
     property.finalidade === 'venda' ? lancamentosProximos({ propertyId: property.id }, 8).catch(() => []) : Promise.resolve([])
   ]);
   const outrosPrivados = privados.filter((a) => a.id !== property.id);
+  const privadosPerto = property.visibilidade !== 'privado' ? await getOcultosPerto({ propertyId: property.id }, outrosPrivados.map((a) => a.id), 6).catch(() => []) : [];
   const entrega = textoEntrega(property.deliveryDate);
   const q = numeroDe(property.beds);
   const ban = numeroDe(property.banheiros);
@@ -274,6 +275,7 @@ export default async function PropertyDetailView({
 
         {/* privados do mesmo condomínio PRIMEIRO, antes dos anunciados */}
         {nomeCondominio && <SecaoPrivados onde={nomeCondominio} itens={outrosPrivados} />}
+        <SecaoPrivados onde={property.bairro ? `do ${property.bairro}` : 'daqui'} itens={privadosPerto} perto />
 
         <RelatedListings
           grade

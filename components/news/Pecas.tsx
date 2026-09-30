@@ -5,6 +5,8 @@ import { TOPICOS, nomeTopico, urlNoticia, urlRegiao, UFS, videoEmbed, miniaturaV
 import { mesAno, pct, type Indicador } from '@/lib/indicadores';
 import { WHATSAPP_ATENDIMENTO } from '@/lib/marca';
 import { regioesComNoticias, type BannerAtivo } from '@/lib/news/dados';
+import { mercadoPorBairro } from '@/lib/news/mercado';
+import { lerIndicadores } from '@/lib/indicadores';
 import { SeletorRegiao } from './SeletorRegiao';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 
@@ -22,8 +24,27 @@ export function Marca({ tamanho = 'g' }: { tamanho?: 'g' | 'p' }) {
 }
 
 export async function TopoNews({ ativo, q, regiaoAtual }: { ativo?: string; q?: string; regiaoAtual?: string }) {
-  const regioes = await regioesComNoticias();
+  const [regioes, bairros, ind] = await Promise.all([regioesComNoticias(), mercadoPorBairro('GO', 8), lerIndicadores(2)]);
+  const radar = [
+    ...ind.filter((i) => i.valor != null && (i.id === 'selic' || i.id === 'incc-di' || i.id === 'ipca')).map((i) => ({ k: i.nome, v: i.id === 'selic' ? `${pct(i.valor)} a.a.` : `${pct(i.valor)} no mês`, href: `/news/indicadores?serie=${i.id}` })),
+    ...bairros.map((b) => ({ k: b.nome, v: `R$ ${b.m2.toLocaleString('pt-BR')}/m²`, href: '/news/mercado' }))
+  ];
   return (
+    <>
+    {radar.length > 0 && (
+      // Radar do mercado: m² dos bairros (nossos dados) e indicadores do Banco Central
+      <div className="w-full overflow-hidden bg-ink text-white">
+        <div className="mx-auto flex h-10 max-w-6xl items-center gap-6 overflow-x-auto whitespace-nowrap px-5 text-[13px] [scrollbar-width:none] md:px-8">
+          <span className="shrink-0 text-[11px] font-bold tracking-[0.08em] text-accent">RADAR DO MERCADO</span>
+          {radar.map((r) => (
+            <Link key={r.k} href={r.href} className="flex shrink-0 gap-1.5 hover:underline">
+              <span className="text-[#B9C0CC]">{r.k}</span>
+              <span className="font-semibold tabular-nums">{r.v}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    )}
     <div className="mx-auto w-full max-w-6xl px-5 pt-6 md:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Marca />
@@ -62,6 +83,7 @@ export async function TopoNews({ ativo, q, regiaoAtual }: { ativo?: string; q?: 
         <Chip href="/news/indicadores" ativo={ativo === 'indicadores'}>Indicadores</Chip>
       </nav>
     </div>
+    </>
   );
 }
 function Chip({ href, ativo, children }: { href: string; ativo: boolean; children: ReactNode }) {
