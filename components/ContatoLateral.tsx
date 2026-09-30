@@ -24,7 +24,7 @@ function maskTelefone(v: string): string {
 
 // Caixa "Fale conosco" da lateral direita (imóvel e empreendimento). Vira um
 // lead em Painel → Interessados (e e-mail para a equipe, se configurado).
-export default function ContatoLateral({ titulo = 'Fale conosco', condominio, developmentId, referencia, mensagemInicial, whatsapp }: Props) {
+export default function ContatoLateral({ titulo = 'Fale conosco', condominio, developmentId, referencia, mensagemInicial, whatsapp, formulario = false }: Props & { formulario?: boolean }) {
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
   const [email, setEmail] = useState('');
@@ -65,14 +65,17 @@ export default function ContatoLateral({ titulo = 'Fale conosco', condominio, de
           <div className="mt-3">
             <BotaoWhatsapp ctx={whatsapp} />
           </div>
-          <div className="my-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">
-            <span className="h-px flex-1 bg-[var(--border)]" />
-            ou deixe sua mensagem
-            <span className="h-px flex-1 bg-[var(--border)]" />
-          </div>
+          {formulario && (
+            <div className="my-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">
+              <span className="h-px flex-1 bg-[var(--border)]" />
+              ou deixe sua mensagem
+              <span className="h-px flex-1 bg-[var(--border)]" />
+            </div>
+          )}
         </>
       )}
-      {ok ? (
+      {/* formulário só onde não há o botão fixo do rodapé (ex.: resumo de anúncio privado) */}
+      {!formulario && whatsapp ? null : ok ? (
         <p className="mt-2 text-sm text-emerald-800">Mensagem enviada! Um corretor vai falar com você em breve.</p>
       ) : (
         <form onSubmit={enviar} className="mt-3 flex flex-col gap-2.5">

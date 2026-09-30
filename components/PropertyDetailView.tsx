@@ -17,6 +17,10 @@ import { altFoto, nomeCondominioSeo, trilhaDoImovel, tituloSeoImovel } from '@/l
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getAveragePricePerM2, formatPricePerM2, type PropertyDetail } from '@/lib/property-details';
 import { getDevelopmentById, getOcultosDoCondominio, getRelatedListings, mercadoDoBairro } from '@/lib/actions';
+import BannerFundadora from '@/components/news/BannerFundadora';
+import VitrineNews from '@/components/news/VitrineNews';
+import { Banner } from '@/components/news/Pecas';
+import { bannersAtivos } from '@/lib/news/dados';
 import { BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
 import { getStatusBadge } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
@@ -83,9 +87,10 @@ export default async function PropertyDetailView({
               </div>
   );
 
-  const [mercado, privados] = await Promise.all([
+  const [mercado, privados, banners] = await Promise.all([
     mercadoDoBairro(property.cidade, property.bairro).catch(() => null),
-    nomeCondominio ? getOcultosDoCondominio(development?.id ?? '', nomeCondominio, property.cidade).catch(() => []) : Promise.resolve([])
+    nomeCondominio ? getOcultosDoCondominio(development?.id ?? '', nomeCondominio, property.cidade).catch(() => []) : Promise.resolve([]),
+    bannersAtivos()
   ]);
   const outrosPrivados = privados.filter((a) => a.id !== property.id);
   const entrega = textoEntrega(property.deliveryDate);
@@ -243,6 +248,8 @@ export default async function PropertyDetailView({
                 mensagemInicial={`Olá! Tenho interesse neste imóvel: ${titulo}. Ainda está disponível?`}
                 whatsapp={whats}
               />
+              <BannerFundadora perfil />
+              <Banner banners={banners} posicao="perfil" />
               {property.corretor && (
                 <div className="flex justify-end rounded-2xl border border-[var(--border)] p-4">
                   <div className="flex flex-col items-end text-right">
@@ -279,6 +286,8 @@ export default async function PropertyDetailView({
           />
         )}
         <RelatedListings grade limite={8} title="Imóveis similares" subtitle={faixaDePreco(related.precoReferencia)} items={related.regiao} />
+
+        <VitrineNews bairro={property.bairro} cidade={property.cidade} />
       </main>
 
       <Footer />

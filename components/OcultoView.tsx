@@ -84,6 +84,7 @@ export default function OcultoView({ a, bloqueado = false }: { a: AnuncioOculto;
           <aside>
             <div className="md:sticky md:top-24">
               <ContatoLateral
+                formulario
                 titulo="Quero ver este imóvel"
                 condominio={a.condominio || titulo}
                 referencia={`Anúncio reservado ${a.id} · ${titulo} · /imovel/${a.id}`}

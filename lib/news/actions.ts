@@ -8,7 +8,7 @@ import { veTudo } from '../papeis';
 import { atualizarIndicadores } from '../indicadores';
 import { mapNoticia } from './dados';
 import { gravarNoticia, type NoticiaEntrada } from './gravar';
-import type { Noticia } from './base';
+import { videoEmbed, type Noticia } from './base';
 
 async function exigirEditor() {
   const eu = await exigirEquipe();
@@ -39,14 +39,15 @@ export async function excluirNoticia(id: string): Promise<void> {
 }
 
 // ---------------- banners ----------------
-export type Banner = { id: string; posicao: string; imagem: string; link: string | null; titulo: string | null; ativo: boolean; inicio: string | null; fim: string | null; cliques: number };
+export type Banner = { id: string; posicao: string; imagem: string | null; videoUrl: string | null; link: string | null; titulo: string | null; ativo: boolean; inicio: string | null; fim: string | null; cliques: number };
 export async function listarBanners(): Promise<Banner[]> {
   await exigirEditor();
   const rows = await query<Record<string, unknown>>('select * from banners order by created_at desc');
   return rows.map((r) => ({
     id: String(r.id),
     posicao: String(r.posicao),
-    imagem: String(r.imagem),
+    imagem: (r.imagem as string) ?? null,
+    videoUrl: (r.video_url as string) ?? null,
     link: (r.link as string) ?? null,
     titulo: (r.titulo as string) ?? null,
     ativo: !!r.ativo,
@@ -55,18 +56,20 @@ export async function listarBanners(): Promise<Banner[]> {
     cliques: Number(r.cliques ?? 0)
   }));
 }
-export async function salvarBanner(b: Partial<Banner> & { imagem: string; posicao: string }): Promise<{ ok: boolean; erro?: string }> {
+export async function salvarBanner(b: Partial<Banner> & { posicao: string }): Promise<{ ok: boolean; erro?: string }> {
   await exigirEditor();
-  if (!/^https:\/\//.test(b.imagem ?? '')) return { ok: false, erro: 'Envie a imagem do banner.' };
-  if (!['lateral', 'lateral-grande', 'texto', 'topo'].includes(b.posicao)) return { ok: false, erro: 'Posição inválida.' };
+  const imagem = /^https:\/\//.test(b.imagem ?? '') ? b.imagem! : null;
+  const video = videoEmbed(b.videoUrl) ? b.videoUrl!.trim().slice(0, 300) : null;
+  if (!imagem && !video) return { ok: false, erro: 'Envie a imagem do banner ou cole o link do vídeo (YouTube ou Vimeo).' };
+  if (!['lateral', 'lateral-grande', 'texto', 'topo', 'perfil'].includes(b.posicao)) return { ok: false, erro: 'Posição inválida.' };
   const link = b.link && /^https?:\/\//.test(b.link) ? b.link.slice(0, 500) : null;
   if (b.id) {
-    await query('update banners set posicao=$2, imagem=$3, link=$4, titulo=$5, ativo=$6, inicio=$7, fim=$8 where id=$1', [
-      b.id, b.posicao, b.imagem, link, b.titulo?.slice(0, 120) ?? null, b.ativo !== false, b.inicio || null, b.fim || null
+    await query('update banners set posicao=$2, imagem=$3, link=$4, titulo=$5, ativo=$6, inicio=$7, fim=$8, video_url=$9 where id=$1', [
+      b.id, b.posicao, imagem, link, b.titulo?.slice(0, 120) ?? null, b.ativo !== false, b.inicio || null, b.fim || null, video
     ]);
   } else {
-    await query('insert into banners (id, posicao, imagem, link, titulo, ativo, inicio, fim) values ($1,$2,$3,$4,$5,$6,$7,$8)', [
-      `ban-${randomBytes(5).toString('hex')}`, b.posicao, b.imagem, link, b.titulo?.slice(0, 120) ?? null, b.ativo !== false, b.inicio || null, b.fim || null
+    await query('insert into banners (id, posicao, imagem, link, titulo, ativo, inicio, fim, video_url) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [
+      `ban-${randomBytes(5).toString('hex')}`, b.posicao, imagem, link, b.titulo?.slice(0, 120) ?? null, b.ativo !== false, b.inicio || null, b.fim || null, video
     ]);
   }
   return { ok: true };

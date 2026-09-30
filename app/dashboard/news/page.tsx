@@ -24,9 +24,10 @@ import { nomeTopico, urlNoticia, type Noticia } from '@/lib/news/base';
 // Painel → News: notícias, banners, chaves para IA publicar e indicadores.
 type Aba = 'noticias' | 'banners' | 'ia';
 const POSICOES: { v: string; l: string }[] = [
-  { v: 'lateral', l: 'Lateral 300×250' },
-  { v: 'lateral-grande', l: 'Lateral grande 300×600' },
-  { v: 'texto', l: 'Dentro do texto 728×120' }
+  { v: 'perfil', l: 'Páginas de imóvel e condomínio (vertical 9:16)' },
+  { v: 'lateral', l: 'News: lateral 300×250' },
+  { v: 'lateral-grande', l: 'News: lateral grande 300×600' },
+  { v: 'texto', l: 'News: dentro do texto 728×120' }
 ];
 
 export default function AdminNews() {
@@ -154,7 +155,7 @@ export default function AdminNews() {
 
 function AbaBanners({ onMsg }: { onMsg: (m: string) => void }) {
   const [lista, setLista] = useState<Banner[]>([]);
-  const [novo, setNovo] = useState<{ posicao: string; imagem: string[]; link: string; titulo: string; inicio: string; fim: string }>({ posicao: 'lateral', imagem: [], link: '', titulo: '', inicio: '', fim: '' });
+  const [novo, setNovo] = useState<{ posicao: string; imagem: string[]; video: string; link: string; titulo: string; inicio: string; fim: string }>({ posicao: 'perfil', imagem: [], video: '', link: '', titulo: '', inicio: '', fim: '' });
   const [erro, setErro] = useState<string | null>(null);
   const carregar = () => listarBanners().then(setLista).catch(() => setLista([]));
   useEffect(() => {
@@ -167,7 +168,7 @@ function AbaBanners({ onMsg }: { onMsg: (m: string) => void }) {
         {lista.map((b) => (
           <div key={b.id} className="flex items-center gap-3 rounded-2xl border border-[var(--border)] p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={b.imagem} alt="" className="h-16 w-24 rounded-lg object-cover" />
+            {b.imagem ? <img src={b.imagem} alt="" className="h-16 w-24 rounded-lg object-cover" /> : <span className="flex h-16 w-24 items-center justify-center rounded-lg bg-ink text-xs font-bold text-white">▶ vídeo</span>}
             <div className="min-w-0 flex-1 text-sm">
               <div className="font-semibold">{b.titulo || 'Banner'}</div>
               <div className="text-[var(--text-muted)]">
@@ -197,6 +198,11 @@ function AbaBanners({ onMsg }: { onMsg: (m: string) => void }) {
           </select>
         </label>
         <PhotoUploadField photos={novo.imagem} onChange={(f) => setNovo({ ...novo, imagem: f.slice(-1) })} folder="site" label="Imagem do banner" compacto />
+        <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
+          Ou vídeo vertical (YouTube ou Vimeo)
+          <input className={campoPainel} placeholder="https://youtube.com/shorts/..." value={novo.video} onChange={(e) => setNovo({ ...novo, video: e.target.value })} />
+          <span className="font-normal">Grave em pé (9:16). Toca sozinho, sem som e em repetição, preenchendo o quadro. Com vídeo, a imagem é ignorada.</span>
+        </label>
         <input className={campoPainel} placeholder="Link ao clicar (https://...)" value={novo.link} onChange={(e) => setNovo({ ...novo, link: e.target.value })} />
         <input className={campoPainel} placeholder="Nome do anunciante" value={novo.titulo} onChange={(e) => setNovo({ ...novo, titulo: e.target.value })} />
         <div className="grid grid-cols-2 gap-2">
@@ -213,10 +219,10 @@ function AbaBanners({ onMsg }: { onMsg: (m: string) => void }) {
         <button
           type="button"
           onClick={async () => {
-            const r = await salvarBanner({ posicao: novo.posicao, imagem: novo.imagem[0] ?? '', link: novo.link, titulo: novo.titulo, inicio: novo.inicio || null, fim: novo.fim || null });
+            const r = await salvarBanner({ posicao: novo.posicao, imagem: novo.imagem[0] ?? null, videoUrl: novo.video || null, link: novo.link, titulo: novo.titulo, inicio: novo.inicio || null, fim: novo.fim || null });
             if (!r.ok) return setErro(r.erro ?? 'Erro');
             setErro(null);
-            setNovo({ posicao: 'lateral', imagem: [], link: '', titulo: '', inicio: '', fim: '' });
+            setNovo({ posicao: 'perfil', imagem: [], video: '', link: '', titulo: '', inicio: '', fim: '' });
             onMsg('Banner salvo.');
             carregar();
           }}

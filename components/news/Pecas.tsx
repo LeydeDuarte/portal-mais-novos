@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { TOPICOS, nomeTopico, urlNoticia, urlRegiao, UFS, videoEmbed, miniaturaVideo, minutosLeitura, textoPuro, type Noticia } from '@/lib/news/base';
 import { mesAno, pct, type Indicador } from '@/lib/indicadores';
 import { WHATSAPP_ATENDIMENTO } from '@/lib/marca';
-import { regioesComNoticias } from '@/lib/news/dados';
+import { regioesComNoticias, type BannerAtivo } from '@/lib/news/dados';
 import { SeletorRegiao } from './SeletorRegiao';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 
@@ -196,36 +196,50 @@ export function Regioes({ lista, atual }: { lista: { uf: string; cidade: string 
   );
 }
 
-/** Espaço de publicidade: mostra o banner ativo da posição, ou o convite "Anuncie aqui" */
-export function Banner({ banners, posicao, className = '' }: { banners: { id: string; posicao: string; imagem: string; link: string | null; titulo: string | null }[]; posicao: string; className?: string }) {
+/** Espaço de publicidade: banner ativo da posição (imagem ou vídeo vertical do YouTube/Vimeo),
+ *  ou o convite "Anuncie aqui". Vídeo sempre vertical (9:16), preenchendo o quadro sem bordas. */
+export function Banner({ banners, posicao, className = '' }: { banners: BannerAtivo[]; posicao: string; className?: string }) {
   const b = banners.find((x) => x.posicao === posicao);
-  const alt = posicao === 'lateral-grande' ? 'aspect-[1/2]' : posicao === 'texto' ? 'aspect-[728/120]' : 'aspect-[6/5]';
+  const formato = posicao === 'perfil' ? 'aspect-[9/16]' : posicao === 'lateral-grande' ? 'aspect-[1/2]' : posicao === 'texto' ? 'aspect-[728/120]' : 'aspect-[6/5]';
   if (!b)
     return (
       <a
-        href={`https://wa.me/${WHATSAPP_ATENDIMENTO}?text=${encodeURIComponent('Olá! Quero anunciar no Mais Novos News.')}`}
+        href={`https://wa.me/${WHATSAPP_ATENDIMENTO}?text=${encodeURIComponent('Olá! Quero anunciar no portal Mais Novos Imóveis.')}`}
         target="_blank"
         rel="noopener"
-        className={`flex flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-[#C9CED6] bg-[#F6F7F9] p-4 text-center text-[13px] text-[var(--text-muted)] ${alt} ${className}`}
+        className={`flex flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-[#C9CED6] bg-[#F6F7F9] p-4 text-center text-[13px] text-[var(--text-muted)] ${posicao === 'perfil' ? 'aspect-[4/3]' : formato} ${className}`}
       >
         <span className="text-[10px] font-bold tracking-[0.12em]">PUBLICIDADE</span>
         <span className="font-semibold text-ink">Anuncie aqui</span>
         <span>Fale com a gente pelo WhatsApp</span>
       </a>
     );
-  const img = (
+  const video = videoEmbed(b.video_url);
+  const conteudo = video ? (
+    // vertical: o player ocupa o quadro 9:16 inteiro, levemente ampliado para não sobrar borda
+    <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-ink">
+      <iframe
+        src={video}
+        title={b.titulo ?? 'Publicidade'}
+        allow="autoplay; encrypted-media; picture-in-picture"
+        loading="lazy"
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[104%] w-[104%] -translate-x-1/2 -translate-y-1/2 border-0"
+      />
+      {b.link && <span className="absolute inset-x-3 bottom-3 rounded-full bg-white/90 py-2 text-center text-[13px] font-bold text-ink">Saiba mais →</span>}
+    </div>
+  ) : (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={b.imagem} alt={b.titulo ?? 'Publicidade'} className={`w-full rounded-2xl object-cover ${alt}`} loading="lazy" />
+    <img src={b.imagem ?? ''} alt={b.titulo ?? 'Publicidade'} className={`w-full rounded-2xl object-cover ${formato}`} loading="lazy" />
   );
   return (
     <div className={className}>
       <span className="mb-1 block text-center text-[10px] font-bold tracking-[0.12em] text-[var(--text-faint)]">PUBLICIDADE</span>
       {b.link ? (
-        <a href={b.link} target="_blank" rel="noopener sponsored">
-          {img}
+        <a href={b.link} target="_blank" rel="noopener sponsored" className="block">
+          {conteudo}
         </a>
       ) : (
-        img
+        conteudo
       )}
     </div>
   );

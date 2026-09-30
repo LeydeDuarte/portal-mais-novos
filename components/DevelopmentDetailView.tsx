@@ -11,6 +11,10 @@ import ContatoLateral from '@/components/ContatoLateral';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getRelatedListings, getOcultosDoCondominio, mercadoDoBairro } from '@/lib/actions';
+import BannerFundadora from '@/components/news/BannerFundadora';
+import VitrineNews from '@/components/news/VitrineNews';
+import { Banner } from '@/components/news/Pecas';
+import { bannersAtivos } from '@/lib/news/dados';
 import { BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
 import { FASES_EXIGEM_CONCEPCAO, ehFutura, getBadgeCondominio, getStatusBucket } from '@/lib/classification';
@@ -83,7 +87,7 @@ export default async function DevelopmentDetailView({ development }: { developme
   const areas = tabela.map((u) => u.areaValue).filter((n): n is number => !!n).sort((x, y) => x - y);
   const faixaArea = !areas.length ? null : Math.round(areas[0]) === Math.round(areas[areas.length - 1]) ? `${Math.round(areas[0])} m²` : `${Math.round(areas[0])} a ${Math.round(areas[areas.length - 1])} m²`;
 
-  const [mercado] = await Promise.all([mercadoDoBairro(development.cidade, development.bairro).catch(() => null)]);
+  const [mercado, banners] = await Promise.all([mercadoDoBairro(development.cidade, development.bairro).catch(() => null), bannersAtivos()]);
   const tipoPlural = development.tipo === 'horizontal' ? 'Casas' : tipos.includes('apartamento') || !tipos.length ? 'Apartamentos' : TIPO_UNIDADE_LABEL[tipos[0]] ?? 'Imóveis';
   const ondeBairro = [development.bairro, development.cidade].filter(Boolean).join(', ') || development.location;
   const entrega = textoEntrega(development.deliveryDate);
@@ -266,8 +270,10 @@ export default async function DevelopmentDetailView({ development }: { developme
                 developmentId={development.id}
                 referencia={`Condomínio ${development.name} · ${urlCondominio(development)}`}
                 mensagemInicial={`Olá! Quero saber mais sobre o ${development.name}: valores e unidades disponíveis.`}
-                whatsapp={whats ?? undefined}
+                whatsapp={whatsAtendimento}
               />
+              <BannerFundadora perfil />
+              <Banner banners={banners} posicao="perfil" />
             </div>
           </aside>
         </div>
@@ -305,6 +311,9 @@ export default async function DevelopmentDetailView({ development }: { developme
         ) : (
           <InterestForm developmentId={development.id} condominio={development.name} destaque={related.mesmoCondominio.length === 0} />
         )}
+
+        {/* logo abaixo do quadro de interesse: últimas notícias do mercado */}
+        <VitrineNews bairro={development.bairro} cidade={development.cidade} />
 
         {!semUnidade && secoesParecidos}
       </main>

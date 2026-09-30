@@ -2,7 +2,7 @@
 // Animações só em CSS (globals.css: fundadora-*), desligadas para quem pede menos movimento.
 const INSTAGRAM = 'https://www.instagram.com/leydeduarte.br/';
 
-export default function BannerFundadora({ className = '' }: { className?: string }) {
+export default function BannerFundadora({ className = '', perfil = false }: { className?: string; perfil?: boolean }) {
   return (
     <a
       href={INSTAGRAM}
@@ -20,9 +20,9 @@ export default function BannerFundadora({ className = '' }: { className?: string
         </span>
       </span>
       <span className="relative flex min-w-0 flex-col">
-        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-accent">Conheça a fundadora</span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-accent">{perfil ? 'Conheça a fundadora do Mais Novos' : 'Conheça a fundadora'}</span>
         <span className="font-serif text-[19px] font-semibold leading-tight">Leyde Duarte</span>
-        <span className="text-[12px] leading-snug text-[var(--text-muted)]">Fundadora do Portal Mais Novos</span>
+        <span className="text-[12px] leading-snug text-[var(--text-muted)]">{perfil ? 'Me acompanhe nas redes sociais' : 'Fundadora do Portal Mais Novos'}</span>
         <span className="mt-1.5 flex items-center gap-1.5 text-[13px] font-semibold">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className="text-[#D6246E]">
             <rect x="3" y="3" width="18" height="18" rx="5" />

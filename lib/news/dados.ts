@@ -133,8 +133,21 @@ export async function urlsNoticiasSitemap(): Promise<{ topico: string; slug: str
   return rows.map((r) => ({ topico: r.topico, slug: r.slug, em: iso(r.em) ?? new Date().toISOString() }));
 }
 
-export async function bannersAtivos(): Promise<{ id: string; posicao: string; imagem: string; link: string | null; titulo: string | null }[]> {
-  return query<{ id: string; posicao: string; imagem: string; link: string | null; titulo: string | null }>(
-    `select id, posicao, imagem, link, titulo from banners where ativo and (inicio is null or inicio <= current_date) and (fim is null or fim >= current_date) order by random()`
+export type BannerAtivo = { id: string; posicao: string; imagem: string | null; video_url: string | null; link: string | null; titulo: string | null };
+export async function bannersAtivos(): Promise<BannerAtivo[]> {
+  return query<BannerAtivo>(
+    `select id, posicao, imagem, video_url, link, titulo from banners where ativo and (inicio is null or inicio <= current_date) and (fim is null or fim >= current_date) order by random()`
   ).catch(() => []);
+}
+
+/** Notícias para as páginas de imóvel/condomínio: do mesmo bairro, depois da cidade, depois as mais recentes */
+export async function noticiasParaLugar(bairro?: string | null, cidade?: string | null, limite = 4): Promise<Noticia[]> {
+  const rows = await query<Row>(
+    `select *, ${DATA_PUB} as publicado_em from noticias where ${PUBLICADA}
+      order by (case when $1::text is not null and lower(bairro) = lower($1) then 0
+                     when $2::text is not null and lower(cidade) = lower($2) then 1 else 2 end),
+               principal desc, ${DATA_PUB} desc limit $3`,
+    [bairro ?? null, cidade ?? null, limite]
+  ).catch(() => []);
+  return rows.map(mapNoticia);
 }
