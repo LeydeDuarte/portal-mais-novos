@@ -125,7 +125,7 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
                 {dataCurta(n.publicadoEm)}
                 {n.atualizadoEm && n.publicadoEm && n.atualizadoEm.slice(0, 10) !== n.publicadoEm.slice(0, 10) ? ` · atualizado em ${dataCurta(n.atualizadoEm)}` : ''} · {min} min
               </span>
-              <Compartilhar url={url} titulo={n.titulo} />
+              <Compartilhar url={url} titulo={n.titulo} refId={n.id} />
             </div>
           </div>
 

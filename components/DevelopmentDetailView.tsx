@@ -10,9 +10,13 @@ import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
-import { getRelatedListings, getOcultosDoCondominio, mercadoDoBairro } from '@/lib/actions';
+import { getRelatedListings, getOcultosDoCondominio, mercadoDoBairro, condominiosProximos } from '@/lib/actions';
 import BannerFundadora from '@/components/news/BannerFundadora';
 import VitrineNews from '@/components/news/VitrineNews';
+import DevelopmentCard from '@/components/DevelopmentCard';
+import { SITE_URL } from '@/lib/seo';
+import BotaoCompartilhar from '@/components/BotaoCompartilhar';
+import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import { Banner } from '@/components/news/Pecas';
 import { bannersAtivos } from '@/lib/news/dados';
 import { BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
@@ -88,6 +92,9 @@ export default async function DevelopmentDetailView({ development }: { developme
   const faixaArea = !areas.length ? null : Math.round(areas[0]) === Math.round(areas[areas.length - 1]) ? `${Math.round(areas[0])} m²` : `${Math.round(areas[0])} a ${Math.round(areas[areas.length - 1])} m²`;
 
   const [mercado, banners] = await Promise.all([mercadoDoBairro(development.cidade, development.bairro).catch(() => null), bannersAtivos()]);
+  // último caso: poucos anúncios por perto → condomínios vizinhos (pode ter unidade à venda lá)
+  const anunciosPerto = new Set([...(('mesmoBairro' in related && related.mesmoBairro) || []), ...related.regiao].filter((x) => !x.vendidoEm).map((x) => x.id)).size;
+  const vizinhos = anunciosPerto < 4 && development.status !== 'rascunho' ? await condominiosProximos(development.id, 8).catch(() => []) : [];
   const tipoPlural = development.tipo === 'horizontal' ? 'Casas' : tipos.includes('apartamento') || !tipos.length ? 'Apartamentos' : TIPO_UNIDADE_LABEL[tipos[0]] ?? 'Imóveis';
   const ondeBairro = [development.bairro, development.cidade].filter(Boolean).join(', ') || development.location;
   const entrega = textoEntrega(development.deliveryDate);
@@ -109,6 +116,19 @@ export default async function DevelopmentDetailView({ development }: { developme
         <RelatedListings grade limite={8} title={`Imóveis à venda no ${development.bairro}`} items={('mesmoBairro' in related && related.mesmoBairro) || []} />
       )}
       <RelatedListings grade limite={8} title={`Imóveis similares perto do ${development.name}`} subtitle={faixaDePreco(related.precoReferencia)} items={related.regiao} />
+      {vizinhos.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-lg font-bold">Pode ser que tenha imóveis à venda nesses condomínios próximos</h2>
+          <p className="mt-0.5 text-sm text-[var(--text-muted)]">
+            {development.tipo === 'horizontal' ? 'Condomínios de casas' : 'Condomínios'} perto do {development.name}. Muitas unidades são vendidas sem anúncio: fale com a gente e verificamos.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-5 md:grid-cols-4">
+            {vizinhos.map((c) => (
+              <DevelopmentCard key={c.id} development={c} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 
@@ -134,6 +154,14 @@ export default async function DevelopmentDetailView({ development }: { developme
 
         <TituloPerfil
           titulo={development.name}
+          acoes={
+            development.status !== 'rascunho' ? (
+              <>
+                <DetailFavoriteButton propertyId={development.id} rotulo="empreendimento" icone />
+                <BotaoCompartilhar url={`${SITE_URL}${urlCondominio(development)}`} titulo={development.name} refId={development.id} />
+              </>
+            ) : null
+          }
           subtitulo={`${tipoPlural} à venda no ${ondeBairro}`}
           endereco={[development.bairro, [development.cidade, development.uf].filter(Boolean).join('/')].filter(Boolean).join(', ') || development.location}
         />
@@ -322,7 +350,7 @@ export default async function DevelopmentDetailView({ development }: { developme
       {development.status !== 'rascunho' && (
         <>
           <EspacoBarra />
-          <BarraContatoFixa favoritoId={development.id} whats={whatsAtendimento} />
+          <BarraContatoFixa favoritoId={development.id} whats={whatsAtendimento} compartilhar={{ url: `${SITE_URL}${urlCondominio(development)}`, titulo: development.name, refId: development.id }} />
         </>
       )}
     </div>

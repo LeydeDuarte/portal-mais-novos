@@ -31,15 +31,36 @@ export function ProgressoLeitura({ id }: { id: string }) {
   );
 }
 
-export function Compartilhar({ url, titulo }: { url: string; titulo: string }) {
+export function Compartilhar({ url, titulo, refId, rotulo = false }: { url: string; titulo: string; refId?: string; rotulo?: boolean }) {
   const [copiado, setCopiado] = useState(false);
+  const [nativo, setNativo] = useState(false);
+  useEffect(() => setNativo(typeof navigator !== 'undefined' && !!navigator.share), []);
   return (
     <div className="flex items-center gap-2">
+      {rotulo && <span className="text-[13px] font-semibold text-[var(--text-muted)]">Compartilhar</span>}
+      {nativo && (
+        // celular: abre o menu de compartilhar do próprio aparelho (WhatsApp, Instagram, e-mail...)
+        <button
+          type="button"
+          aria-label="Compartilhar"
+          data-rastro="compartilhar"
+          data-rastro-ref={refId}
+          onClick={() => navigator.share({ title: titulo, url }).catch(() => {})}
+          className="grid h-10 w-10 place-items-center rounded-full border border-[var(--border)] hover:bg-[var(--pill-bg)]"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+            <path d="m16 6-4-4-4 4M12 2v13" />
+          </svg>
+        </button>
+      )}
       <a
         href={`https://wa.me/?text=${encodeURIComponent(`${titulo}\n${url}`)}`}
         target="_blank"
         rel="noopener"
         aria-label="Compartilhar no WhatsApp"
+        data-rastro="compartilhar"
+        data-rastro-ref={refId}
         className="grid h-10 w-10 place-items-center rounded-full border border-[var(--border)] text-[#1BA84F] hover:bg-[var(--pill-bg)]"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -49,6 +70,8 @@ export function Compartilhar({ url, titulo }: { url: string; titulo: string }) {
       <button
         type="button"
         aria-label="Copiar link"
+        data-rastro="compartilhar"
+        data-rastro-ref={refId}
         onClick={async () => {
           try {
             await navigator.clipboard.writeText(url);

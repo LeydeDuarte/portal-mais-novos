@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import LocationCard from '@/components/LocationCard';
 import OcultoCard from '@/components/OcultoCard';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
+import BotaoCompartilhar from '@/components/BotaoCompartilhar';
 import BotaoWhatsapp, { type WhatsappContexto } from '@/components/BotaoWhatsapp';
 import type { AnuncioOculto, MercadoDoBairro } from '@/lib/actions';
 
@@ -24,10 +25,14 @@ export function textoEntrega(deliveryDate?: string | null): string | null {
 }
 
 // ---------- título ----------
-export function TituloPerfil({ titulo, subtitulo, endereco, extra }: { titulo: string; subtitulo?: string | null; endereco?: string | null; extra?: ReactNode }) {
+export function TituloPerfil({ titulo, subtitulo, endereco, extra, acoes }: { titulo: string; subtitulo?: string | null; endereco?: string | null; extra?: ReactNode; acoes?: ReactNode }) {
   return (
     <header className="mb-5">
-      <h1 className="font-serif text-[26px] font-semibold leading-tight tracking-tight md:text-[32px]">{titulo}</h1>
+      <div className="flex items-start justify-between gap-3">
+        <h1 className="font-serif text-[26px] font-semibold leading-tight tracking-tight md:text-[32px]">{titulo}</h1>
+        {/* favoritar e compartilhar: ao lado do nome, acima das fotos */}
+        {acoes && <div className="flex shrink-0 items-center gap-2 pt-0.5">{acoes}</div>}
+      </div>
       {subtitulo && <p className="mt-1 text-[15px] font-semibold text-[var(--text-muted)]">{subtitulo}</p>}
       {extra && <div className="mt-2">{extra}</div>}
       {endereco && (
@@ -194,11 +199,12 @@ export function CardRegiao({
 }
 
 // ---------- barra fixa do rodapé: Salvar + Fale comigo ----------
-export function BarraContatoFixa({ favoritoId, whats, rotulo }: { favoritoId?: string | null; whats?: WhatsappContexto | null; rotulo?: string }) {
+export function BarraContatoFixa({ favoritoId, whats, rotulo, compartilhar }: { favoritoId?: string | null; whats?: WhatsappContexto | null; rotulo?: string; compartilhar?: { url: string; titulo: string; refId?: string } }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-[80] border-t border-black/[0.08] bg-[var(--bg)] px-3 pb-[calc(10px+env(safe-area-inset-bottom,0px))] pt-2.5 shadow-[0_-6px_20px_rgba(0,0,0,0.06)]">
       <div className="mx-auto flex max-w-[560px] gap-2.5">
         {favoritoId && <DetailFavoriteButton propertyId={favoritoId} curto />}
+        {compartilhar && <BotaoCompartilhar {...compartilhar} tamanho={52} />}
         {whats ? (
           <BotaoWhatsapp ctx={whats} variante="barra" rotulo={rotulo} />
         ) : (

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import PainelNav from '@/components/PainelNav';
 import PainelDados from '@/components/painel/PainelDados';
+import OnlineAgora from '@/components/painel/OnlineAgora';
 import { useStaffSession } from '@/lib/use-staff-session';
 
 // Painel → Resultados: dados do portal inteiro. Só o administrador principal vê.
@@ -19,7 +20,10 @@ export default function ResultadosPage() {
     <div className="min-h-screen">
       <PainelNav />
       <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-8 md:px-6">
-        <PainelDados />
+        <OnlineAgora />
+        <div className="mt-8">
+          <PainelDados />
+        </div>
       </main>
     </div>
   );

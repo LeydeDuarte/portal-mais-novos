@@ -716,37 +716,49 @@ const GRUPO_TIPO: Record<string, string> = {
 const MARGEM_PRECO = 0.35;
 
 export async function getRelatedListings(target: { propertyId?: string; developmentId?: string }): Promise<RelatedListings> {
-  type Base = { id?: string; devId: string | null; condominio: string | null; bairro: string | null; cidade: string | null; finalidade: string; price: number | null; quartos: number | null; area: number | null; grupos: string[] };
+  type Base = { id?: string; devId: string | null; condominio: string | null; bairro: string | null; cidade: string | null; finalidade: string; price: number | null; quartos: number | null; area: number | null; vagas: number | null; grupos: string[]; lat: number | null; lng: number | null };
   let base: Base | null = null;
   const vazio: RelatedListings = { mesmoCondominio: [], regiao: [], precoReferencia: null };
 
   if (target.propertyId) {
-    const r = await query<{ id: string; empreendimento_id: string | null; condominio: string | null; bairro: string | null; cidade: string | null; finalidade: string; price_value: string; quartos: number | null; area: string | null; tipo_unidade: string }>(
-      'select id, empreendimento_id, condominio, bairro, cidade, finalidade, price_value, quartos, area, tipo_unidade from properties where id = $1',
+    const r = await query<{ id: string; empreendimento_id: string | null; condominio: string | null; bairro: string | null; cidade: string | null; finalidade: string; price_value: string; quartos: number | null; area: string | null; vagas: number | null; tipo_unidade: string; lat: string | null; lng: string | null }>(
+      `select p.id, p.empreendimento_id, p.condominio, p.bairro, p.cidade, p.finalidade, p.price_value, p.quartos, p.area, p.vagas, p.tipo_unidade,
+              coalesce(p.lat, d.lat) lat, coalesce(p.lng, d.lng) lng
+         from properties p left join developments d on d.id = p.empreendimento_id where p.id = $1`,
       [target.propertyId]
     );
     if (!r[0]) return vazio;
     base = {
       id: r[0].id, devId: r[0].empreendimento_id, condominio: r[0].condominio, bairro: r[0].bairro, cidade: r[0].cidade, finalidade: r[0].finalidade,
       price: Number(r[0].price_value) || null, quartos: r[0].quartos, area: r[0].area != null ? Number(r[0].area) : null,
-      grupos: [GRUPO_TIPO[r[0].tipo_unidade] ?? 'vertical']
+      vagas: r[0].vagas ?? null,
+      grupos: [GRUPO_TIPO[r[0].tipo_unidade] ?? 'vertical'],
+      lat: r[0].lat != null ? Number(r[0].lat) : null,
+      lng: r[0].lng != null ? Number(r[0].lng) : null
     };
   } else if (target.developmentId) {
-    const r = await query<{ id: string; name: string; bairro: string | null; cidade: string | null; tipos_unidade: unknown; min_price: string | null; q: string | null; a: string | null; unit_tipos: unknown }>(
-      `select d.id, d.name, d.bairro, d.cidade, d.tipos_unidade,
+    const r = await query<{ id: string; name: string; bairro: string | null; cidade: string | null; tipos_unidade: unknown; min_price: string | null; q: string | null; a: string | null; unit_tipos: unknown; tipo: string | null; lat: string | null; lng: string | null; v: string | null }>(
+      `select d.id, d.name, d.bairro, d.cidade, d.tipos_unidade, d.tipo, d.lat, d.lng,
               (select min(price_value) filter (where price_value > 0) from properties where empreendimento_id = d.id) as min_price,
               (select round(avg(quartos)) from properties where empreendimento_id = d.id) as q,
               (select avg(area) from properties where empreendimento_id = d.id) as a,
+              (select round(avg(vagas)) from properties where empreendimento_id = d.id) as v,
               (select jsonb_agg(distinct tipo_unidade) from properties where empreendimento_id = d.id) as unit_tipos
          from developments d where d.id = $1`,
       [target.developmentId]
     );
     if (!r[0]) return vazio;
-    const tipos = [...toStringArray(r[0].tipos_unidade), ...toStringArray(r[0].unit_tipos)];
+    // tipos: os dos anúncios do condomínio valem mais que o cadastro; condomínio horizontal = casas
+    const dosAnuncios = toStringArray(r[0].unit_tipos);
+    const tipos = dosAnuncios.length ? dosAnuncios : toStringArray(r[0].tipos_unidade);
+    if (r[0].tipo === 'horizontal' && !tipos.some((t) => GRUPO_TIPO[t] === 'casa')) tipos.push('casa_condominio');
     base = {
       devId: r[0].id, condominio: r[0].name, bairro: r[0].bairro, cidade: r[0].cidade, finalidade: 'venda',
       price: r[0].min_price ? Number(r[0].min_price) : null, quartos: r[0].q ? Number(r[0].q) : null, area: r[0].a ? Number(r[0].a) : null,
-      grupos: Array.from(new Set(tipos.map((t) => GRUPO_TIPO[t]).filter(Boolean)))
+      vagas: r[0].v ? Number(r[0].v) : null,
+      grupos: Array.from(new Set(tipos.map((t) => GRUPO_TIPO[t]).filter(Boolean))),
+      lat: r[0].lat != null ? Number(r[0].lat) : null,
+      lng: r[0].lng != null ? Number(r[0].lng) : null
     };
   }
   if (!base) return vazio;
@@ -767,41 +779,95 @@ export async function getRelatedListings(target: { propertyId?: string; developm
     .filter(([, g]) => !base!.grupos.length || base!.grupos.includes(g))
     .map(([t]) => t);
 
-  const params: unknown[] = [excluir, base.cidade, base.bairro, base.finalidade, tiposDoGrupo];
-  const p = (v: unknown) => {
-    params.push(v);
-    return `$${params.length}`;
+  // Similares PERTO: mesmo tipo (casa x apartamento x comercial), ordenados pela distância.
+  // Ponto de cada imóvel: coordenada própria, senão a do condomínio, senão o centro do bairro
+  // (média dos condomínios do bairro com coordenada). Busca até 2 km; se faltar, até 5 km (e 10 km em último caso);
+  // sem coordenada nenhuma, fica no mesmo bairro e depois na mesma cidade.
+  if (base.lat == null || base.lng == null) {
+    const c = await query<{ lat: string | null; lng: string | null }>(
+      `select avg(lat) lat, avg(lng) lng from developments where lat is not null and ${norm("coalesce(bairro, '')")} = ${norm("coalesce($1::text, '')")} and ${norm("coalesce(cidade, '')")} = ${norm("coalesce($2::text, '')")}`,
+      [base.bairro, base.cidade]
+    ).catch(() => []);
+    if (c[0]?.lat != null) {
+      base.lat = Number(c[0].lat);
+      base.lng = Number(c[0].lng);
+    }
+  }
+  const similares = async (raioKm: number | null, comPreco: boolean, tipos: string[] | null, ja: string[]) => {
+    const params: unknown[] = [[...excluir, ...ja], base!.cidade, base!.bairro, base!.finalidade, tipos ?? Object.keys(GRUPO_TIPO)];
+    const p = (v: unknown) => {
+      params.push(v);
+      return `$${params.length}`;
+    };
+    const conds = [
+      'not p.is_tipologia',
+      "p.visibilidade = 'publico'",
+      'not (p.id = any($1::text[]))',
+      'p.finalidade = $4',
+      'p.tipo_unidade = any($5::text[])'
+    ];
+    const score: string[] = ['(case when p.vendido_em is not null then 3 else 0 end)'];
+    let dist = 'null::float';
+    if (base!.lat != null && base!.lng != null && raioKm) {
+      const la = p(base!.lat);
+      const ln = p(base!.lng);
+      dist = `111.2 * sqrt(power(coalesce(p.lat, d.lat, bc.lat) - ${la}, 2) + power((coalesce(p.lng, d.lng, bc.lng) - ${ln}) * cos(radians(${la})), 2))`;
+      score.push('coalesce(dist, 99)'); // cada km pesa como meio quarto de diferença... e manda na ordem
+    } else {
+      conds.push(`${norm("coalesce(p.cidade, '')")} = ${norm('$2::text')}`);
+      score.push(`(case when ${norm("coalesce(p.bairro, '')")} = ${norm("coalesce($3::text, '')")} then 0 else 5 end)`);
+    }
+    if (base!.price && comPreco) {
+      const pr = p(base!.price);
+      conds.push(`p.price_value between ${pr} * 0.5 and ${pr} * 1.6`);
+      score.push(`abs(p.price_value - ${pr}) / ${pr} * 1.5`);
+    }
+    if (base!.quartos) score.push(`coalesce(abs(p.quartos - ${p(base!.quartos)}), 2) * 0.8`);
+    if (base!.vagas) score.push(`coalesce(abs(p.vagas - ${p(base!.vagas)}), 2) * 0.5`);
+    if (base!.area) {
+      const a = p(base!.area);
+      score.push(`coalesce(abs(p.area - ${a}) / ${a}, 0.5) * 2`);
+    }
+    const onde = raioKm && dist !== 'null::float' ? `where q.dist <= ${Number(raioKm)}` : '';
+    return query<PropertyRow>(
+      `select * from (
+         select p.*, ${dist} as dist
+           from properties p
+           left join developments d on d.id = p.empreendimento_id
+           left join lateral (select avg(x.lat) lat, avg(x.lng) lng from developments x
+                               where x.lat is not null and lower(x.bairro) = lower(p.bairro) and lower(x.cidade) = lower(p.cidade)) bc on true
+          where ${conds.join(' and ')}) q
+       ${onde}
+       order by ${score.map((x) => x.replace(/\bp\./g, 'q.')).join(' + ')} asc, q.created_at desc limit 8`,
+      params
+    ).catch(() => [] as PropertyRow[]);
   };
-  const conds = [
-    'is_tipologia = false',
-    "visibilidade = 'publico'",
-    'not (id = any($1::text[]))',
-    `${norm("coalesce(cidade, '')")} = ${norm('$2::text')}`,
-    'finalidade = $4',
-    'tipo_unidade = any($5::text[])'
-  ];
-  const score: string[] = [
-    `(case when ${norm("coalesce(bairro, '')")} = ${norm("coalesce($3::text, '')")} then 0 else 1 end)`,
-    // vendidos continuam aparecendo (escassez), mas depois dos disponíveis parecidos
-    '(case when vendido_em is not null then 1.5 else 0 end)'
-  ];
-  if (base.price) {
-    const pr = p(base.price);
-    conds.push(`price_value between ${pr} * ${1 - MARGEM_PRECO} and ${pr} * ${1 + MARGEM_PRECO}`);
-    score.push(`abs(price_value - ${pr}) / ${pr} * 2`);
-  }
-  if (base.quartos) {
-    const q = p(base.quartos);
-    score.push(`coalesce(abs(quartos - ${q}), 2) * 3`); // cada quarto de diferença pesa muito
-  }
-  if (base.area) {
-    const a = p(base.area);
-    score.push(`coalesce(abs(area - ${a}) / ${a}, 0.5) * 4`); // 25% de diferença na metragem ≈ 1 quarto
-  }
-  const regiaoRows = await query<PropertyRow>(
-    `select * from properties where ${conds.join(' and ')} order by (${score.join(' + ')}) asc, created_at desc limit 8`,
-    params
-  );
+  // Ordem de importância (vai somando até 8, sem repetir):
+  //  1. mesmo tipo até 2 km (preço parecido, depois qualquer preço)
+  //  2. mesmo tipo até 5 km
+  //  3. região com poucas opções: outros tipos (casa/apartamento) no MESMO raio, parecidos em
+  //     quartos, metragem e vagas (2 km, depois 5 km)
+  //  4. só em último caso: mesmo tipo até 10 km, depois a mesma cidade
+  const META = 8;
+  const MINIMO = 4; // abaixo disso a vitrine fica pobre e sem rodízio
+  let regiaoRows: PropertyRow[] = [];
+  const somar = async (raio: number | null, comPreco: boolean, tipos: string[] | null) => {
+    if (regiaoRows.length >= META) return;
+    const novos = await similares(raio, comPreco, tipos, regiaoRows.map((r) => r.id));
+    regiaoRows = [...regiaoRows, ...novos].slice(0, META);
+  };
+  await somar(2, true, tiposDoGrupo);
+  if (regiaoRows.length < MINIMO) await somar(2, false, tiposDoGrupo);
+  if (regiaoRows.length < MINIMO) await somar(5, true, tiposDoGrupo);
+  if (regiaoRows.length < MINIMO) await somar(5, false, tiposDoGrupo);
+  // mistura só entre residenciais (casa e apartamento); comercial só com comercial
+  const outrosTipos = Object.entries(GRUPO_TIPO)
+    .filter(([, g]) => (base!.grupos.includes('comercial') ? g === 'comercial' : g === 'vertical' || g === 'casa'))
+    .map(([t]) => t);
+  if (regiaoRows.length < MINIMO) await somar(2, false, outrosTipos);
+  if (regiaoRows.length < MINIMO) await somar(5, false, outrosTipos);
+  if (regiaoRows.length < 2) await somar(10, false, tiposDoGrupo);
+  if (regiaoRows.length < 2) await somar(null, true, tiposDoGrupo);
   // Outros no mesmo bairro (qualquer tipo/preço), sem repetir os anteriores; vendidos depois
   const bairroRows = base.bairro
     ? await query<PropertyRow>(
@@ -2124,4 +2190,47 @@ export async function mercadoDoBairro(cidade?: string | null, bairro?: string | 
     vendidos12m: Number(x.vendidos) || 0,
     m2Vendido: x.m2v ? Math.round(Number(x.m2v)) : null
   };
+}
+
+// ---------------- condomínios próximos (seção de último caso) ----------------
+/** Condomínios publicados perto de um condomínio (mesmo tipo: horizontal ou vertical),
+ *  do mais perto para o mais longe: até 2 km, depois até 5 km; sem coordenada, o mesmo bairro.
+ *  Usado quando a região tem poucos anúncios: "pode ser que tenha imóvel à venda nesses". */
+export async function condominiosProximos(developmentId: string, limite = 8): Promise<DevelopmentCardData[]> {
+  const b = await query<{ id: string; tipo: string | null; bairro: string | null; cidade: string | null; lat: string | null; lng: string | null }>(
+    `select d.id, d.tipo, d.bairro, d.cidade,
+            coalesce(d.lat, (select avg(x.lat) from developments x where x.lat is not null and lower(x.bairro) = lower(d.bairro) and lower(x.cidade) = lower(d.cidade))) lat,
+            coalesce(d.lng, (select avg(x.lng) from developments x where x.lng is not null and lower(x.bairro) = lower(d.bairro) and lower(x.cidade) = lower(d.cidade))) lng
+       from developments d where d.id = $1`,
+    [developmentId]
+  ).catch(() => []);
+  const base = b[0];
+  if (!base) return [];
+  const tipo = base.tipo === 'horizontal' ? 'horizontal' : 'vertical';
+  let ids: string[] = [];
+  if (base.lat != null && base.lng != null) {
+    for (const raio of [2, 5]) {
+      const r = await query<{ id: string }>(
+        `select id from (
+           select x.id, x.photos, 111.2 * sqrt(power(x.lat - $2, 2) + power((x.lng - $3) * cos(radians($2)), 2)) dist
+             from developments x
+            where x.status = 'publicado' and x.id <> $1 and x.lat is not null and coalesce(x.tipo, 'vertical') = $4) q
+          where q.dist <= $5
+          order by (jsonb_array_length(coalesce(q.photos, '[]'::jsonb)) = 0), q.dist limit $6`,
+        [developmentId, Number(base.lat), Number(base.lng), tipo, raio, limite]
+      ).catch(() => []);
+      ids = r.map((x) => x.id);
+      if (ids.length >= 4) break;
+    }
+  }
+  if (ids.length < 4 && base.bairro) {
+    const r = await query<{ id: string }>(
+      `select id from developments where status = 'publicado' and id <> $1 and not (id = any($5::text[]))
+          and lower(bairro) = lower($2) and lower(coalesce(cidade, '')) = lower(coalesce($3, '')) and coalesce(tipo, 'vertical') = $4
+        order by (jsonb_array_length(coalesce(photos, '[]'::jsonb)) = 0), name limit $6`,
+      [developmentId, base.bairro, base.cidade, tipo, ids, limite - ids.length]
+    ).catch(() => []);
+    ids = [...ids, ...r.map((x) => x.id)];
+  }
+  return ids.length ? cardsDeCondominios(ids) : [];
 }

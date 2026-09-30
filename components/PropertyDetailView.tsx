@@ -19,6 +19,9 @@ import { getAveragePricePerM2, formatPricePerM2, type PropertyDetail } from '@/l
 import { getDevelopmentById, getOcultosDoCondominio, getRelatedListings, mercadoDoBairro } from '@/lib/actions';
 import BannerFundadora from '@/components/news/BannerFundadora';
 import VitrineNews from '@/components/news/VitrineNews';
+import { SITE_URL } from '@/lib/seo';
+import BotaoCompartilhar from '@/components/BotaoCompartilhar';
+import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import { Banner } from '@/components/news/Pecas';
 import { bannersAtivos } from '@/lib/news/dados';
 import { BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
@@ -138,6 +141,12 @@ export default async function PropertyDetailView({
 
         <TituloPerfil
           titulo={titulo}
+          acoes={
+            <>
+              <DetailFavoriteButton propertyId={property.id} icone />
+              <BotaoCompartilhar url={`${SITE_URL}${urlImovel(property)}`} titulo={titulo} refId={property.id} />
+            </>
+          }
           endereco={property.location}
           extra={
             nomeCondominio ? (
@@ -292,7 +301,7 @@ export default async function PropertyDetailView({
 
       <Footer />
       <EspacoBarra />
-      <BarraContatoFixa favoritoId={property.id} whats={whats} />
+      <BarraContatoFixa favoritoId={property.id} whats={whats} compartilhar={{ url: `${SITE_URL}${urlImovel(property)}`, titulo, refId: property.id }} />
     </div>
   );
 }

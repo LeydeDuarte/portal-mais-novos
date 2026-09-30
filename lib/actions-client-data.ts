@@ -1,4 +1,5 @@
 'use server';
+import { staffAtual } from './staff-auth';
 
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
@@ -58,6 +59,7 @@ export async function getMyFavorites(): Promise<string[]> {
 export async function setFavorite(propertyId: string, favorite: boolean): Promise<void> {
   const key = getVisitorKey(true)!;
   if (typeof propertyId !== 'string' || propertyId.length > 80) return;
+  if (favorite) registrarFavoritoNoPainel(propertyId).catch(() => {});
   // Condomínio/empreendimento também pode ser favoritado (tabela própria)
   const ehCondominio = (await query('select 1 from developments where id = $1', [propertyId])).length > 0;
   if (ehCondominio) {
@@ -218,4 +220,11 @@ export async function getMyFavoriteDevelopments(): Promise<import('./actions').D
   if (!rows.length) return [];
   const { cardsDeCondominios } = await import('./actions');
   return cardsDeCondominios(rows.map((r) => r.development_id));
+}
+
+// Painel → Resultados: conta o favorito (equipe logada e robôs não contam)
+async function registrarFavoritoNoPainel(id: string) {
+  if (await staffAtual().catch(() => null)) return;
+  const vid = cookies().get('mn_vid')?.value ?? null;
+  await query("insert into eventos (tipo, ref, visitante) values ('favorito', $1, $2)", [id, vid]);
 }
