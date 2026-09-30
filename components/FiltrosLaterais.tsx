@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { BUCKET_LABEL } from '@/lib/classification';
 import { DEFAULT_FILTERS, countActiveFilters, localKey, NUMEROS_FILTRO, rotuloNumero, alternarNumero, type FilterState, type LocalFiltro } from '@/lib/filters';
 import { getLocationIndex, type LocalSugestao } from '@/lib/actions';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
@@ -159,9 +160,41 @@ export default function FiltrosLaterais({ filters, onChange }: { filters: Filter
   const alternarTipo = (t: TipoUnidade) => set('tipos', filters.tipos.includes(t) ? filters.tipos.filter((x) => x !== t) : [...filters.tipos, t]);
   const ano = new Date().getFullYear();
   const ativos = countActiveFilters({ ...filters, situacao: [], termos: [], locais: [] });
+  const total = countActiveFilters(filters);
 
   return (
     <div className="flex flex-col gap-6">
+      {/* o que está filtrando agora, inclusive o que veio da busca do topo: dá para tirar um a um */}
+      {total > 0 && (
+        <div className="rounded-2xl border border-accent/30 bg-[#F3F7FF] p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[12px] font-bold uppercase tracking-wide text-accent">Filtrando por</span>
+            <button type="button" onClick={() => onChange({ ...DEFAULT_FILTERS, modo: filters.modo })} className="text-[12px] font-bold text-red-600 hover:underline">
+              Limpar tudo
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {filters.termos.map((t) => (
+              <button key={`t-${t}`} type="button" onClick={() => set('termos', filters.termos.filter((x) => x !== t))} className="flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold text-white">
+                “{t}” <span aria-hidden>✕</span>
+                <span className="sr-only">Remover busca</span>
+              </button>
+            ))}
+            {filters.locais.map((l) => (
+              <button key={`l-${localKey(l)}`} type="button" onClick={() => set('locais', filters.locais.filter((x) => localKey(x) !== localKey(l)))} className="flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-[12px] font-semibold text-white">
+                {l.nome} <span aria-hidden>✕</span>
+                <span className="sr-only">Remover local</span>
+              </button>
+            ))}
+            {filters.situacao.map((s) => (
+              <button key={`s-${s}`} type="button" onClick={() => set('situacao', filters.situacao.filter((x) => x !== s))} className="flex items-center gap-1 rounded-full bg-accent px-3 py-1.5 text-[12px] font-semibold text-white">
+                {BUCKET_LABEL[s] ?? s} <span aria-hidden>✕</span>
+              </button>
+            ))}
+            {ativos > 0 && <span className="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-[var(--text-muted)]">+ {ativos} filtro(s) abaixo</span>}
+          </div>
+        </div>
+      )}
       {MOSTRAR_ALUGUEL && (
       <Secao titulo="Comprar ou alugar">
         <div className="flex flex-wrap gap-1.5">
