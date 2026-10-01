@@ -1,0 +1,7 @@
+node_modules
+.next
+.vercel
+.env*.local
+
+# zips de entrega nunca vão para o repositório
+*.zip

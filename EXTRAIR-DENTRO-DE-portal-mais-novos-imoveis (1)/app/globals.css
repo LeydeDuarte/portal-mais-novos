@@ -1,0 +1,193 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --text: #14161a;
+  --text-muted: #5f6368;
+  --text-faint: #6b7178;
+  --border: #e6e8eb;
+  --pill-bg: #f3f4f6;
+  --pill-bg-hover: #e8eaed;
+  --card-img-bg: #eef0f3;
+  --overlay: rgba(20, 22, 26, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #121212;
+    --surface: #1a1a1a;
+    --text: #f3f4f6;
+    --text-muted: #a8abb1;
+    --text-faint: #8f949b;
+    --border: #2a2a2a;
+    --pill-bg: #222222;
+    --pill-bg-hover: #2c2c2c;
+    --card-img-bg: #23252a;
+    --overlay: rgba(0, 0, 0, 0.4);
+  }
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+@keyframes video-sweep {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.video-playing {
+  background: linear-gradient(120deg, var(--card-img-bg) 20%, #dde1e7 45%, var(--card-img-bg) 70%);
+  background-size: 260% 260%;
+  animation: video-sweep 3.4s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.dot-pulse { animation: dot-pulse 1s ease-in-out infinite; }
+
+/* Fotos: sem menu "salvar imagem" no toque longo (iPhone) e sem arrastar */
+img {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Proposta de compra: ao imprimir (ou "Salvar como PDF"), só o documento aparece */
+@media print {
+  body.imprimindo-proposta * { visibility: hidden !important; }
+  body.imprimindo-proposta .documento-proposta,
+  body.imprimindo-proposta .documento-proposta * { visibility: visible !important; }
+  body.imprimindo-proposta .documento-proposta { position: absolute; left: 0; top: 0; width: 100%; max-width: none; padding: 0 !important; }
+  /* margens do PDF: brancas dos dois lados, em todas as páginas */
+  @page { size: A4; margin: 18mm 17mm 16mm 17mm; }
+  body.imprimindo-proposta { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* Feed: formato "alinhado" = todas as fotos no mesmo formato; item largo (2 colunas) = foto deitada */
+.feed-grade[data-modo='alinhado'] .feed-midia { height: auto !important; aspect-ratio: 4 / 5; }
+.feed-grade .feed-largo .feed-midia { height: auto !important; aspect-ratio: 16 / 10; }
+.feed-grade .feed-largo .inline-block { display: block; }
+
+/* Botão de formato do feed: pulsa até a pessoa experimentar pela primeira vez */
+@keyframes feed-pulso { 0% { box-shadow: 0 0 0 0 rgba(37, 124, 255, 0.55); } 70% { box-shadow: 0 0 0 12px rgba(37, 124, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(37, 124, 255, 0); } }
+@keyframes feed-balao { 0% { opacity: 0; transform: translateY(-4px); } 10%, 85% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-4px); } }
+.feed-pulso { animation: feed-pulso 1.8s ease-out 4; }
+.feed-balao { animation: feed-balao 7s ease forwards; }
+@keyframes feed-troca { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: scale(1); } }
+.feed-troca { animation: feed-troca 0.5s ease; }
+
+/* Destaque grande (2 colunas e 2 linhas): foto em pé, quase a tela toda no celular */
+.feed-grade .feed-grande .feed-midia { aspect-ratio: 4 / 5 !important; height: auto !important; }
+
+/* Cards surgem suavemente ao rolar (ativado por SurgirAoRolar) */
+.js-surgir .surgir { transition: opacity 0.5s ease, transform 0.5s ease; }
+.js-surgir .surgir:not(.visto) { opacity: 0; transform: translateY(16px); }
+
+/* Esqueleto enquanto a próxima leva de cards carrega */
+@keyframes brilho { 0% { background-position: -300px 0; } 100% { background-position: 300px 0; } }
+.esqueleto {
+  background: linear-gradient(90deg, var(--pill-bg) 0px, var(--pill-bg-hover) 120px, var(--pill-bg) 240px);
+  background-size: 600px 100%;
+  animation: brilho 1.3s linear infinite;
+}
+
+/* Banner "Conheça a fundadora" (News): anel do Instagram girando, foto respirando,
+   brilho atravessando o cartão e seta chamando para o clique. */
+.fundadora-card { animation: fundadora-entra 0.7s ease-out both; }
+.fundadora-anel {
+  background: conic-gradient(from 0deg, #feda75, #fa7e1e, #d62976, #962fbf, #4f5bd5, #feda75);
+  animation: fundadora-gira 6s linear infinite;
+}
+.fundadora-foto { animation: fundadora-respira 7s ease-in-out infinite alternate; }
+.fundadora-brilho {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(37, 124, 255, 0.10) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: fundadora-brilho 7s ease-in-out 1.5s infinite;
+}
+.fundadora-seta { display: inline-block; animation: fundadora-seta 2.4s ease-in-out infinite; }
+.fundadora-card:hover .fundadora-seta { animation-duration: 0.9s; }
+@keyframes fundadora-entra { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fundadora-gira { to { transform: rotate(360deg); } }
+@keyframes fundadora-respira { from { transform: scale(1); } to { transform: scale(1.07); } }
+@keyframes fundadora-brilho { 0%, 70% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@keyframes fundadora-seta { 0%, 60%, 100% { transform: translateX(0); } 30% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .fundadora-card, .fundadora-anel, .fundadora-foto, .fundadora-brilho, .fundadora-seta { animation: none !important; }
+}
+
+/* Modo escuro (celular à noite): o que era preto fixo some no fundo escuro.
+   Botões e selecionados pretos viram azul; textos e bordas pretos viram claros. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bg-ink { background-color: #257cff !important; }
+  :root:not([data-theme='light']) .text-ink { color: var(--text, #f3f4f6) !important; }
+  :root:not([data-theme='light']) .border-ink { border-color: #257cff !important; }
+}
+
+/* ===== Modo escuro (celular/computador com tema noturno) =====
+   Cores fixas claras dos componentes viram superfícies escuras (com um toque da mesma
+   cor) e os textos escuros viram claros. Assim nada fica "branco no branco". */
+:root { color-scheme: light; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { color-scheme: dark; }
+  :root:not([data-theme='light']) .bg-white, :root:not([data-theme='light']) .bg-white\/90, :root:not([data-theme='light']) .bg-\[\#F6F7F9\], :root:not([data-theme='light']) .bg-\[\#F6F6F7\], :root:not([data-theme='light']) .bg-\[\#F4F6F9\], :root:not([data-theme='light']) .bg-\[\#E9ECF1\], :root:not([data-theme='light']) .bg-\[\#DDE2E9\], :root:not([data-theme='light']) .bg-\[\#D8DCE3\] { background-color: var(--surface) !important; }
+  :root:not([data-theme='light']) .bg-\[\#F3F7FF\], :root:not([data-theme='light']) .bg-\[\#f5f8ff\], :root:not([data-theme='light']) .bg-\[\#eef4ff\], :root:not([data-theme='light']) .bg-\[\#E8F0FF\], :root:not([data-theme='light']) .bg-sky-100, :root:not([data-theme='light']) .bg-sky-50, :root:not([data-theme='light']) .bg-blue-50 { background-color: rgba(37,124,255,.16) !important; }
+  :root:not([data-theme='light']) .bg-red-50, :root:not([data-theme='light']) .bg-red-100, :root:not([data-theme='light']) .bg-rose-50 { background-color: rgba(239,68,68,.16) !important; }
+  :root:not([data-theme='light']) .bg-emerald-50, :root:not([data-theme='light']) .bg-emerald-100, :root:not([data-theme='light']) .bg-green-50, :root:not([data-theme='light']) .bg-green-100, :root:not([data-theme='light']) .bg-\[\#DCFCE7\] { background-color: rgba(16,185,129,.16) !important; }
+  :root:not([data-theme='light']) .bg-amber-50, :root:not([data-theme='light']) .bg-amber-100, :root:not([data-theme='light']) .bg-yellow-50, :root:not([data-theme='light']) .bg-orange-50 { background-color: rgba(245,158,11,.16) !important; }
+  :root:not([data-theme='light']) .text-\[\#14161A\], :root:not([data-theme='light']) .text-\[\#22262E\], :root:not([data-theme='light']) .text-\[\#3A404C\], :root:not([data-theme='light']) .text-gray-900, :root:not([data-theme='light']) .text-gray-800, :root:not([data-theme='light']) .text-black { color: var(--text) !important; }
+  :root:not([data-theme='light']) .text-\[\#5B6270\], :root:not([data-theme='light']) .text-\[\#6B7280\], :root:not([data-theme='light']) .text-\[\#4D5156\], :root:not([data-theme='light']) .text-gray-700, :root:not([data-theme='light']) .text-gray-600 { color: var(--text-muted) !important; }
+  :root:not([data-theme='light']) .text-red-600, :root:not([data-theme='light']) .text-red-700, :root:not([data-theme='light']) .text-red-800, :root:not([data-theme='light']) .text-\[\#B42318\] { color: #f87171 !important; }
+  :root:not([data-theme='light']) .text-emerald-700, :root:not([data-theme='light']) .text-emerald-800, :root:not([data-theme='light']) .text-emerald-900, :root:not([data-theme='light']) .text-green-700, :root:not([data-theme='light']) .text-green-800, :root:not([data-theme='light']) .text-\[\#1A7F37\], :root:not([data-theme='light']) .text-\[\#166534\] { color: #34d399 !important; }
+  :root:not([data-theme='light']) .text-amber-700, :root:not([data-theme='light']) .text-amber-800, :root:not([data-theme='light']) .text-amber-900, :root:not([data-theme='light']) .text-\[\#B45309\] { color: #fbbf24 !important; }
+  :root:not([data-theme='light']) .text-sky-800, :root:not([data-theme='light']) .text-sky-700, :root:not([data-theme='light']) .text-\[\#1F5FD1\], :root:not([data-theme='light']) .text-\[\#1B5FCC\] { color: #7dd3fc !important; }
+  :root:not([data-theme='light']) .border-black, :root:not([data-theme='light']) .border-\[\#e6e8eb\], :root:not([data-theme='light']) .border-\[\#E3E6EB\], :root:not([data-theme='light']) .border-\[\#C9CED6\], :root:not([data-theme='light']) .border-white { border-color: var(--border) !important; }
+  :root:not([data-theme='light']) .border-red-200, :root:not([data-theme='light']) .border-red-300 { border-color: rgba(239,68,68,.45) !important; }
+  :root:not([data-theme='light']) .border-emerald-200, :root:not([data-theme='light']) .border-emerald-300 { border-color: rgba(16,185,129,.45) !important; }
+  :root:not([data-theme='light']) .border-amber-200, :root:not([data-theme='light']) .border-amber-300 { border-color: rgba(245,158,11,.45) !important; }
+  /* campos de formulário e listas */
+  :root:not([data-theme='light']) input, :root:not([data-theme='light']) select, :root:not([data-theme='light']) textarea { background-color: var(--surface); color: var(--text); }
+}
+
+/* Modo escuro: varredura completa das cores fixas (etiquetas de condomínio, venda, caixas) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bg-\[\#DCFCE7\] { background-color: rgba(16,185,129,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#E7FBEF\] { background-color: rgba(16,185,129,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#EAF2FF\] { background-color: rgba(37,124,255,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#EEF1F4\] { background-color: var(--pill-bg) !important; }
+  :root:not([data-theme='light']) .bg-\[\#EFEFEF\] { background-color: var(--pill-bg) !important; }
+  :root:not([data-theme='light']) .bg-\[\#F2F7FF\] { background-color: rgba(37,124,255,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#F3F7FF\] { background-color: rgba(37,124,255,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#F6F6F7\] { background-color: var(--pill-bg) !important; }
+  :root:not([data-theme='light']) .bg-\[\#F6F7F9\] { background-color: var(--pill-bg) !important; }
+  :root:not([data-theme='light']) .bg-\[\#eef4ff\] { background-color: rgba(37,124,255,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#f1f3f5\] { background-color: var(--pill-bg) !important; }
+  :root:not([data-theme='light']) .bg-\[\#f5f8ff\] { background-color: rgba(37,124,255,.18) !important; }
+  :root:not([data-theme='light']) .bg-\[\#fff5f5\] { background-color: rgba(239,68,68,.18) !important; }
+  :root:not([data-theme='light']) .text-\[\#0F1E3D\] { color: var(--text) !important; }
+  :root:not([data-theme='light']) .text-\[\#14161A\] { color: var(--text) !important; }
+  :root:not([data-theme='light']) .text-\[\#14161a\] { color: var(--text) !important; }
+  :root:not([data-theme='light']) .text-\[\#166534\] { color: #34d399 !important; }
+  :root:not([data-theme='light']) .text-\[\#1A0DAB\] { color: #93c5fd !important; }
+  :root:not([data-theme='light']) .text-\[\#1B5FCC\] { color: #93c5fd !important; }
+  :root:not([data-theme='light']) .text-\[\#22262E\] { color: var(--text) !important; }
+  :root:not([data-theme='light']) .text-\[\#3c4043\] { color: var(--text-muted) !important; }
+  :root:not([data-theme='light']) .text-\[\#4D5156\] { color: var(--text-muted) !important; }
+  :root:not([data-theme='light']) .text-\[\#B42318\] { color: #f87171 !important; }
+  :root:not([data-theme='light']) .text-\[\#D6246E\] { color: #f472b6 !important; }
+  :root:not([data-theme='light']) .text-\[\#e62f2f\] { color: #f87171 !important; }
+  :root:not([data-theme='light']) .border-\[\#C9CED6\] { border-color: var(--border) !important; }
+  :root:not([data-theme='light']) .border-\[\#E7EAEE\] { border-color: var(--border) !important; }
+  :root:not([data-theme='light']) .border-\[\#e6e8eb\] { border-color: var(--border) !important; }
+}
+
+/* Nada pode deixar a página mais larga que a tela (no celular isso aparecia como
+   faixas brancas dos lados). "clip" não atrapalha os elementos fixos/grudados. */
+html, body { overflow-x: clip; max-width: 100%; }

@@ -1,0 +1,39 @@
+import { Caracteristica, IconeCama, IconeCarro, IconeChuveiro, IconeMetragem } from './IconesImovel';
+import Link from 'next/link';
+import type { AnuncioOculto } from '@/lib/actions';
+import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
+import { brlCurto } from '@/lib/ocultos';
+import IconeOlhoCortado from '@/components/IconeOlhoCortado';
+
+// Card de anúncio RESERVADO (privado): só características — sem foto, título
+// ou endereço. Leva para a página do anúncio, onde a pessoa pede para ver.
+export default function OcultoCard({ a }: { a: AnuncioOculto }) {
+  return (
+    <Link
+      href={`/imovel/${a.id}`}
+      className="group flex flex-col gap-2 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--pill-bg)]/60 p-4 transition-colors hover:border-accent hover:bg-[var(--bg)]"
+    >
+      <div className="flex h-28 flex-col items-center justify-center gap-1.5 rounded-xl bg-[#1d2026] text-white">
+        <IconeOlhoCortado size={26} strokeWidth={1.7} />
+        <span className="text-[11px] font-extrabold uppercase tracking-[0.18em]">Anúncio privado</span>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-accent">{TIPO_UNIDADE_LABEL[a.tipoUnidade]}</span>
+        <span className="flex items-center gap-1 rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold text-white">
+          <IconeOlhoCortado size={10} strokeWidth={2.4} />
+          Privado
+        </span>
+      </div>
+      <div className="font-sans text-lg font-bold tabular-nums tracking-tight">{a.preco ? brlCurto(a.preco) : 'Valor sob consulta'}</div>
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          <Caracteristica icone={<IconeCama />} valor={a.quartos ?? null} titulo="Quartos" />
+          <Caracteristica icone={<IconeChuveiro />} valor={a.banheiros ?? null} titulo="Banheiros" />
+          <Caracteristica icone={<IconeCarro />} valor={a.vagas ?? null} titulo="Vagas" />
+          <Caracteristica icone={<IconeMetragem />} valor={a.area ? `${Math.round(a.area).toLocaleString('pt-BR')} m²` : null} titulo="Área privativa" />
+        </div>
+      <div className="text-xs text-[var(--text-muted)]">{[a.condominio, a.bairro, a.cidade].filter(Boolean).join(' · ')}</div>
+      {a.precoM2 && <div className="text-[11px] text-[var(--text-faint)]">{brlCurto(a.precoM2)}/m²</div>}
+      <span className="mt-1 text-xs font-semibold text-accent group-hover:underline">Pedir para ver este imóvel →</span>
+    </Link>
+  );
+}
