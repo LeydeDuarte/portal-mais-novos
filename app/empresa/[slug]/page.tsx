@@ -1,3 +1,4 @@
+import { fasesDaEmpresa, frasesFases } from '@/lib/empresa-fases';
 import { tituloEmpresa } from '@/lib/titulos';
 import { imoveisDaEmpresa, nomeCondominioSeo } from '@/lib/seo';
 import { urlCondominio } from '@/lib/urls';
@@ -60,6 +61,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!e) return { title: 'Empresa não encontrada' };
   const nome = nomeEmpresa(e);
   const idade = idadeEmpresa(e.dataInicio, undefined, e.anoFundacao);
+  const fases = await fasesDaEmpresa(e.ids);
   const desc = `${nome}: ${e.totalEmpreendimentos ?? 0} empreendimento(s)${e.municipio ? `, sede em ${e.municipio}/${e.uf}` : ''}. ${
     idade ? `Empresa com ${idade.texto} de mercado` : 'Construtora e incorporadora'
   }. Veja lançamentos, obras e prontos do portfólio.`;
@@ -67,7 +69,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const titulo = imoveisDaEmpresa(nome);
   return {
     title: { absolute: tituloEmpresa(titulo) },
-    description: `${titulo}. ${desc}`.slice(0, 160),
+    // a frase que as pessoas buscam vem primeiro: "conheça todos os empreendimentos da X"
+    description: (fases[0]
+      ? `Conheça todos os empreendimentos da ${nome} em ${fases[0].cidade}: ${frasesFases(fases[0])}, com plantas, preços e fotos.${idade ? ` ${idade.texto} de mercado.` : ''}`
+      : `Conheça todos os empreendimentos da ${nome}, com plantas, preços e fotos.`
+    ).slice(0, 160),
     alternates: { canonical: `${SITE_URL}/empresa/${e.slug}` },
     openGraph: { title: `${nome} | ${SITE_NAME}`, description: desc.slice(0, 200), url: `${SITE_URL}/empresa/${e.slug}`, siteName: SITE_NAME, locale: 'pt_BR', type: 'website' }
   };
@@ -78,7 +84,7 @@ export default async function EmpresaPage({ params, searchParams }: Props) {
   if (!e) notFound();
   const pagina = Math.max(1, Number(searchParams.pagina) || 1);
   const filtros = { cidade: searchParams.cidade, bairro: searchParams.bairro, fase: searchParams.fase, tipo: searchParams.tipo, q: searchParams.q };
-  const { cards, total, cidades, bairros } = await empreendimentosDaEmpresa(e.ids, filtros, pagina - 1, POR_PAGINA);
+  const [{ cards, total, cidades, bairros }, fases] = await Promise.all([empreendimentosDaEmpresa(e.ids, filtros, pagina - 1, POR_PAGINA), fasesDaEmpresa(e.ids)]);
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const nome = nomeEmpresa(e);
   const ativa = empresaAtiva(e);
@@ -169,6 +175,42 @@ export default async function EmpresaPage({ params, searchParams }: Props) {
             )}
             <span className="rounded-full bg-accent/10 px-3 py-1 font-bold text-accent">{e.totalEmpreendimentos ?? 0} empreendimento(s)</span>
           </div>
+          {/* por cidade: quantos em lançamento, em obras e prontos (clique filtra a lista) */}
+          {fases.length > 0 && (
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {fases.slice(0, 6).map((f) => (
+                <div key={f.cidade + f.uf} className="rounded-2xl border border-[var(--border)] p-4">
+                  <p className="text-sm font-bold">
+                    {nome} em {f.cidade}
+                    <span className="font-normal text-[var(--text-muted)]">/{f.uf}</span>
+                  </p>
+                  <p className="mt-1 text-[13px] text-[var(--text-muted)]">{f.total} empreendimento(s): {frasesFases(f)}.</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold">
+                    {f.breve > 0 && (
+                      <a href={`?cidade=${encodeURIComponent(f.cidade)}&fase=breve_lancamento`} className="rounded-full bg-[#9CC2FF] px-2.5 py-1 text-[#0B2A66]">
+                        {f.breve} em breve
+                      </a>
+                    )}
+                    {f.lancamento > 0 && (
+                      <a href={`?cidade=${encodeURIComponent(f.cidade)}&fase=lancamento`} className="rounded-full bg-accent px-2.5 py-1 text-white">
+                        {f.lancamento} lançamento(s)
+                      </a>
+                    )}
+                    {f.obras > 0 && (
+                      <a href={`?cidade=${encodeURIComponent(f.cidade)}&fase=obras`} className="rounded-full bg-[#1E3A8A] px-2.5 py-1 text-white">
+                        {f.obras} em obras
+                      </a>
+                    )}
+                    {f.prontos > 0 && (
+                      <a href={`?cidade=${encodeURIComponent(f.cidade)}`} className="rounded-full bg-[var(--pill-bg)] px-2.5 py-1">
+                        {f.prontos} pronto(s)
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <p className="mt-4 max-w-3xl whitespace-pre-line text-[15px] leading-relaxed">{historia(e, idade)}</p>
           <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-[var(--text-muted)]">
             Aqui você vê os empreendimentos que fazem parte do portfólio {e.membros.length ? 'desta empresa e das empresas do grupo' : 'desta empresa'}.

@@ -205,7 +205,17 @@ export function buildAgentJsonLd() {
           { '@type': 'City', name: 'Senador Canedo' },
           { '@type': 'State', name: 'Goiás' }
         ],
-        knowsAbout: ['imóveis à venda em Goiânia', 'lançamentos imobiliários', 'casas em condomínio', 'financiamento imobiliário', 'home equity'],
+        knowsAbout: ['imóveis à venda em Goiânia', 'lançamentos imobiliários', 'casas em condomínio', 'financiamento imobiliário', 'home equity', 'avaliação de imóveis', 'indicadores do mercado imobiliário'],
+        hasOfferCatalog: {
+          '@type': 'OfferCatalog',
+          name: 'Serviços',
+          itemListElement: [
+            { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Venda e compra de imóveis', url: `${SITE_URL}/vender` } },
+            { '@type': 'Offer', price: '0', priceCurrency: 'BRL', itemOffered: { '@type': 'Service', name: 'Avaliação de imóvel grátis (NBR 14653-2)', url: `${SITE_URL}/avaliar` } },
+            { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Financiamento imobiliário, home equity e financiamento de construção (Mais Valor Capital)', url: 'https://maisvalorcapital.com.br' } },
+            { '@type': 'Offer', price: '0', priceCurrency: 'BRL', itemOffered: { '@type': 'Service', name: 'Indicadores do mercado imobiliário e calculadora de correção', url: `${SITE_URL}/news/indicadores` } }
+          ]
+        },
         sameAs: [EMPRESA.instagram]
       },
       {

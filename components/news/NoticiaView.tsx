@@ -154,6 +154,9 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
             </div>
           )}
 
+          {/* celular: a fundadora no começo da leitura, não no fim da página */}
+          <BannerFundadora className="lg:hidden" />
+
           <Corpo corpo={n.corpo} banners={banners} foco={foco} />
 
           {n.faq.length > 0 && (
@@ -236,8 +239,6 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
             </div>
             <BotaoInstagram />
           </div>
-
-          <BannerFundadora className="lg:hidden" />
 
           {doBairro.length > 0 && (
             <div className="[&>section]:mt-4">

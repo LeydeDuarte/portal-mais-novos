@@ -79,7 +79,8 @@ export default async function IndicadoresPage({ searchParams }: { searchParams: 
           url: `${SITE_URL}/news/indicadores`,
           creator: { '@type': 'Organization', name: 'Banco Central do Brasil' },
           isAccessibleForFree: true,
-          variableMeasured: SERIES.map((s) => s.nome)
+          variableMeasured: SERIES.map((s) => s.nome),
+          about: 'Inclui calculadora gratuita de correção de valores (parcelas, aluguel e valor de compra) pelo IPCA, INCC-DI, INCC-M e IGP-M.'
         }}
       />
       <TopoNews ativo="indicadores" />

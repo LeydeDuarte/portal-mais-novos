@@ -56,6 +56,7 @@ export default async function Listagem({
           ) : (
             <>
               {pagina === 0 && <CardNoticia n={primeira} variante="principal" />}
+              <BannerFundadora className="lg:hidden" />
               <div className="grid gap-6 md:grid-cols-2">
                 {(pagina === 0 ? resto : itens).map((n) => (
                   <CardNoticia key={n.id} n={n} variante="linha" />
@@ -77,8 +78,8 @@ export default async function Listagem({
           )}
         </div>
         <aside className="flex flex-col gap-6">
+          <BannerFundadora className="hidden lg:flex" />
           <MaisLidas itens={lidas} />
-          <BannerFundadora />
           <Regioes lista={regioes} atual={regiaoAtual} />
           <Banner banners={banners} posicao="lateral" />
         </aside>

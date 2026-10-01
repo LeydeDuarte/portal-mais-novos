@@ -10,6 +10,7 @@ import { staffAtual } from '@/lib/staff-auth';
 import { SITE_URL } from '@/lib/seo';
 import { regiaoDoVisitante } from '@/lib/news/regiao-visitante';
 import { UFS } from '@/lib/news/base';
+import JsonLd from '@/components/JsonLd';
 
 // Ranking das incorporadoras. Depois do login: o gráfico do PAÍS e o do ESTADO do visitante.
 // Sem login: prévia das 10 maiores do país e o convite para entrar.
@@ -35,6 +36,22 @@ export default async function RankingIncorporadoras() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@type': 'ItemList',
+          name: 'Incorporadoras que mais estão construindo no Brasil',
+          description: 'Ranking por número de empreendimentos em breve lançamento, lançamento e obras.',
+          url: `${SITE_URL}/news/incorporadoras`,
+          numberOfItems: pais.length,
+          itemListElement: pais.slice(0, 20).map((d, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            name: `${d.nome}: ${d.total} empreendimentos`,
+            url: d.slug ? `${SITE_URL}/empresa/${d.slug}` : undefined
+          }))
+        }}
+      />
       <TopoNews ativo="lancamentos" />
       <main className="mx-auto w-full max-w-5xl px-5 pb-20 pt-8 md:px-8">
         <h1 className="font-serif text-[30px] font-semibold leading-tight md:text-[42px]">As incorporadoras que mais estão construindo</h1>

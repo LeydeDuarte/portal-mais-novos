@@ -78,6 +78,8 @@ export default async function NewsCapa({ searchParams }: { searchParams: { q?: s
           <section className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div className="flex min-w-0 flex-col gap-8">
               <CardNoticia n={principal} variante="principal" />
+              {/* celular: a fundadora logo abaixo da principal (no computador ela fica na lateral) */}
+              <BannerFundadora className="lg:hidden" />
               {/* abaixo da principal: mais duas notícias e o gráfico das incorporadoras (sem buraco ao lado da coluna) */}
               {abaixo.length > 0 && (
                 <div className="grid gap-6 border-t border-[var(--border)] pt-6 md:grid-cols-2">
@@ -89,6 +91,7 @@ export default async function NewsCapa({ searchParams }: { searchParams: { q?: s
               <GraficoIncorporadorasRegiao inicial={incorporadoras} />
             </div>
             <aside className="flex flex-col gap-6">
+              <BannerFundadora className="hidden lg:flex" />
               <MaisLidas itens={lidas.length ? lidas : resto.slice(0, 5)} />
               <Link href="/avaliar" className="group flex flex-col gap-1.5 rounded-2xl border-2 border-accent/30 bg-[#F3F7FF] p-4 hover:border-accent">
                 <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-accent">Grátis e na hora</span>
@@ -96,7 +99,6 @@ export default async function NewsCapa({ searchParams }: { searchParams: { q?: s
                 <span className="text-[13px] leading-snug text-[var(--text-muted)]">Avaliação pelo método comparativo da NBR 14653, com os anúncios da sua região.</span>
                 <span className="mt-1 inline-flex h-10 w-fit items-center rounded-full bg-accent px-4 text-sm font-bold text-white">Avaliar meu imóvel →</span>
               </Link>
-              <BannerFundadora />
               <Regioes lista={regioes} />
               <Banner banners={banners} posicao="lateral" />
             </aside>
