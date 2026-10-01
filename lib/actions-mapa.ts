@@ -56,6 +56,14 @@ type ResultadoGeo = {
 
 class ErroCota extends Error {}
 
+/** Resposta do Google em português curto (o texto original é longo e em inglês) */
+function mensagemGoogle(codigo: string): string {
+  if (/OVER_QUERY_LIMIT|OVER_DAILY_LIMIT|RESOURCE_EXHAUSTED/.test(codigo))
+    return 'Limite diário do Google atingido. A cota zera às 4h (horário de Goiânia); depois é só clicar de novo.';
+  if (/REQUEST_DENIED/.test(codigo)) return 'O Google recusou a chave. Confira no Google Cloud se a Geocoding API está liberada para ela.';
+  return `O Google não respondeu agora (${codigo.split(':')[0]}). Tente de novo em instantes.`;
+}
+
 async function geocodificar(endereco: string): Promise<ResultadoGeo[]> {
   const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
   url.searchParams.set('address', endereco);
@@ -156,7 +164,7 @@ export async function localizarCondominios(): Promise<LoteLocalizacao> {
         else if (s.value === 'aprox') res.aproximados++;
         else res.falharam++;
       } else if (s.reason instanceof ErroCota) {
-        res.erro = `O Google recusou: ${s.reason.message}. Se for limite do dia, continue amanhã.`;
+        res.erro = mensagemGoogle(s.reason.message);
       } else {
         res.erro = 'Falha de conexão com o Google. Tente de novo em instantes.';
       }

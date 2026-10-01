@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GeoJSONSource, Map as MLMap, MapLayerMouseEvent, Marker, Popup } from 'maplibre-gl';
 import { getBadgeCondominio, getStatusBucket, temEntrega, BUCKET_LABEL, type StatusBucket } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
-import { precoCurto, type PontoCondominio, type PontoImovel, type PontoMapa } from '@/lib/mapa-tipos';
+import { linkWhatsapp, precoCurto, type PontoCondominio, type PontoImovel, type PontoMapa } from '@/lib/mapa-tipos';
 import { SITE_URL } from '@/lib/seo';
 
 const ESTILO = 'https://tiles.openfreemap.org/styles/positron';
@@ -169,6 +169,14 @@ function linkBotao(texto: string, href: string, primario = false) {
   a.target = '_blank';
   a.rel = 'noopener';
   return a;
+}
+const WHATS_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21l1.7-4.6A8.5 8.5 0 1 1 8 19.6L3 21z"></path></svg>';
+/** Mensagem para o proprietário (só no painel) */
+function linkDono(i: PontoImovel): string | null {
+  if (!i.dono?.whatsapp) return null;
+  const primeiro = i.dono.nome.trim().split(/\s+/)[0] || '';
+  const onde = [i.nome, i.bairro].filter(Boolean).join(', ');
+  return linkWhatsapp(i.dono.whatsapp, `Olá${primeiro ? `, ${primeiro}` : ''}! Aqui é da Mais Novos Imóveis, sobre o seu imóvel ${onde}.`);
 }
 const streetView = (lat: number, lng: number) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
 const detalhes = (i: { quartos: number | null; area: number | null; vagas: number | null }) =>
@@ -464,14 +472,27 @@ export default function MapaImoveis({
     const local = [c.bairro, c.cidade].filter(Boolean).join(', ');
     const lista = el('div', 'margin-top:8px;display:flex;flex-direction:column;gap:6px;max-height:180px;overflow:auto');
     for (const i of c.imoveis.slice(0, 12)) {
-      const a = el('a', 'display:block;padding:7px 9px;border-radius:10px;background:#F3F4F6;text-decoration:none;color:#14161A') as HTMLAnchorElement;
+      const linha = el('div', 'display:flex;align-items:stretch;gap:6px');
+      const a = el('a', 'flex:1;min-width:0;display:block;padding:7px 9px;border-radius:10px;background:#F3F4F6;text-decoration:none;color:#14161A') as HTMLAnchorElement;
       a.href = `${SITE_URL}${i.url}`;
       a.target = '_blank';
       a.rel = 'noopener';
       a.appendChild(el('div', 'font:700 13px/1.3 Inter,system-ui,sans-serif', `${i.preco ? precoCurto(i.preco) : 'Consulte'}${i.privado ? ' · privado' : ''}`));
       const tipoU = i.tipoUnidade ? TIPO_UNIDADE_LABEL[i.tipoUnidade as TipoUnidade] ?? '' : '';
       a.appendChild(el('div', 'font:12px/1.3 Inter,system-ui,sans-serif;color:#5B6068', [tipoU, detalhes(i)].filter(Boolean).join(' · ')));
-      lista.appendChild(a);
+      linha.appendChild(a);
+      const wa = linkDono(i);
+      if (wa) {
+        const b = el('a', 'width:40px;flex-shrink:0;display:grid;place-items:center;border-radius:10px;background:#25D366;color:#08361A;text-decoration:none') as HTMLAnchorElement;
+        b.href = wa;
+        b.target = '_blank';
+        b.rel = 'noopener';
+        b.title = `WhatsApp do proprietário: ${i.dono?.nome ?? ''}`;
+        b.setAttribute('aria-label', `WhatsApp do proprietário ${i.dono?.nome ?? ''}`);
+        b.innerHTML = WHATS_SVG;
+        linha.appendChild(b);
+      }
+      lista.appendChild(linha);
     }
     if (c.imoveis.length > 12) lista.appendChild(el('div', 'font:12px Inter,system-ui,sans-serif;color:#5B6068', `+ ${c.imoveis.length - 12} anúncios`));
     const precoLinha = c.preco ? el('div', 'font:600 13px/1.4 Inter,system-ui,sans-serif;margin-top:4px', `Tipologias a partir de ${precoCurto(c.preco)}`) : null;
@@ -479,8 +500,25 @@ export default function MapaImoveis({
       c.precisao && !['ROOFTOP', 'MANUAL', 'RANGE_INTERPOLATED'].includes(c.precisao)
         ? el('div', 'font:11.5px/1.4 Inter,system-ui,sans-serif;color:#B45309;margin-top:6px', 'Posição aproximada: confira e corrija se precisar.')
         : null;
+    // construtora / incorporadora (link para a página da empresa no site)
+    let empresas: HTMLElement | null = null;
+    if (c.empresas.length) {
+      empresas = el('div', 'font:12.5px/1.4 Inter,system-ui,sans-serif;color:#14161A;margin-top:4px');
+      empresas.appendChild(el('span', 'color:#5B6068', c.empresas.length > 1 ? 'Construtoras: ' : 'Construtora: '));
+      c.empresas.forEach((e, k) => {
+        if (k) empresas!.appendChild(document.createTextNode(' · '));
+        if (e.slug) {
+          const a = el('a', 'font-weight:700;color:#1A5FD0;text-decoration:none', e.nome) as HTMLAnchorElement;
+          a.href = `${SITE_URL}/empresa/${e.slug}`;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          empresas!.appendChild(a);
+        } else empresas!.appendChild(el('b', '', e.nome));
+      });
+    }
     return el('div', 'min-width:230px', '', [
       cabecalho(c.capa, c.nome, local, etiqueta),
+      empresas,
       precoLinha,
       c.imoveis.length ? lista : null,
       posicao,
@@ -493,6 +531,28 @@ export default function MapaImoveis({
     ]);
   }
 
+  // proprietário (só aparece para quem pode mexer no anúncio)
+  function blocoDono(i: PontoImovel) {
+    if (!i.podeMover) return null;
+    const wa = linkDono(i);
+    if (wa && i.dono) {
+      const a = el('a', 'margin-top:8px;height:40px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:999px;background:#25D366;color:#08361A;font:700 12.5px/1 Inter,system-ui,sans-serif;text-decoration:none') as HTMLAnchorElement;
+      a.href = wa;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.innerHTML = WHATS_SVG;
+      a.appendChild(document.createTextNode(` Proprietário: ${i.dono.nome.split(/\s+/).slice(0, 2).join(' ')}`));
+      return a;
+    }
+    const aviso = el('div', 'margin-top:8px;font:12px/1.4 Inter,system-ui,sans-serif;color:#5B6068');
+    aviso.appendChild(document.createTextNode(i.dono ? `Proprietário: ${i.dono.nome} (sem telefone). ` : 'Sem proprietário cadastrado. '));
+    const l = el('a', 'font-weight:700;color:#1A5FD0', i.dono ? 'Completar' : 'Vincular') as HTMLAnchorElement;
+    l.href = `/dashboard/imoveis/${i.id}/editar`;
+    l.target = '_blank';
+    aviso.appendChild(l);
+    return aviso;
+  }
+
   function cartaoImovel(i: PontoImovel | undefined) {
     if (!i) return null;
     const tipoU = i.tipoUnidade ? TIPO_UNIDADE_LABEL[i.tipoUnidade as TipoUnidade] ?? 'Imóvel' : 'Imóvel';
@@ -502,6 +562,7 @@ export default function MapaImoveis({
       cabecalho(i.capa, i.preco ? precoCurto(i.preco) : 'Consulte', [tipoU, local].filter(Boolean).join(' · '), etiqueta),
       el('div', 'font:12.5px/1.4 Inter,system-ui,sans-serif;color:#14161A;margin-top:2px', [i.nome !== tipoU ? i.nome : '', detalhes(i)].filter(Boolean).join(' · ')),
       i.aproximada ? el('div', 'font:11.5px/1.4 Inter,system-ui,sans-serif;color:#5B6068;margin-top:4px', 'Localização aproximada (o círculo mostra a região).') : null,
+      blocoDono(i),
       el('div', '', '', [
         linkBotao('Abrir anúncio', `${SITE_URL}${i.url}`, true),
         linkBotao('Editar', `/dashboard/imoveis/${i.id}/editar`),

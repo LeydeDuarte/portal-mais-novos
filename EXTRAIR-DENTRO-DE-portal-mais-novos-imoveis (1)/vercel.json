@@ -1,4 +1,0 @@
-{
-  "regions": ["pdx1"],
-  "crons": [{ "path": "/api/cron/indicadores", "schedule": "0 12 * * *" }]
-}

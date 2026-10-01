@@ -89,15 +89,31 @@ function Localizador({ aoTerminarLote }: { aoTerminarLote: () => void }) {
   const [st, setSt] = useState<StatusLocalizacao | null>(null);
   const [rodando, setRodando] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [aberto, setAberto] = useState(true);
   const parar = useRef(false);
   const atualizar = () => statusLocalizacao().then(setSt).catch(() => {});
   useEffect(() => {
     atualizar();
+    try {
+      if (localStorage.getItem('mn_localizador') === 'recolhido') setAberto(false);
+    } catch {
+      /* sem armazenamento */
+    }
   }, []);
+  const alternar = (v: boolean) => {
+    setAberto(v);
+    try {
+      localStorage.setItem('mn_localizador', v ? 'aberto' : 'recolhido');
+    } catch {
+      /* ignora */
+    }
+  };
   const rodar = async () => {
     parar.current = false;
     setRodando(true);
     setMsg(null);
+    setAviso(null);
     const soma = { ok: 0, aprox: 0, falhou: 0 };
     let lotes = 0;
     try {
@@ -106,9 +122,9 @@ function Localizador({ aoTerminarLote }: { aoTerminarLote: () => void }) {
         soma.ok += r.ok;
         soma.aprox += r.aproximados;
         soma.falhou += r.falharam;
-        setMsg(`Localizados ${soma.ok} · aproximados ${soma.aprox} · não encontrados ${soma.falhou} · faltam ${r.restantes}`);
+        setMsg(`${soma.ok} localizados · ${soma.aprox} aproximados · ${soma.falhou} não encontrados`);
         if (r.erro) {
-          setMsg((m) => `${m ?? ''}\n${r.erro}`);
+          setAviso(r.erro);
           break;
         }
         if (!r.restantes || !r.feitos || parar.current) break;
@@ -116,7 +132,7 @@ function Localizador({ aoTerminarLote }: { aoTerminarLote: () => void }) {
         if (++lotes % 3 === 0) aoTerminarLote();
       }
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : 'Falha ao localizar.');
+      setAviso(e instanceof Error ? e.message : 'Falha ao localizar.');
     } finally {
       setRodando(false);
       atualizar();
@@ -124,13 +140,42 @@ function Localizador({ aoTerminarLote }: { aoTerminarLote: () => void }) {
     }
   };
   if (!st || (!st.pendentes && !st.falharam && !msg)) return null;
+
+  // recolhido: só uma pílula pequena com o número que falta
+  if (!aberto)
+    return (
+      <button
+        type="button"
+        onClick={() => alternar(true)}
+        className="flex h-9 items-center gap-2 rounded-full bg-[var(--bg)] px-3.5 text-[12.5px] font-semibold shadow-lg"
+        title="Abrir o quadro de localização"
+      >
+        <span className={`h-2 w-2 rounded-full ${aviso ? 'bg-amber-500' : rodando ? 'animate-pulse bg-accent' : 'bg-[var(--text-faint)]'}`} />
+        {rodando ? 'Localizando…' : `${st.pendentes} sem posição`}
+        <span aria-hidden>›</span>
+      </button>
+    );
+
   return (
     <div className="w-full rounded-2xl bg-[var(--bg)] p-3 text-[12.5px] shadow-lg md:w-[340px]">
-      <div className="font-bold">Condomínios sem posição no mapa</div>
-      <div className="mt-0.5 text-[var(--text-muted)]">
-        {st.pendentes} na fila{st.falharam ? ` · ${st.falharam} não encontrados` : ''} · {st.localizados} já no mapa
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-bold">Condomínios sem posição no mapa</div>
+          <div className="mt-0.5 text-[var(--text-muted)]">
+            {st.pendentes} na fila{st.falharam ? ` · ${st.falharam} não encontrados` : ''} · {st.localizados} no mapa
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => alternar(false)}
+          aria-label="Recolher o quadro"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[16px] text-[var(--text-muted)] hover:bg-[var(--pill-bg)]"
+        >
+          –
+        </button>
       </div>
-      {msg && <div className="mt-2 whitespace-pre-line">{msg}</div>}
+      {msg && <div className="mt-2">{msg}</div>}
+      {aviso && <div className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-amber-800 dark:bg-amber-950 dark:text-amber-200">{aviso}</div>}
       <div className="mt-2 flex flex-wrap gap-2">
         {rodando ? (
           <button type="button" onClick={() => (parar.current = true)} className="h-9 rounded-full border border-[var(--border)] px-3.5 font-semibold">

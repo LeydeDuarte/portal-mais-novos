@@ -26,6 +26,8 @@ export type PontoImovel = {
   /** sem posição própria: usa a do condomínio */
   herdaPosicao: boolean;
   podeMover: boolean;
+  /** SÓ NO PAINEL: proprietário do imóvel (nunca vai para o mapa público) */
+  dono?: { nome: string; whatsapp: string | null } | null;
 };
 
 export type PontoCondominio = {
@@ -47,6 +49,8 @@ export type PontoCondominio = {
   /** como a posição foi obtida: ROOFTOP, RANGE_INTERPOLATED, GEOMETRIC_CENTER, APPROXIMATE, MANUAL */
   precisao: string | null;
   podeMover: boolean;
+  /** construtoras/incorporadoras ligadas ao condomínio, na ordem do cadastro */
+  empresas: { nome: string; slug: string | null }[];
 };
 
 export type PontoMapa = PontoImovel | PontoCondominio;
@@ -61,4 +65,12 @@ export function precoCurto(v: number | null | undefined): string {
     return `R$ ${mi.toLocaleString('pt-BR', { maximumFractionDigits: mi >= 10 ? 0 : 1 })} mi`;
   }
   return `R$ ${Math.round(v / 1000).toLocaleString('pt-BR')} mil`;
+}
+
+/** Link do WhatsApp para um telefone brasileiro (com ou sem 55), com mensagem pronta */
+export function linkWhatsapp(telefone: string | null | undefined, mensagem: string): string | null {
+  let d = (telefone ?? '').replace(/\D/g, '');
+  if (d.length === 10 || d.length === 11) d = `55${d}`;
+  if (d.length < 12 || d.length > 13) return null;
+  return `https://wa.me/${d}?text=${encodeURIComponent(mensagem)}`;
 }

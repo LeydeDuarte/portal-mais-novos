@@ -28,6 +28,7 @@ import type { EmpresaNaConcepcao } from './empresas-tipos';
 import type { DepoimentoCard, DestaqueCard } from './especiais-tipos';
 import { urlImovel, urlCondominio } from './urls';
 import type { PontoMapa, ResultadoMapa } from './mapa-tipos';
+import { proprietariosDoImovel } from './proprietarios';
 
 const PAGE_SIZE = 24;
 const STAFF_COOKIE = 'mn_staff';
@@ -2348,13 +2349,14 @@ export async function getPontosMapa(filters: FilterState): Promise<ResultadoMapa
     lat: number | null; lng: number | null; d_lat: number | null; d_lng: number | null; aproximada: boolean | null;
     visibilidade: string | null; bairro: string | null; cidade: string | null; uf: string | null;
     condominio: string | null; d_nome: string | null; delivery_date: string | Date | null; capa: string | null;
-    corretor_email: string | null; empreendimento_id: string | null;
+    corretor_email: string | null; empreendimento_id: string | null; vendedor: { nome?: string; telefone?: string } | null;
   };
   type LinhaCondo = {
     id: string; slug: string | null; name: string; tipo: string | null; lat: number | null; lng: number | null;
     delivery_date: string | Date | null; bairro: string | null; cidade: string | null; uf: string | null;
     capa: string | null; min_price: string | number | null; anuncios: number | string; privados: number | string;
     geo_fonte: string | null; geo_precisao: string | null; corretor_email: string | null;
+    empresas: { nome: string; slug: string | null }[] | null;
   };
   const [imoveis, condos] = await Promise.all([
     propIds.length
@@ -2362,7 +2364,7 @@ export async function getPontosMapa(filters: FilterState): Promise<ResultadoMapa
           `select p.id, p.slug, p.titulo, p.tipo_unidade, p.finalidade, p.price_value, p.quartos, p.vagas, p.area,
                   p.lat, p.lng, d.lat as d_lat, d.lng as d_lng, p.localizacao_aproximada as aproximada, p.visibilidade,
                   p.bairro, p.cidade, p.uf, p.condominio, d.name as d_nome, p.delivery_date,
-                  coalesce(p.capa_mini, p.photos->>0) as capa, p.corretor_email, p.empreendimento_id
+                  coalesce(p.capa_mini, p.photos->>0) as capa, p.corretor_email, p.empreendimento_id, p.vendedor
              from properties p left join developments d on d.id = p.empreendimento_id
             where p.id = any($1::text[])`,
           [propIds]
@@ -2377,7 +2379,9 @@ export async function getPontosMapa(filters: FilterState): Promise<ResultadoMapa
                   (select count(*) from properties x
                     where x.empreendimento_id = d.id and not x.is_tipologia and x.visibilidade = 'publico' and x.vendido_em is null) as anuncios,
                   (select count(*) from properties x
-                    where x.empreendimento_id = d.id and not x.is_tipologia and x.visibilidade = 'privado' and x.vendido_em is null) as privados
+                    where x.empreendimento_id = d.id and not x.is_tipologia and x.visibilidade = 'privado' and x.vendido_em is null) as privados,
+                  (select json_agg(json_build_object('nome', coalesce(nullif(e.nome_perfil, ''), nullif(e.nome_fantasia, ''), e.razao_social), 'slug', e.slug) order by de.ordem)
+                     from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = d.id) as empresas
              from developments d where d.id = any($1::text[])`,
           [devIds]
         )
@@ -2386,6 +2390,17 @@ export async function getPontosMapa(filters: FilterState): Promise<ResultadoMapa
   const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v) || null);
   const data = (v: string | Date | null) => (v ? (v instanceof Date ? v.toISOString() : String(v)).slice(0, 7) : null);
   const podeMover = (dono: string | null) => veTudo(staff.role) || (dono ?? '').toLowerCase() === staff.email.toLowerCase();
+
+  // proprietário de cada anúncio (só para quem pode mexer no anúncio: gestor ou o corretor dele)
+  const comPermissao = imoveis.filter((r) => podeMover(r.corretor_email)).map((r) => r.id);
+  const donos = await proprietariosDoImovel(comPermissao).catch(() => new Map());
+  const donoDe = (r: LinhaImovel): { nome: string; whatsapp: string | null } | null => {
+    if (!podeMover(r.corretor_email)) return null;
+    const o = (donos.get(r.id) ?? [])[0];
+    if (o) return { nome: o.nome, whatsapp: o.whatsapp ?? (o.conjuge?.telefone || null) };
+    const v = r.vendedor && typeof r.vendedor === 'object' ? r.vendedor : null;
+    return v?.nome || v?.telefone ? { nome: v.nome ?? 'Proprietário', whatsapp: v.telefone ?? null } : null;
+  };
 
   const pontos: PontoMapa[] = [];
   let semPosicao = 0;
@@ -2416,7 +2431,8 @@ export async function getPontosMapa(filters: FilterState): Promise<ResultadoMapa
       privado: r.visibilidade === 'privado',
       aproximada: !!r.aproximada || r.lat == null,
       herdaPosicao: r.lat == null,
-      podeMover: podeMover(r.corretor_email)
+      podeMover: podeMover(r.corretor_email),
+      dono: donoDe(r)
     });
   }
   for (const r of condos) {
@@ -2440,7 +2456,8 @@ export async function getPontosMapa(filters: FilterState): Promise<ResultadoMapa
       capa: r.capa,
       url: urlCondominio({ id: r.id, slug: r.slug, uf: r.uf, cidade: r.cidade, bairro: r.bairro }),
       precisao: r.geo_precisao,
-      podeMover: podeMover(r.corretor_email)
+      podeMover: podeMover(r.corretor_email),
+      empresas: Array.isArray(r.empresas) ? r.empresas.filter((e) => e?.nome) : []
     });
   }
   return { pontos, semPosicao };
