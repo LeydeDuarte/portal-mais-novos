@@ -49,3 +49,31 @@ export async function mercadoPorCidade(uf = 'GO', limite = 6): Promise<LinhaMerc
   ).catch(() => []);
   return rows.map((r) => ({ nome: r.cidade, cidade: r.cidade, uf: r.uf, m2: Math.round(Number(r.m2)), anuncios: Number(r.n), vendidos12m: 0, variacao12m: null }));
 }
+
+// Lançamentos por incorporadora (fase pela data de entrega: breve lançamento, lançamento e obras)
+import { getStatusBucket } from '../classification';
+export type IncorporadoraFases = { nome: string; slug: string | null; breve: number; lancamento: number; obras: number; total: number };
+export async function lancamentosPorIncorporadora(cidade: string | null = 'Goiânia', limite = 10, uf: string | null = null): Promise<IncorporadoraFases[]> {
+  const rows = await query<{ nome: string; slug: string | null; entrega: string | Date }>(
+    `select coalesce(nullif(e.nome_perfil, ''), nullif(e.nome_fantasia, ''), e.razao_social) nome, e.slug, d.delivery_date entrega
+       from developments d
+       join development_empresas de on de.development_id = d.id and de.ordem = 0
+       join empresas e on e.id = de.empresa_id
+      where d.status = 'publicado' and d.delivery_date > now()
+        and ($1::text is null or lower(d.cidade) = lower($1)) and ($2::text is null or upper(coalesce(d.uf, 'GO')) = upper($2))`,
+    [cidade, uf]
+  ).catch(() => []);
+  const mapa = new Map<string, IncorporadoraFases>();
+  for (const r of rows) {
+    const k = r.nome;
+    const it = mapa.get(k) ?? { nome: r.nome, slug: r.slug, breve: 0, lancamento: 0, obras: 0, total: 0 };
+    const iso = (r.entrega instanceof Date ? r.entrega.toISOString() : String(r.entrega)).slice(0, 10);
+    const b = getStatusBucket(iso);
+    if (b === 'breve_lancamento') it.breve++;
+    else if (b === 'lancamento') it.lancamento++;
+    else it.obras++;
+    it.total++;
+    mapa.set(k, it);
+  }
+  return Array.from(mapa.values()).sort((a, b) => b.total - a.total).slice(0, limite);
+}

@@ -10,7 +10,8 @@ import { Banner, CardNoticia, FaixaIndicadores, MaisLidas, Regioes, TopoNews } f
 import { noticiasDaCapa, maisLidas, regioesComNoticias, bannersAtivos, noticiasPublicadas } from '@/lib/news/dados';
 import { imoveisEmDestaque } from '@/lib/news/imoveis';
 import { lerIndicadores } from '@/lib/indicadores';
-import { mercadoPorBairro } from '@/lib/news/mercado';
+import { lancamentosPorIncorporadora, mercadoPorBairro } from '@/lib/news/mercado';
+import GraficoIncorporadorasRegiao from '@/components/news/GraficoIncorporadorasRegiao';
 import { TOPICOS, urlNoticia, type Noticia } from '@/lib/news/base';
 
 import { SITE_URL, SITE_NAME, urlRegiao as urlRegiaoImoveis } from '@/lib/seo';
@@ -29,19 +30,22 @@ const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR')}`;
 
 export default async function NewsCapa({ searchParams }: { searchParams: { q?: string } }) {
   const q = searchParams.q?.trim();
-  const [todas, lidas, regioes, indicadores, destaques, banners, bairros] = await Promise.all([
+  const [todas, lidas, regioes, indicadores, destaques, banners, bairros, incorporadoras] = await Promise.all([
     q ? noticiasPublicadas({ q, limite: 40 }) : noticiasDaCapa(),
     maisLidas(30, 5),
     regioesComNoticias(),
     lerIndicadores(13),
     imoveisEmDestaque(4),
     bannersAtivos(),
-    mercadoPorBairro('GO', 8)
+    mercadoPorBairro('GO', 8),
+    lancamentosPorIncorporadora(null, 10, 'GO')
   ]);
   const [principal, ...resto] = todas;
   const secundarias = resto.slice(0, 3);
-  const porTopico = TOPICOS.map((t) => ({ t, itens: resto.slice(3).filter((n) => n.topico === t.id).slice(0, 4) })).filter((x) => x.itens.length >= 2);
-  const demais = resto.slice(3).filter((n) => !porTopico.some((x) => x.itens.includes(n))).slice(0, 8);
+  const abaixo = q ? [] : resto.slice(3, 5);
+  const restoDepois = resto.slice(3 + abaixo.length);
+  const porTopico = TOPICOS.map((t) => ({ t, itens: restoDepois.filter((n) => n.topico === t.id).slice(0, 4) })).filter((x) => x.itens.length >= 2);
+  const demais = restoDepois.filter((n) => !porTopico.some((x) => x.itens.includes(n))).slice(0, 8);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -72,7 +76,18 @@ export default async function NewsCapa({ searchParams }: { searchParams: { q?: s
           <p className="rounded-2xl bg-[var(--pill-bg)] p-6 text-center text-[var(--text-muted)]">As primeiras notícias estão a caminho.</p>
         ) : (
           <section className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <CardNoticia n={principal} variante="principal" />
+            <div className="flex min-w-0 flex-col gap-8">
+              <CardNoticia n={principal} variante="principal" />
+              {/* abaixo da principal: mais duas notícias e o gráfico das incorporadoras (sem buraco ao lado da coluna) */}
+              {abaixo.length > 0 && (
+                <div className="grid gap-6 border-t border-[var(--border)] pt-6 md:grid-cols-2">
+                  {abaixo.map((n) => (
+                    <CardNoticia key={n.id} n={n} variante="linha" />
+                  ))}
+                </div>
+              )}
+              <GraficoIncorporadorasRegiao inicial={incorporadoras} />
+            </div>
             <aside className="flex flex-col gap-6">
               <MaisLidas itens={lidas.length ? lidas : resto.slice(0, 5)} />
               <Link href="/avaliar" className="group flex flex-col gap-1.5 rounded-2xl border-2 border-accent/30 bg-[#F3F7FF] p-4 hover:border-accent">
