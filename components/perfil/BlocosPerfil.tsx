@@ -205,7 +205,7 @@ export function BarraContatoFixa({ favoritoId, whats, rotulo, compartilhar }: { 
     <div className="fixed inset-x-0 bottom-0 z-[80] border-t border-black/[0.08] bg-[var(--bg)] px-3 pb-[calc(10px+env(safe-area-inset-bottom,0px))] pt-2.5 shadow-[0_-6px_20px_rgba(0,0,0,0.06)]">
       <div className="mx-auto flex max-w-[560px] gap-2 [&>*]:min-w-0">
         {favoritoId && <DetailFavoriteButton propertyId={favoritoId} curto />}
-        {compartilhar && <BotaoCompartilhar {...compartilhar} tamanho={52} />}
+        {compartilhar && <BotaoCompartilhar {...compartilhar} tamanho={52} menuAcima />}
         {whats ? (
           <BotaoWhatsapp ctx={whats} variante="barra" rotulo={rotulo} />
         ) : (

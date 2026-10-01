@@ -4,7 +4,21 @@ import { useEffect, useRef, useState } from 'react';
 
 // Compartilhar (só o ícone): no celular abre o menu do próprio aparelho; no computador,
 // um menu com WhatsApp e copiar link. Conta no painel de Resultados (data-rastro).
-export default function BotaoCompartilhar({ url, titulo, refId, tamanho = 40 }: { url: string; titulo: string; refId?: string; tamanho?: number }) {
+// menuAcima: o menu abre sempre para cima (botão na barra fixa do rodapé; abrir para
+// baixo jogava o menu para fora da tela no computador)
+export default function BotaoCompartilhar({
+  url,
+  titulo,
+  refId,
+  tamanho = 40,
+  menuAcima = false
+}: {
+  url: string;
+  titulo: string;
+  refId?: string;
+  tamanho?: number;
+  menuAcima?: boolean;
+}) {
   const [aberto, setAberto] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const caixa = useRef<HTMLDivElement | null>(null);
@@ -39,7 +53,11 @@ export default function BotaoCompartilhar({ url, titulo, refId, tamanho = 40 }: 
         </svg>
       </button>
       {aberto && (
-        <div className="absolute bottom-full right-0 z-[95] mb-2 w-52 rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-1.5 shadow-xl md:bottom-auto md:top-full md:mb-0 md:mt-2">
+        <div
+          className={`absolute bottom-full z-[95] mb-2 w-52 rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-1.5 shadow-xl ${
+            menuAcima ? 'left-0' : 'right-0 md:bottom-auto md:top-full md:mb-0 md:mt-2'
+          }`}
+        >
           <a
             href={`https://wa.me/?text=${encodeURIComponent(`${titulo}\n${url}`)}`}
             target="_blank"
