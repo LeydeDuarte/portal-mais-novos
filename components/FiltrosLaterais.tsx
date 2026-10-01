@@ -84,7 +84,7 @@ let indiceCache: Promise<LocalSugestao[]> | null = null;
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 /** Localização: estado (UF) + digitar a cidade ou o bairro, com sugestões "Cidade - UF" */
-function Localizacao({ filters, onChange }: { filters: FilterState; onChange: (f: FilterState) => void }) {
+function Localizacao({ filters, onChange, aoEscolher }: { filters: FilterState; onChange: (f: FilterState) => void; aoEscolher?: () => void }) {
   const [indice, setIndice] = useState<LocalSugestao[] | null>(null);
   const [q, setQ] = useState('');
   const [uf, setUf] = useState('');
@@ -109,6 +109,8 @@ function Localizacao({ filters, onChange }: { filters: FilterState; onChange: (f
     const novo: LocalFiltro = { tipo: l.tipo, nome: l.nome, cidade: l.cidade, uf: l.uf, id: l.id };
     if (!filters.locais.some((x) => localKey(x) === localKey(novo))) onChange({ ...filters, locais: [...filters.locais, novo] });
     setQ('');
+    (document.activeElement as HTMLElement | null)?.blur(); // recolhe o teclado do celular
+    aoEscolher?.(); // na gaveta do celular: fecha e mostra o resultado
   };
   return (
     <div className="flex flex-col gap-2">
@@ -121,7 +123,21 @@ function Localizacao({ filters, onChange }: { filters: FilterState; onChange: (f
         </select>
       )}
       <div className="relative">
-        <input className={campo} value={q} onFocus={carregar} onChange={(e) => (carregar(), setQ(e.target.value))} placeholder="Digite parte do nome: bueno, marista, goiânia…" />
+        <input
+          className={campo}
+          value={q}
+          onFocus={carregar}
+          onChange={(e) => (carregar(), setQ(e.target.value))}
+          // Enter / "Buscar" no teclado do celular escolhe a 1ª sugestão
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && sugestoes[0]) {
+              e.preventDefault();
+              escolher(sugestoes[0]);
+            }
+          }}
+          enterKeyHint="search"
+          placeholder="Digite parte do nome: bueno, marista, goiânia…"
+        />
         {sugestoes.length > 0 && (
           <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)] p-1 shadow-xl">
             {sugestoes.map((l) => (
@@ -138,7 +154,7 @@ function Localizacao({ filters, onChange }: { filters: FilterState; onChange: (f
   );
 }
 
-export default function FiltrosLaterais({ filters, onChange }: { filters: FilterState; onChange: (f: FilterState) => void }) {
+export default function FiltrosLaterais({ filters, onChange, aoEscolherLocal }: { filters: FilterState; onChange: (f: FilterState) => void; aoEscolherLocal?: () => void }) {
   const set = <K extends keyof FilterState>(k: K, v: FilterState[K]) => onChange({ ...filters, [k]: v });
   const alternarTipo = (t: TipoUnidade) => set('tipos', filters.tipos.includes(t) ? filters.tipos.filter((x) => x !== t) : [...filters.tipos, t]);
   const ano = new Date().getFullYear();
@@ -201,7 +217,7 @@ export default function FiltrosLaterais({ filters, onChange }: { filters: Filter
       )}
 
       <Secao titulo="Localização">
-        <Localizacao filters={filters} onChange={onChange} />
+        <Localizacao filters={filters} onChange={onChange} aoEscolher={aoEscolherLocal} />
       </Secao>
 
       <Secao titulo="Tipo de imóvel">

@@ -73,14 +73,29 @@ export default function PainelFiltros({ filters, onChange }: { filters: FilterSt
       {gaveta && (
         <div className="fixed inset-0 z-50 md:hidden">
           <button type="button" aria-label="Fechar" onClick={() => setGaveta(false)} className="absolute inset-0 bg-black/40" />
-          <div className="absolute left-0 top-0 h-full w-[86%] max-w-[340px] overflow-y-auto bg-[var(--bg)] p-5">
+          <div className="absolute left-0 top-0 flex h-full w-[86%] max-w-[340px] flex-col bg-[var(--bg)]">
+            <div className="flex-1 overflow-y-auto p-5">
             <div className="mb-5 flex items-center justify-between">
               <span className="text-lg font-bold">Filtros{n ? ` (${n})` : ''}</span>
               <button type="button" onClick={() => setGaveta(false)} className="rounded-full bg-ink px-4 py-2 text-[13px] font-semibold text-white">
                 Ver imóveis
               </button>
             </div>
-            <FiltrosLaterais filters={filters} onChange={onChange} />
+            <FiltrosLaterais
+              filters={filters}
+              onChange={onChange}
+              aoEscolherLocal={() => {
+                setGaveta(false);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+            </div>
+            {/* botão sempre visível no rodapé da gaveta: não precisa rolar até o fim */}
+            <div className="border-t border-[var(--border)] p-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))]">
+              <button type="button" onClick={() => setGaveta(false)} className="h-12 w-full rounded-full bg-accent text-[15px] font-bold text-white">
+                Ver imóveis{n ? ` (${n} filtro${n > 1 ? 's' : ''})` : ''}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -122,7 +122,7 @@ export default function Header({ searchSlot }: { searchSlot?: ReactNode }) {
           >
             {session.cliente?.foto ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={session.cliente.foto} alt="" referrerPolicy="no-referrer" className="h-8 w-8 rounded-full object-cover" />
+              <img src={session.cliente.foto} alt="" width={32} height={32} referrerPolicy="no-referrer" className="h-8 w-8 rounded-full object-cover" />
             ) : session.loggedIn ? (
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-sm font-bold text-white">{(session.cliente?.nome ?? 'V').slice(0, 1).toUpperCase()}</span>
             ) : (

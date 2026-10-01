@@ -16,6 +16,9 @@ const PADRAO = '/imoveis-a-venda/go/goiania';
 
 async function destino(caminho: string): Promise<string> {
   const p = decodeURIComponent(caminho || '/').toLowerCase();
+  // sitemap e robots do site antigo → os do portal (o Google segue e descobre as páginas novas)
+  if (/sitemap[^/]*\.xml$/.test(p)) return '/sitemap.xml';
+  if (p === '/robots.txt') return '/robots.txt';
   const numeros = Array.from(new Set(p.match(/\d{4,10}/g) ?? [])).slice(-3);
 
   if (numeros.length) {
@@ -35,7 +38,8 @@ async function destino(caminho: string): Promise<string> {
 
   if (/lancament/.test(p)) return '/lancamentos';
   if (/financ|credito|home-equity|emprestimo/.test(p)) return '/financiamento';
-  if (/anuncie|cadastr.*imovel|venda-seu|vender|avalia/.test(p)) return '/vender';
+  if (/avalia|quanto-vale/.test(p)) return '/avaliar';
+  if (/anuncie|cadastr.*imovel|venda-seu|vender/.test(p)) return '/vender';
   if (/sobre|quem-somos|empresa|contato|fale-conosco/.test(p)) return '/quem-somos';
   return PADRAO;
 }

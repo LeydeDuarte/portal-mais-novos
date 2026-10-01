@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Home from '@/components/Home';
 import { montarFeedInicial } from '@/lib/feed-inicial';
+import { preloadPrimeirasFotos } from '@/lib/preload-feed';
 
 export const metadata: Metadata = {
   title: 'Lançamentos e imóveis novos em Goiânia',
@@ -13,10 +14,13 @@ export const metadata: Metadata = {
 export default async function LancamentosPage({ searchParams }: { searchParams: { q?: string } }) {
   const q = typeof searchParams?.q === 'string' ? searchParams.q.slice(0, 120) : '';
   const inicial = await montarFeedInicial('lancamentos', q);
+  preloadPrimeirasFotos([...(inicial.destaques ?? []).slice(0, 1), ...inicial.items], 3);
   return (
     <>
       <h1 className="sr-only">Lançamentos e imóveis novos à venda em Goiânia</h1>
-      <Home initialModo="lancamentos" initialQuery={q} inicial={inicial} />
+      <main id="conteudo">
+        <Home initialModo="lancamentos" initialQuery={q} inicial={inicial} />
+      </main>
     </>
   );
 }

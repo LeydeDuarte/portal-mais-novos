@@ -3,6 +3,7 @@ import Home from '@/components/Home';
 import JsonLd from '@/components/JsonLd';
 import { buildAgentJsonLd, SITE_NAME, SITE_URL } from '@/lib/seo';
 import { montarFeedInicial } from '@/lib/feed-inicial';
+import { preloadPrimeirasFotos } from '@/lib/preload-feed';
 import { TITULO_HOME } from '@/lib/titulos';
 
 export const metadata: Metadata = {
@@ -24,11 +25,14 @@ export const metadata: Metadata = {
 export default async function Page({ searchParams }: { searchParams: { q?: string } }) {
   const q = typeof searchParams?.q === 'string' ? searchParams.q.slice(0, 120) : '';
   const inicial = await montarFeedInicial('todos', q);
+  preloadPrimeirasFotos([...(inicial.destaques ?? []).slice(0, 1), ...inicial.items], 3);
   return (
     <>
       <JsonLd data={buildAgentJsonLd()} />
       <h1 className="sr-only">Os Mais Novos Imóveis à Venda estão aqui: lançamentos, apartamentos e casas em condomínio em Goiânia</h1>
-      <Home initialQuery={q} inicial={inicial} />
+      <main id="conteudo">
+        <Home initialQuery={q} inicial={inicial} />
+      </main>
     </>
   );
 }

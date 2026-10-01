@@ -19,7 +19,7 @@ import LoginModal from './LoginModal';
 import type { Cliente } from '@/lib/cliente-auth';
 import { urlImovel, urlCondominio } from '@/lib/urls';
 
-export type FeedInicial = { items: FeedItem[]; hasMore: boolean; totalAVenda: number; modoEquipe: boolean; filtrosChave: string; modoFeed?: 'masonry' | 'alinhado'; escolheuFeed?: boolean };
+export type FeedInicial = { items: FeedItem[]; hasMore: boolean; totalAVenda: number; modoEquipe: boolean; filtrosChave: string; modoFeed?: 'masonry' | 'alinhado'; escolheuFeed?: boolean; destaques?: FeedItem[] };
 
 const chaveItem = (i: FeedItem) =>
   i.kind === 'empreendimento' ? `d-${i.development.id}` : i.kind === 'imovel' ? `p-${i.property.id}` : i.chave;
@@ -27,7 +27,14 @@ const chaveItem = (i: FeedItem) =>
 export default function MasonryFeed({ filters, inicial }: { filters: FilterState; inicial?: FeedInicial }) {
   // destaques da equipe que combinam com esta busca (espaço de 2 colunas que se reveza)
   const filtrosJson = JSON.stringify(filters);
+  // na 1ª pintura os destaques já vieram do servidor: só busca de novo quando a busca muda
+  const destaquesDoServidor = useRef(inicial?.destaques ? inicial.filtrosChave : null);
   useEffect(() => {
+    if (destaquesDoServidor.current === filtrosJson) {
+      destaquesDoServidor.current = null;
+      return;
+    }
+    destaquesDoServidor.current = null;
     let vivo = true;
     getDestaquesFeed(JSON.parse(filtrosJson))
       .then((d) => vivo && setDestaques(d))
@@ -41,7 +48,7 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
   const [items, setItems] = useState<FeedItem[]>(inicial?.items ?? []);
   const [modoFeed, setModoFeed] = useState<'masonry' | 'alinhado'>(inicial?.modoFeed ?? 'masonry');
   const [escolheuFeed, setEscolheuFeed] = useState(!!inicial?.escolheuFeed);
-  const [destaques, setDestaques] = useState<FeedItem[]>([]);
+  const [destaques, setDestaques] = useState<FeedItem[]>(inicial?.destaques ?? []);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);

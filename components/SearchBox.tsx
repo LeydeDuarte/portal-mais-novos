@@ -72,19 +72,36 @@ export default function SearchBox({ locais, onToggleLocal, onSearchText }: Props
   }, [index, q]);
 
   const totalSugestoes = grupos.reduce((n, g) => n + g.itens.length, 0);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const ehCelular = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+  // fecha a lista, recolhe o teclado e volta para o topo do feed (resultado aparece na hora)
+  const concluir = () => {
+    setOpen(false);
+    inputRef.current?.blur();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const escolherLocal = (f: LocalFiltro) => {
+    onToggleLocal(f);
+    setQ('');
+    if (ehCelular()) concluir();
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const texto = q.trim();
     if (!texto) return;
     // Se o texto é exatamente o nome de um local, marca o local; senão vira busca livre
+    // Enter (ou "Buscar" no teclado do celular): nome exato → esse local; senão a 1ª sugestão
+    // de local; sem sugestão, vira busca por palavra-chave
     const exato = (index ?? []).find((s) => normalize(s.nome) === normalize(texto));
-    if (exato) {
-      if (!selecionados.has(localKey(toFiltro(exato)))) onToggleLocal(toFiltro(exato));
+    const primeira = exato ?? grupos.flatMap((g) => g.itens)[0];
+    if (primeira) {
+      if (!selecionados.has(localKey(toFiltro(primeira)))) onToggleLocal(toFiltro(primeira));
     } else {
       onSearchText(texto);
     }
     setQ('');
+    concluir();
   };
 
   return (
@@ -100,6 +117,8 @@ export default function SearchBox({ locais, onToggleLocal, onSearchText }: Props
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
+          ref={inputRef}
+          enterKeyHint="search"
           placeholder="Cidade, bairro, condomínio ou palavra-chave"
           aria-label="Buscar imóveis"
           autoComplete="off"
@@ -124,7 +143,7 @@ export default function SearchBox({ locais, onToggleLocal, onSearchText }: Props
                       <button
                         key={localKey(f)}
                         type="button"
-                        onClick={() => onToggleLocal(f)}
+                        onClick={() => escolherLocal(f)}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--pill-bg)]"
                       >
                         <Pin className="shrink-0 text-[var(--text-muted)]" />
@@ -136,7 +155,7 @@ export default function SearchBox({ locais, onToggleLocal, onSearchText }: Props
                         </span>
                         <span
                           className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[11px] font-bold ${
-                            marcado ? 'border-ink bg-ink text-white' : 'border-[var(--text-faint)]'
+                            marcado ? 'border-accent bg-accent text-white' : 'border-[var(--text-faint)]'
                           }`}
                           aria-hidden
                         >
@@ -158,6 +177,7 @@ export default function SearchBox({ locais, onToggleLocal, onSearchText }: Props
               onClick={() => {
                 onSearchText(q.trim());
                 setQ('');
+                concluir();
               }}
               className="mt-1 flex w-full items-center gap-3 border-t border-[var(--border)] px-4 py-3 text-left text-sm hover:bg-[var(--pill-bg)]"
             >
@@ -172,8 +192,8 @@ export default function SearchBox({ locais, onToggleLocal, onSearchText }: Props
           )}
 
           {locais.length > 0 && (
-            <div className="flex justify-end border-t border-[var(--border)] px-4 pt-2">
-              <button type="button" onClick={() => setOpen(false)} className="rounded-full bg-ink px-4 py-1.5 text-xs font-bold text-white">
+            <div className="sticky bottom-0 -mb-2 flex justify-end border-t border-[var(--border)] bg-[var(--bg)] px-4 py-2">
+              <button type="button" onClick={concluir} className="rounded-full bg-accent px-4 py-2 text-xs font-bold text-white">
                 Ver {locais.length === 1 ? 'resultados' : `resultados (${locais.length} locais)`}
               </button>
             </div>
