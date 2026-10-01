@@ -192,7 +192,13 @@ export function buildAgentJsonLd() {
         image: `${SITE_URL}/icons/icon-512.png`,
         description:
           'Portal de imóveis à venda em Goiânia: apartamentos, casas em condomínio, lançamentos e imóveis novos, com vídeos e atendimento especializado em crédito imobiliário.',
-        address: { '@type': 'PostalAddress', addressLocality: EMPRESA.cidade, addressRegion: EMPRESA.uf, addressCountry: 'BR' },
+        address: { '@type': 'PostalAddress', streetAddress: 'Rua T-37, Setor Bueno', addressLocality: EMPRESA.cidade, addressRegion: EMPRESA.uf, addressCountry: 'BR' },
+        // marca de crédito e certificações (correspondente bancário ANEPS, Res. CMN 4.935/21)
+        brand: [{ '@type': 'Brand', name: 'Mais Novos Imóveis' }, { '@type': 'Brand', name: 'Mais Valor Capital', url: 'https://maisvalorcapital.com.br' }],
+        hasCredential: [
+          { '@type': 'EducationalOccupationalCredential', name: 'Certificação ANEPS: Crédito Imobiliário', identifier: '0185260817022749', recognizedBy: { '@type': 'Organization', name: 'ANEPS' } },
+          { '@type': 'EducationalOccupationalCredential', name: 'Certificação ANEPS: PLDFT', identifier: '0185260819071443', recognizedBy: { '@type': 'Organization', name: 'ANEPS' } }
+        ],
         areaServed: [
           { '@type': 'City', name: 'Goiânia' },
           { '@type': 'City', name: 'Aparecida de Goiânia' },

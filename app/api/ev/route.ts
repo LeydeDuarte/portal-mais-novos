@@ -8,7 +8,7 @@ import { verifySession } from '@/lib/session';
 // Não conta a equipe logada nem robôs. Visitante = cookie anônimo "mn_vid" (1 ano):
 // sem o cookie, é visitante novo.
 export const dynamic = 'force-dynamic';
-const TIPOS = new Set(['ping', 'visita', 'whatsapp', 'whatsapp_lead', 'formulario_lead', 'fundadora', 'banner', 'anuncie', 'canal', 'compartilhar', 'tempo', 'instagram']);
+const TIPOS = new Set(['ping', 'visita', 'whatsapp', 'whatsapp_lead', 'formulario_lead', 'fundadora', 'banner', 'anuncie', 'canal', 'compartilhar', 'tempo', 'instagram', 'maisvalor']);
 const ROBO = /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp\/|headless|lighthouse|vercel|monitor/i;
 
 export async function POST(request: Request) {

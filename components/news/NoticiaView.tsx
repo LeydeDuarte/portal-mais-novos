@@ -12,7 +12,7 @@ import { relacionadas, bannersAtivos } from '@/lib/news/dados';
 import { imoveisParaNoticia } from '@/lib/news/imoveis';
 import { blocosDoTexto, slugNews, focoDaNoticia, minutosLeitura, nomeTopico, textoPuro, urlNoticia, urlRegiao, UFS, type Noticia } from '@/lib/news/base';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
-import { INSTAGRAM_DIRECT, LEYDE_CARGO } from '@/lib/marca';
+import { INSTAGRAM_DIRECT, LEYDE_CARGO, MAIS_VALOR_URL } from '@/lib/marca';
 import BotaoInstagram from '@/components/news/BotaoInstagram';
 
 export default async function NoticiaView({ n, previa = false }: { n: Noticia; previa?: boolean }) {
@@ -193,7 +193,7 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
           {(() => {
             const cta =
               n.topico === 'financiamento'
-                ? { t: 'Quer entender a matemática do seu crédito sem amadorismo?', s: 'Faça uma simulação técnica com a nossa equipe de estruturação: financiamento, portabilidade ou crédito com garantia do imóvel.', b: 'Chamar no Instagram', href: INSTAGRAM_DIRECT }
+                ? { t: 'maisvalor', s: '', b: '', href: MAIS_VALOR_URL }
                 : n.topico === 'lancamentos' || n.empreendimentoId
                   ? { t: 'Procurando uma unidade específica?', s: 'Acesse o portfólio completo de lançamentos e condomínios cadastrados na Mais Novos, com tabela, planta e disponibilidade.', b: 'Ver lançamentos', href: '/lancamentos' }
                   : n.topico === 'direito-imobiliario' || n.topico === 'comprar-e-vender'
@@ -201,6 +201,20 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
                     : n.bairro
                       ? { t: `Quer morar ou investir no ${n.bairro}?`, s: `Veja todos os imóveis e condomínios do ${n.bairro}, com preço, fotos e o que está disponível agora.`, b: `Imóveis no ${n.bairro}`, href: `/imoveis-a-venda/${(n.uf ?? 'go').toLowerCase()}/${slugNews(n.cidade ?? 'Goiânia')}/${slugNews(n.bairro)}` }
                       : { t: 'Quanto vale o seu imóvel hoje?', s: 'Comparamos com os anúncios e as vendas da região e te dizemos um preço que vende, não um preço que só enfeita anúncio.', b: 'Avaliar meu imóvel', href: '/avaliar' };
+            if (cta.t === 'maisvalor')
+              return (
+                <a href={MAIS_VALOR_URL} target="_blank" rel="noopener" data-rastro="maisvalor" className="flex flex-col gap-3 rounded-2xl border-2 border-accent/30 bg-[#F3F7FF] p-5 hover:border-accent sm:flex-row sm:items-center">
+                  <span className="shrink-0 rounded-xl bg-white px-3 py-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/marca/mais-valor-capital.webp" alt="Mais Valor Capital" width={170} height={39} className="h-[39px] w-auto" loading="lazy" />
+                  </span>
+                  <span className="flex flex-col gap-1">
+                    <span className="font-serif text-[19px] font-semibold leading-snug">Faça uma simulação de crédito imobiliário</span>
+                    <span className="text-[14px] leading-relaxed text-[var(--text-muted)]">A Mais Valor Capital é uma marca Mais Novos Imóveis e pode te ajudar com o seu financiamento imobiliário ou o seu home equity.</span>
+                    <span className="mt-1 inline-flex h-10 w-fit items-center rounded-full bg-accent px-4 text-sm font-bold text-white">Acessar a Mais Valor Capital →</span>
+                  </span>
+                </a>
+              );
             return (
               <div className="rounded-2xl border-2 border-accent/30 bg-[#F3F7FF] p-5">
                 <p className="font-serif text-[21px] font-semibold leading-snug">{cta.t}</p>
