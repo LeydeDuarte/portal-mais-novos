@@ -26,7 +26,8 @@ import { corretoresPublicos, comCorretores } from './corretores';
 import type { EmpresaPlanilha } from './planilha-condominios';
 import type { EmpresaNaConcepcao } from './empresas-tipos';
 import type { DepoimentoCard, DestaqueCard } from './especiais-tipos';
-import { urlImovel } from './urls';
+import { urlImovel, urlCondominio } from './urls';
+import type { PontoMapa, ResultadoMapa } from './mapa-tipos';
 
 const PAGE_SIZE = 24;
 const STAFF_COOKIE = 'mn_staff';
@@ -174,7 +175,13 @@ export async function getFeedPage(page: number, filters: FilterState): Promise<{
 
 // Uso interno (não exportado → não vira endpoint): com ocultos=true devolve os
 // privados, que só saem daqui mascarados (getAnunciosOcultos).
-async function feedInterno(page: number, filters: FilterState, ocultos: boolean, soDestaques = false): Promise<{ items: FeedItem[]; hasMore: boolean; total?: number }> {
+async function feedInterno(
+  page: number,
+  filters: FilterState,
+  ocultos: boolean,
+  soDestaques = false,
+  opts: { mapa?: boolean } = {}
+): Promise<{ items: FeedItem[]; hasMore: boolean; total?: number; mapa?: { kind: 'imovel' | 'empreendimento'; id: string }[] }> {
   page = Math.max(0, Math.min(500, Math.floor(Number(page) || 0)));
   // Os filtros vêm do navegador: limita tamanho de listas e textos
   const lista = <T,>(v: unknown, n: number): T[] => (Array.isArray(v) ? (v.slice(0, n) as T[]) : []);
@@ -212,7 +219,7 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean,
   const propConds: string[] = [];
   const devConds: string[] = [];
   // Vendidos: privados nunca; feed inicial só os vendidos há até 15 dias; buscas sempre
-  if (ocultos) propConds.push('p.vendido_em is null');
+  if (ocultos || opts.mapa) propConds.push('p.vendido_em is null');
   else if (!buscando) propConds.push(`(p.vendido_em is null or p.vendido_em > now() - interval '${DIAS_VENDIDO_NO_FEED} days')`);
   // Destaques (2 colunas no feed): só os marcados pela equipe, dentro da mesma busca
   if (soDestaques) {
@@ -402,6 +409,19 @@ async function feedInterno(page: number, filters: FilterState, ocultos: boolean,
   // Contagem do cabeçalho ("N imóveis à venda"), SEMPRE conforme os filtros:
   // anúncios avulsos que atendem a busca (sem os vendidos) + condomínios que atendem
   // a busca e são lançamento, novo ou seminovo (entregues há até 6 anos).
+  // MAPA (painel): todos os que atendem os filtros, sem ordem nem páginas
+  if (opts.mapa) {
+    const mapa = await query<{ kind: 'imovel' | 'empreendimento'; id: string }>(
+      `with ${TIPOS_CTE}
+       select 'imovel' as kind, p.id ${fromImovel} ${where(propConds)}
+       union all
+       select 'empreendimento' as kind, d.id ${fromCondo} ${where(devConds)}
+       limit 12000`,
+      params
+    );
+    return { items: [], hasMore: false, mapa };
+  }
+
   let total: number | undefined;
   if (page === 0 && !ocultos) {
     const soVenda = filters.finalidade === 'todas' ? " and p.finalidade = 'venda'" : '';
@@ -2306,4 +2326,135 @@ export async function getOcultosPerto(alvo: { developmentId?: string; propertyId
     [[alvo.propertyId ?? '', ...excluir], alvo.developmentId ?? null, tipos, base.cidade, base.bairro]
   ).catch(() => []);
   return rows.map((r) => mascarar(r, true));
+}
+
+// ---------------- Mapa do painel ----------------
+// Todos os anúncios e condomínios que atendem os MESMOS filtros do feed, com a
+// posição no mapa. Só para a equipe (inclui os privados). Os pontos vêm prontos
+// para o mapa (lib/mapa-tipos.ts); a regra de "aceso" / "apagado" fica no mapa.
+export async function getPontosMapa(filters: FilterState): Promise<ResultadoMapa> {
+  const staff = await exigirEquipe();
+  const [pub, priv] = await Promise.all([
+    feedInterno(0, filters, false, false, { mapa: true }),
+    feedInterno(0, filters, true, false, { mapa: true })
+  ]);
+  const todos = [...(pub.mapa ?? []), ...(priv.mapa ?? [])];
+  const propIds = Array.from(new Set(todos.filter((r) => r.kind === 'imovel').map((r) => r.id)));
+  const devIds = Array.from(new Set(todos.filter((r) => r.kind === 'empreendimento').map((r) => r.id)));
+
+  type LinhaImovel = {
+    id: string; slug: string | null; titulo: string | null; tipo_unidade: string | null; finalidade: string | null;
+    price_value: string | number | null; quartos: number | null; vagas: number | null; area: string | number | null;
+    lat: number | null; lng: number | null; d_lat: number | null; d_lng: number | null; aproximada: boolean | null;
+    visibilidade: string | null; bairro: string | null; cidade: string | null; uf: string | null;
+    condominio: string | null; d_nome: string | null; delivery_date: string | Date | null; capa: string | null;
+    corretor_email: string | null; empreendimento_id: string | null;
+  };
+  type LinhaCondo = {
+    id: string; slug: string | null; name: string; tipo: string | null; lat: number | null; lng: number | null;
+    delivery_date: string | Date | null; bairro: string | null; cidade: string | null; uf: string | null;
+    capa: string | null; min_price: string | number | null; anuncios: number | string; privados: number | string;
+    geo_fonte: string | null; geo_precisao: string | null; corretor_email: string | null;
+  };
+  const [imoveis, condos] = await Promise.all([
+    propIds.length
+      ? query<LinhaImovel>(
+          `select p.id, p.slug, p.titulo, p.tipo_unidade, p.finalidade, p.price_value, p.quartos, p.vagas, p.area,
+                  p.lat, p.lng, d.lat as d_lat, d.lng as d_lng, p.localizacao_aproximada as aproximada, p.visibilidade,
+                  p.bairro, p.cidade, p.uf, p.condominio, d.name as d_nome, p.delivery_date,
+                  coalesce(p.capa_mini, p.photos->>0) as capa, p.corretor_email, p.empreendimento_id
+             from properties p left join developments d on d.id = p.empreendimento_id
+            where p.id = any($1::text[])`,
+          [propIds]
+        )
+      : Promise.resolve([] as LinhaImovel[]),
+    devIds.length
+      ? query<LinhaCondo>(
+          `select d.id, d.slug, d.name, d.tipo, d.lat, d.lng, d.delivery_date, d.bairro, d.cidade, d.uf,
+                  coalesce(d.capa_mini, d.photos->>0) as capa, d.geo_fonte, d.geo_precisao, d.corretor_email,
+                  (select min(x.price_value) from properties x
+                    where x.empreendimento_id = d.id and x.visibilidade = 'publico' and x.vendido_em is null and x.price_value > 0) as min_price,
+                  (select count(*) from properties x
+                    where x.empreendimento_id = d.id and not x.is_tipologia and x.visibilidade = 'publico' and x.vendido_em is null) as anuncios,
+                  (select count(*) from properties x
+                    where x.empreendimento_id = d.id and not x.is_tipologia and x.visibilidade = 'privado' and x.vendido_em is null) as privados
+             from developments d where d.id = any($1::text[])`,
+          [devIds]
+        )
+      : Promise.resolve([] as LinhaCondo[])
+  ]);
+  const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v) || null);
+  const data = (v: string | Date | null) => (v ? (v instanceof Date ? v.toISOString() : String(v)).slice(0, 7) : null);
+  const podeMover = (dono: string | null) => veTudo(staff.role) || (dono ?? '').toLowerCase() === staff.email.toLowerCase();
+
+  const pontos: PontoMapa[] = [];
+  let semPosicao = 0;
+  for (const r of imoveis) {
+    const lat = r.lat ?? r.d_lat;
+    const lng = r.lng ?? r.d_lng;
+    if (lat == null || lng == null) {
+      semPosicao++;
+      continue;
+    }
+    pontos.push({
+      tipo: 'imovel',
+      id: r.id,
+      lat: Number(lat),
+      lng: Number(lng),
+      nome: r.d_nome || r.condominio || r.titulo || 'Imóvel',
+      tipoUnidade: r.tipo_unidade,
+      preco: num(r.price_value),
+      quartos: r.quartos,
+      vagas: r.vagas,
+      area: num(r.area),
+      entrega: data(r.delivery_date),
+      bairro: r.bairro,
+      cidade: r.cidade,
+      capa: r.capa,
+      url: urlImovel({ id: r.id, slug: r.slug, uf: r.uf, cidade: r.cidade, bairro: r.bairro, finalidade: r.finalidade }),
+      condominioId: r.empreendimento_id,
+      privado: r.visibilidade === 'privado',
+      aproximada: !!r.aproximada || r.lat == null,
+      herdaPosicao: r.lat == null,
+      podeMover: podeMover(r.corretor_email)
+    });
+  }
+  for (const r of condos) {
+    if (r.lat == null || r.lng == null) {
+      semPosicao++;
+      continue;
+    }
+    pontos.push({
+      tipo: 'condominio',
+      id: r.id,
+      lat: Number(r.lat),
+      lng: Number(r.lng),
+      nome: r.name,
+      horizontal: r.tipo === 'horizontal',
+      preco: num(r.min_price),
+      anuncios: Number(r.anuncios) || 0,
+      privados: Number(r.privados) || 0,
+      entrega: data(r.delivery_date),
+      bairro: r.bairro,
+      cidade: r.cidade,
+      capa: r.capa,
+      url: urlCondominio({ id: r.id, slug: r.slug, uf: r.uf, cidade: r.cidade, bairro: r.bairro }),
+      precisao: r.geo_precisao,
+      podeMover: podeMover(r.corretor_email)
+    });
+  }
+  return { pontos, semPosicao };
+}
+
+/** Corrige a posição de um ponto (arrastando no mapa do painel) */
+export async function salvarPosicaoMapa(tipo: 'imovel' | 'condominio', id: string, lat: number, lng: number): Promise<void> {
+  const staff = await exigirEquipe();
+  const la = Number(lat);
+  const lo = Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(lo) || Math.abs(la) > 90 || Math.abs(lo) > 180) throw new Error('Posição inválida.');
+  const tabela = tipo === 'condominio' ? 'developments' : 'properties';
+  await assertCanEdit(tabela, String(id), staff);
+  if (tabela === 'developments')
+    await query(`update developments set lat = $2, lng = $3, geo_fonte = 'manual', geo_precisao = 'MANUAL', geo_erro = null where id = $1`, [id, la, lo]);
+  else await query(`update properties set lat = $2, lng = $3, geo_fonte = 'manual', localizacao_aproximada = false where id = $1`, [id, la, lo]);
 }
