@@ -23,19 +23,21 @@ export function Inline({ texto }: { texto: string }) {
   while ((m = re.exec(texto))) {
     if (m.index > ult) partes.push(texto.slice(ult, m.index));
     const s = m[0];
-    if (s.startsWith('**')) partes.push(<strong key={k++}>{s.slice(2, -2)}</strong>);
-    else if (s.startsWith('*')) partes.push(<em key={k++}>{s.slice(1, -1)}</em>);
+    // negrito e itálico podem ter link dentro (o nome do condomínio vira link automático
+    // mesmo quando está em **negrito**), então o conteúdo passa de novo por aqui
+    if (s.startsWith('**')) partes.push(<strong key={k++}><Inline texto={s.slice(2, -2)} /></strong>);
+    else if (s.startsWith('*')) partes.push(<em key={k++}><Inline texto={s.slice(1, -1)} /></em>);
     else {
       const [, t, u] = s.match(/\[([^\]]+)\]\(([^)]+)\)/)!;
       const interno = u.startsWith('/') || u.includes('maisnovosimoveis.com');
       partes.push(
         interno ? (
           <Link key={k++} href={u.replace(/^https?:\/\/(www\.)?maisnovosimoveis\.com/, '') || '/'} className="font-semibold text-accent underline underline-offset-2">
-            {t}
+            <Inline texto={t} />
           </Link>
         ) : (
           <a key={k++} href={u} target="_blank" rel="noopener" className="font-semibold text-accent underline underline-offset-2">
-            {t}
+            <Inline texto={t} />
           </a>
         )
       );
