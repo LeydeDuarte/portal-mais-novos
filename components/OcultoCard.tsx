@@ -1,3 +1,4 @@
+import { Caracteristica, IconeCama, IconeCarro, IconeChuveiro, IconeMetragem } from './IconesImovel';
 import Link from 'next/link';
 import type { AnuncioOculto } from '@/lib/actions';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
@@ -24,9 +25,12 @@ export default function OcultoCard({ a }: { a: AnuncioOculto }) {
         </span>
       </div>
       <div className="font-sans text-lg font-bold tabular-nums tracking-tight">{a.preco ? brlCurto(a.preco) : 'Valor sob consulta'}</div>
-      <div className="text-xs text-[var(--text-muted)]">
-        {[a.quartos ? `${a.quartos} qts` : null, a.vagas ? `${a.vagas} vg` : null, a.area ? `${Math.round(a.area)} m²` : null].filter(Boolean).join(' · ')}
-      </div>
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          <Caracteristica icone={<IconeCama />} valor={a.quartos ?? null} titulo="Quartos" />
+          <Caracteristica icone={<IconeChuveiro />} valor={a.banheiros ?? null} titulo="Banheiros" />
+          <Caracteristica icone={<IconeCarro />} valor={a.vagas ?? null} titulo="Vagas" />
+          <Caracteristica icone={<IconeMetragem />} valor={a.area ? `${Math.round(a.area).toLocaleString('pt-BR')} m²` : null} titulo="Área privativa" />
+        </div>
       <div className="text-xs text-[var(--text-muted)]">{[a.condominio, a.bairro, a.cidade].filter(Boolean).join(' · ')}</div>
       {a.precoM2 && <div className="text-[11px] text-[var(--text-faint)]">{brlCurto(a.precoM2)}/m²</div>}
       <span className="mt-1 text-xs font-semibold text-accent group-hover:underline">Pedir para ver este imóvel →</span>

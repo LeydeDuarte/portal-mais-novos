@@ -1082,6 +1082,7 @@ export type AnuncioOculto = {
   bairro: string | null;
   cidade: string | null;
   quartos: number | null;
+  banheiros?: number | null;
   vagas: number | null;
   area: number | null;
   preco: number | null;
@@ -1100,6 +1101,7 @@ function mascarar(r: PropertyRow, comCondominio = false): AnuncioOculto {
     bairro: r.bairro ?? null,
     cidade: r.cidade ?? null,
     quartos: r.quartos ?? null,
+    banheiros: r.banheiros ?? null,
     vagas: r.vagas ?? null,
     area,
     preco,
