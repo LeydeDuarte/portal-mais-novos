@@ -9,6 +9,7 @@ import { campoPainel } from '@/components/painel/ui';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { lerNoticiaAdmin, salvarNoticia } from '@/lib/news/actions';
 import { FOCOS, TOPICOS, UFS, blocosDoTexto, clichesNoTexto, focoDaNoticia, minutosLeitura, slugNews, textoPuro, urlNoticia } from '@/lib/news/base';
+import PilulaStatus from '@/components/news/PilulaStatus';
 
 // Editor de notícia. O texto usa marcações simples (## subtítulo, > citação, - lista,
 // **negrito**) e blocos especiais inseridos pelos botões.
@@ -185,6 +186,7 @@ export default function EditorNoticia() {
             <Link href="/dashboard/news" className="font-semibold text-[var(--text-muted)]">
               ← News
             </Link>
+            <PilulaStatus status={f.status} agendadoPara={f.agendadoPara || null} />
             {url && (
               <a href={url} target="_blank" rel="noopener" className="font-semibold text-accent">
                 {f.status === 'publicada' ? 'Ver no site ↗' : 'Prévia ↗'}

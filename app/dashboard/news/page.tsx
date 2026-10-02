@@ -21,6 +21,7 @@ import {
   type Banner
 } from '@/lib/news/actions';
 import { nomeTopico, urlNoticia, type Noticia } from '@/lib/news/base';
+import PilulaStatus, { CORES_STATUS } from '@/components/news/PilulaStatus';
 
 // Painel → News: notícias, banners, chaves para IA publicar e indicadores.
 type Aba = 'noticias' | 'banners' | 'ia';
@@ -102,7 +103,14 @@ export default function AdminNews() {
                   ['publicada', `Publicadas (${cont('publicada')})`]
                 ] as [typeof filtro, string][]
               ).map(([v, l]) => (
-                <button key={v} type="button" onClick={() => setFiltro(v)} className={`rounded-full px-3.5 py-2 ${filtro === v ? 'bg-ink font-semibold text-white' : 'bg-[var(--pill-bg)]'}`}>
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setFiltro(v)}
+                  className={`rounded-full px-3.5 py-2 ${
+                    filtro === v ? 'bg-ink font-semibold text-white' : v === 'todas' ? 'bg-[var(--pill-bg)]' : `font-medium ring-1 ${CORES_STATUS[v]}`
+                  }`}
+                >
                   {l}
                 </button>
               ))}
@@ -121,9 +129,12 @@ export default function AdminNews() {
                         {n.principal && <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-white">PRINCIPAL</span>}
                         {n.origem === 'ia' && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">IA</span>}
                       </div>
-                      <div className="text-[13px] text-[var(--text-muted)]">
-                        {n.status === 'publicada' ? 'Publicada' : n.status === 'agendada' ? `Agendada para ${n.agendadoPara ? new Date(n.agendadoPara).toLocaleString('pt-BR') : '-'}` : 'Rascunho'} · {nomeTopico(n.topico)}
-                        {n.cidade ? ` · ${n.cidade}` : ''} · {n.leituras} leitura(s)
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-[var(--text-muted)]">
+                        <PilulaStatus status={n.status} agendadoPara={n.agendadoPara} />
+                        <span>
+                          {nomeTopico(n.topico)}
+                          {n.cidade ? ` · ${n.cidade}` : ''} · {n.leituras} leitura(s)
+                        </span>
                       </div>
                     </Link>
                     <a href={n.status === 'publicada' ? urlNoticia(n) : `/news/previa/${n.id}`} target="_blank" rel="noopener" className="rounded-full px-3 py-1.5 text-xs font-semibold hover:bg-[var(--pill-bg)]">
@@ -321,3 +332,4 @@ function AbaIA({ onMsg }: { onMsg: (m: string) => void }) {
     </div>
   );
 }
+
