@@ -31,16 +31,35 @@ export const categoriaDoTipo = (t: string) => Object.entries(CATEGORIAS).find(([
 const PUBLICO_COM_VENDIDOS = "p.visibilidade = 'publico' and p.is_tipologia = false and p.finalidade = 'venda'";
 const PUBLICO = `${PUBLICO_COM_VENDIDOS} and p.vendido_em is null`;
 
-export type Regiao = { uf: string; cidade: string; bairro: string | null; n: number; categorias: Record<string, number>; condominios: number };
+export type Regiao = {
+  uf: string;
+  cidade: string;
+  bairro: string | null;
+  n: number;
+  categorias: Record<string, number>;
+  /** categoria → nº de quartos → anúncios (só onde faz sentido: apartamentos, casas, coberturas) */
+  quartos: Record<string, Record<number, number>>;
+  condominios: number;
+};
+
+/** Categorias que ganham páginas por número de quartos ("apartamento de 3 quartos no Setor Bueno") */
+export const CATEGORIAS_COM_QUARTOS = ['apartamentos', 'coberturas', 'casas', 'casas-em-condominio'];
+/** Mínimo de anúncios para existir a página de quartos (sem página rala) */
+export const MIN_QUARTOS = 2;
+export const slugQuartos = (q: number) => `${q}-quartos`;
+export const lerSlugQuartos = (s?: string) => {
+  const m = /^([1-5])-quartos?$/.exec(s ?? '');
+  return m ? Number(m[1]) : null;
+};
 
 const UF_SQL = (col: string) => `coalesce(nullif(upper(trim(${col})), ''), 'GO')`;
 
 /** Todas as cidades/bairros com anúncio (ou condomínio lançamento/novo), com contagens por categoria */
 export const listarRegioes = unstable_cache(
   async (): Promise<Regiao[]> => {
-    const rows = await query<{ uf: string; cidade: string; bairro: string | null; tipo: string; n: string }>(
-      `select ${UF_SQL('p.uf')} as uf, p.cidade, p.bairro, p.tipo_unidade as tipo, count(*) as n from properties p
-        where ${PUBLICO} and coalesce(p.cidade, '') <> '' group by 1, 2, 3, 4`
+    const rows = await query<{ uf: string; cidade: string; bairro: string | null; tipo: string; quartos: number | null; n: string }>(
+      `select ${UF_SQL('p.uf')} as uf, p.cidade, p.bairro, p.tipo_unidade as tipo, p.quartos, count(*) as n from properties p
+        where ${PUBLICO} and coalesce(p.cidade, '') <> '' group by 1, 2, 3, 4, 5`
     );
     const condos = await query<{ uf: string; cidade: string; bairro: string | null; n: string }>(
       `select ${UF_SQL('d.uf')} as uf, d.cidade, d.bairro, count(*) as n from developments d
@@ -52,7 +71,7 @@ export const listarRegioes = unstable_cache(
     const mapa = new Map<string, Regiao>();
     const pegar = (uf: string, cidade: string, bairro: string | null) => {
       const k = `${uf.toLowerCase()}|${slugify(cidade)}|${bairro ? slugify(bairro) : ''}`;
-      if (!mapa.has(k)) mapa.set(k, { uf: uf.toUpperCase(), cidade, bairro, n: 0, categorias: {}, condominios: 0 });
+      if (!mapa.has(k)) mapa.set(k, { uf: uf.toUpperCase(), cidade, bairro, n: 0, categorias: {}, quartos: {}, condominios: 0 });
       return mapa.get(k)!;
     };
     for (const r of rows) {
@@ -60,12 +79,17 @@ export const listarRegioes = unstable_cache(
       for (const reg of [pegar(r.uf, r.cidade, null), ...(r.bairro ? [pegar(r.uf, r.cidade, r.bairro)] : [])]) {
         reg.n += Number(r.n);
         if (cat) reg.categorias[cat] = (reg.categorias[cat] ?? 0) + Number(r.n);
+        const q = Number(r.quartos);
+        if (cat && CATEGORIAS_COM_QUARTOS.includes(cat) && q >= 1 && q <= 5) {
+          const m = (reg.quartos[cat] ??= {});
+          m[q] = (m[q] ?? 0) + Number(r.n);
+        }
       }
     }
     for (const c of condos) for (const reg of [pegar(c.uf, c.cidade, null), ...(c.bairro ? [pegar(c.uf, c.cidade, c.bairro)] : [])]) reg.condominios += Number(c.n);
     return Array.from(mapa.values()).sort((a, b) => b.n - a.n);
   },
-  ['landing-regioes'],
+  ['landing-regioes-v2'],
   { revalidate: 600 }
 );
 
@@ -81,7 +105,13 @@ export async function acharRegiao(uf: string, cidadeSlug: string, bairroSlug?: s
 export type Estatisticas = { n: number; min: number | null; max: number | null; m2: number | null; comVideo: number };
 
 export const anunciosDaRegiao = unstable_cache(
-  async (cidade: string, bairro: string | null, categoria: string | null, limite = 60): Promise<{ itens: PropertyDetail[]; est: Estatisticas }> => {
+  async (
+    cidade: string,
+    bairro: string | null,
+    categoria: string | null,
+    limite = 60,
+    quartos: number | null = null
+  ): Promise<{ itens: PropertyDetail[]; est: Estatisticas }> => {
     const params: unknown[] = [cidade];
     let cond = `lower(p.cidade) = lower($1)`;
     if (bairro) {
@@ -91,6 +121,10 @@ export const anunciosDaRegiao = unstable_cache(
     if (categoria && CATEGORIAS[categoria]) {
       params.push(CATEGORIAS[categoria].tipos);
       cond += ` and p.tipo_unidade = any($${params.length}::text[])`;
+    }
+    if (quartos) {
+      params.push(quartos);
+      cond += ` and p.quartos = $${params.length}`;
     }
     const [rows, est] = await Promise.all([
       query<PropertyRow>(
@@ -119,7 +153,7 @@ export const anunciosDaRegiao = unstable_cache(
       }
     };
   },
-  ['landing-anuncios'],
+  ['landing-anuncios-v2'],
   { revalidate: 600 }
 );
 

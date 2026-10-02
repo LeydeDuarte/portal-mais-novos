@@ -1,7 +1,7 @@
 import { SERIES } from '@/lib/indicadores';
 import type { MetadataRoute } from 'next';
 import { SITE_URL, urlRegiao } from '@/lib/seo';
-import { listarRegioes, urlsParaSitemap } from '@/lib/landing';
+import { MIN_QUARTOS, listarRegioes, urlsParaSitemap } from '@/lib/landing';
 import { urlImovel, urlCondominio } from '@/lib/urls';
 import { query } from '@/lib/db';
 import { regioesComNoticias, urlsNoticiasSitemap } from '@/lib/news/dados';
@@ -45,7 +45,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const base = `${SITE_URL}${urlRegiao({ uf: r.uf, cidade: r.cidade, bairro: r.bairro })}`;
     return [
       { url: base, lastModified: agora, changeFrequency: 'daily' as const, priority: r.bairro ? 0.8 : 0.9 },
-      ...Object.keys(r.categorias).map((c) => ({ url: `${base}/${c}`, lastModified: agora, changeFrequency: 'daily' as const, priority: 0.7 }))
+      ...Object.keys(r.categorias).map((c) => ({ url: `${base}/${c}`, lastModified: agora, changeFrequency: 'daily' as const, priority: 0.7 })),
+      // "apartamento de 3 quartos no Setor Bueno": só com 2+ anúncios
+      ...Object.entries(r.quartos ?? {}).flatMap(([c, m]) =>
+        Object.entries(m)
+          .filter(([, n]) => n >= MIN_QUARTOS)
+          .map(([q]) => ({ url: `${base}/${c}/${q}-quartos`, lastModified: agora, changeFrequency: 'daily' as const, priority: 0.7 }))
+      )
     ];
   });
 

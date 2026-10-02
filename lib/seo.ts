@@ -105,12 +105,13 @@ function trilha(itens: { nome: string; url: string }[]) {
  * Endereço das páginas de região, em silos: /imoveis-a-venda/go/goiania/setor-bueno/apartamentos
  * (o estado na URL deixa o portal pronto para outras cidades e estados).
  */
-export function urlRegiao(r: { uf?: string | null; cidade?: string | null; bairro?: string | null; categoria?: string | null }): string {
+export function urlRegiao(r: { uf?: string | null; cidade?: string | null; bairro?: string | null; categoria?: string | null; quartos?: number | null }): string {
   if (!r.cidade) return r.uf ? `/imoveis-a-venda/${r.uf.toLowerCase()}` : '/imoveis-a-venda';
   const uf = (r.uf || 'GO').toLowerCase();
   let u = `/imoveis-a-venda/${uf}/${slugify(r.cidade)}`;
   if (r.bairro) u += `/${slugify(r.bairro)}`;
   if (r.categoria) u += `/${r.categoria}`;
+  if (r.categoria && r.quartos) u += `/${r.quartos}-quartos`;
   return u;
 }
 
