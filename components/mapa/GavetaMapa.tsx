@@ -10,6 +10,7 @@ import { getBadgeCondominio, getStatusBucket, temEntrega } from '@/lib/classific
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { precoCurto, type PontoCondominio, type PontoImovel } from '@/lib/mapa-tipos';
 import { SITE_URL } from '@/lib/seo';
+import IconeOlhoCortado from '@/components/IconeOlhoCortado';
 
 export type CondoComImoveis = PontoCondominio & { imoveis: PontoImovel[] };
 export type Selecionado = { tipo: 'condominio'; c: CondoComImoveis } | { tipo: 'imovel'; i: PontoImovel };
@@ -191,16 +192,26 @@ export default function GavetaMapa({ sel, onFechar, onSol }: { sel: Selecionado;
                 )}
               </p>
             ) : (
-              condo.imoveis.map((i) => (
+              [...condo.imoveis]
+                .sort((a, b) => Number(a.privado) - Number(b.privado) || (a.preco ?? 1e13) - (b.preco ?? 1e13))
+                .map((i) => (
                 <div key={i.id} className="flex items-center gap-2 rounded-2xl border border-[var(--border)] p-2">
                   <a href={i.url} target="_blank" rel="noopener" className="flex min-w-0 flex-1 items-center gap-3 rounded-xl hover:bg-[var(--pill-bg)]">
-                    <span className="h-14 w-16 shrink-0 overflow-hidden rounded-xl bg-[#DDE1E6]">
-                      {i.capa && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={i.capa} alt="" className="h-full w-full object-cover" loading="lazy" />
-                      )}
-                    </span>
+                    {i.privado ? (
+                      <span className="flex h-14 w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-[#1d2026] text-white">
+                        <IconeOlhoCortado size={18} strokeWidth={1.8} />
+                        <span className="text-[7.5px] font-extrabold uppercase tracking-[0.12em]">Privado</span>
+                      </span>
+                    ) : (
+                      <span className="h-14 w-16 shrink-0 overflow-hidden rounded-xl bg-[#DDE1E6]">
+                        {i.capa && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={i.capa} alt="" className="h-full w-full object-cover" loading="lazy" />
+                        )}
+                      </span>
+                    )}
                     <span className="min-w-0 flex-1">
+                      {i.privado && <span className="block text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Anúncio privado</span>}
                       <span className="block text-[14px] font-bold tabular-nums">{brl(i.preco)}</span>
                       <span className="block truncate text-[12px] text-[var(--text-muted)]">{[tipoTxt(i.tipoUnidade), det(i)].filter(Boolean).join(' · ')}</span>
                     </span>

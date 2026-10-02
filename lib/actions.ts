@@ -2581,7 +2581,8 @@ export async function getPontosMapaPublico(filters: FilterState, area: AreaMapa)
     let lat = Number(noCondominio ? r.d_lat : r.lat);
     let lng = Number(noCondominio ? r.d_lng : r.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-    const aproximada = privado || !noCondominio;
+    // privado dentro de condomínio entra no condomínio (a portaria já é pública); de rua, região aproximada
+    const aproximada = !noCondominio;
     if (aproximada) [lat, lng] = aproximar(lat, lng, r.id);
     pontos.push({
       tipo: 'imovel',
@@ -2599,7 +2600,7 @@ export async function getPontosMapaPublico(filters: FilterState, area: AreaMapa)
       cidade: r.cidade,
       capa: privado ? null : r.capa,
       url: urlImovel({ id: r.id, slug: r.slug, uf: r.uf, cidade: r.cidade, bairro: r.bairro, finalidade: r.finalidade }),
-      condominioId: privado ? null : r.empreendimento_id,
+      condominioId: r.empreendimento_id,
       privado,
       aproximada,
       herdaPosicao: false,
