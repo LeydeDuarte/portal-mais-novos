@@ -34,6 +34,7 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
   const [aberto, setAberto] = useState(false);
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
+  const [souCorretor, setSouCorretor] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [indo, setIndo] = useState(false);
   const campo = useRef<HTMLInputElement | null>(null);
@@ -71,7 +72,7 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
       /* ok */
     }
     rastrear('whatsapp_lead', ctx.developmentId ?? ctx.caminho);
-    await registrarLeadWhatsapp({ nome: n, telefone, titulo: ctx.titulo, caminho: ctx.caminho, condominio: ctx.condominio, developmentId: ctx.developmentId }).catch(() => null);
+    await registrarLeadWhatsapp({ nome: n, telefone, titulo: ctx.titulo, caminho: ctx.caminho, condominio: ctx.condominio, developmentId: ctx.developmentId, souCorretor }).catch(() => null);
     if (janela) janela.location.href = url;
     else window.location.href = url;
     setIndo(false);
@@ -172,6 +173,10 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
               autoComplete="tel"
               className="mt-2 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5 text-sm outline-none focus:border-[#25D366]"
             />
+            <label className="mt-2 flex items-center gap-2 text-[12.5px] text-[var(--text-muted)]">
+              <input type="checkbox" checked={souCorretor} onChange={(e) => setSouCorretor(e.target.checked)} className="h-4 w-4 accent-[#25D366]" />
+              Sou corretor(a) de imóveis
+            </label>
             {erro && <p className="mt-2 text-xs font-semibold text-red-600">{erro}</p>}
             <button
               type="submit"

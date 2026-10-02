@@ -3,6 +3,7 @@
 // "Venda seu imóvel": o proprietário deixa as características básicas e o contato;
 // a equipe liga de volta. Painel → Quero vender.
 import { query } from './db';
+import { cookies } from 'next/headers';
 import { exigirEquipe } from './staff-auth';
 import { dentroDoLimite, registrarUso, ipDoVisitante } from './limites';
 import { TIPO_UNIDADE_LABEL } from './tipologias';
@@ -50,8 +51,8 @@ export async function registrarCaptacao(d: CaptacaoInput): Promise<{ ok: boolean
   const tipo = d.tipoUnidade && d.tipoUnidade in TIPO_UNIDADE_LABEL ? d.tipoUnidade : null;
   const finalidade = ['venda', 'aluguel', 'venda_aluguel'].includes(String(d.finalidade)) ? d.finalidade : 'venda';
   await query(
-    `insert into captacoes (nome, telefone, email, cep, logradouro, bairro, cidade, uf, condominio, tipo_unidade, quartos, area, valor_pretendido, finalidade, observacoes, ip)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+    `insert into captacoes (nome, telefone, email, cep, logradouro, bairro, cidade, uf, condominio, tipo_unidade, quartos, area, valor_pretendido, finalidade, observacoes, ip, visitante)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
     [
       nome,
       telefone,
@@ -68,7 +69,8 @@ export async function registrarCaptacao(d: CaptacaoInput): Promise<{ ok: boolean
       num(d.valorPretendido, 10_000_000_000),
       finalidade,
       t(d.observacoes, 1500),
-      ip
+      ip,
+      cookies().get('mn_vid')?.value?.slice(0, 64) ?? null
     ]
   );
 

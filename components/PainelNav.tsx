@@ -9,6 +9,7 @@ import { SITE_URL } from '@/lib/seo';
 
 const LINKS: { href: string; label: string; admin?: boolean; gestor?: boolean }[] = [
   { href: '/dashboard', label: 'Início' },
+  { href: '/dashboard/crm', label: 'CRM' },
   { href: '/dashboard/resultados', label: 'Resultados', admin: true },
   { href: '/dashboard/imoveis', label: 'Imóveis' },
   { href: '/dashboard/condominios', label: 'Condomínios' },

@@ -34,6 +34,12 @@ export default function TermosPage() {
           financiamento. Você pode cancelar a qualquer momento, respondendo a qualquer mensagem ou falando com nosso atendimento. Quando você envia um
           formulário (Fale conosco, Registre seu interesse), usamos seus dados para responder ao seu pedido.
         </p>
+        <p className="mt-2">
+          Quando você entra em contato (WhatsApp, formulário, aviso de imóveis, avaliação ou proposta), o seu atendimento passa a contar também com o
+          histórico de navegação deste aparelho no portal: as páginas de imóveis e condomínios que você visitou, por quanto tempo e as simulações que
+          fez. Isso serve só para o corretor entender o que você procura e indicar os imóveis certos, fica restrito à nossa equipe e nunca é vendido nem
+          compartilhado. Você pode pedir para ver ou apagar esse histórico a qualquer momento.
+        </p>
 
         <h2 className="mt-6 text-lg font-bold">4. Compartilhamento</h2>
         <p className="mt-2">

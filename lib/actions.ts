@@ -1518,6 +1518,8 @@ export type InteresseInput = {
   quartosOpcoes?: number[];
   /** o que a pessoa procura: apartamento, casa, comercial, lote ou rural (lib/interesse-regras.ts) */
   grupo?: GrupoInteresse;
+  /** marcou "Sou corretor(a) de imóveis" (vai para o funil de parceiros no CRM) */
+  souCorretor?: boolean;
   /** quando o formulário está na página de um anúncio */
   propertyId?: string;
 };
@@ -1568,12 +1570,15 @@ export async function registrarInteresse(input: InteresseInput): Promise<{ ok: b
   // anúncio de rua (sem condomínio): o registro fica identificado pelo bairro
   const rotulo = condominio || (ref?.bairro ? formatTitulo(ref.bairro) : 'Anúncio');
   await query(
-    `insert into interest_leads (development_id, condominio, nome, email, telefone, finalidade, area_min, area_max, valor_max, quartos, mensagem, aceita_contato, raio, lat, lng, property_id, quartos_opcoes, grupo, bairro_ref, cidade_ref)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::int[],$18,$19,$20)`,
+    `insert into interest_leads (development_id, condominio, nome, email, telefone, finalidade, area_min, area_max, valor_max, quartos, mensagem, aceita_contato, raio, lat, lng, property_id, quartos_opcoes, grupo, bairro_ref, cidade_ref, visitante, sou_corretor)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::int[],$18,$19,$20,$21,$22)`,
     [
       devId, rotulo, nome, email || null, telefone || null, input.finalidade === 'aluguel' ? 'aluguel' : 'venda', num(input.areaMin), num(input.areaMax), num(input.valorMax),
       num(input.quartos), (input.mensagem ?? '').trim().slice(0, 1000) || null, true, raio, ref?.lat ?? null, ref?.lng ?? null, propId, qOpcoes.length ? qOpcoes : null,
-      grupo, ref?.bairro ?? null, ref?.cidade ?? null
+      grupo, ref?.bairro ?? null, ref?.cidade ?? null,
+      // navegador da pessoa: liga o histórico de visitas à ficha dela no CRM
+      cookies().get('mn_vid')?.value?.slice(0, 64) ?? null,
+      !!input.souCorretor
     ]
   );
 
@@ -2130,6 +2135,7 @@ export async function registrarLeadWhatsapp(input: {
   caminho: string;
   condominio?: string;
   developmentId?: string;
+  souCorretor?: boolean;
 }): Promise<{ ok: boolean; erro?: string }> {
   const nome = String(input.nome ?? '').trim().slice(0, 120);
   if (nome.length < 2) return { ok: false, erro: 'Digite seu nome.' };
@@ -2141,14 +2147,16 @@ export async function registrarLeadWhatsapp(input: {
   if (!(await dentroDoLimite(`lead:${ip}`, 15, 60))) return { ok: true }; // não trava a pessoa; só não grava de novo
   await registrarUso(`lead:${ip}`);
   await query(
-    `insert into interest_leads (development_id, condominio, nome, telefone, finalidade, mensagem, aceita_contato, status)
-     values ($1, $2, $3, $4, 'venda', $5, true, 'novo')`,
+    `insert into interest_leads (development_id, condominio, nome, telefone, finalidade, mensagem, aceita_contato, status, visitante, sou_corretor)
+     values ($1, $2, $3, $4, 'venda', $5, true, 'novo', $6, $7)`,
     [
       devId,
       formatTitulo(String(input.condominio || titulo).slice(0, 160)),
       nome,
       telefone || null,
-      `Contato pelo WhatsApp: ${titulo}${caminho ? ` (${SITE_URL}${caminho})` : ''}`
+      `Contato pelo WhatsApp: ${titulo}${caminho ? ` (${SITE_URL}${caminho})` : ''}`,
+      cookies().get('mn_vid')?.value?.slice(0, 64) ?? null,
+      !!input.souCorretor
     ]
   ).catch(() => {});
   return { ok: true };
