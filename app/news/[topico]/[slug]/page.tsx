@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import NoticiaView from '@/components/news/NoticiaView';
 import { noticiaPorSlug } from '@/lib/news/dados';
+import { importarCapaExterna } from '@/lib/news/capa';
 import { nomeTopico, textoPuro, urlNoticia } from '@/lib/news/base';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
 import { caber } from '@/lib/titulos';
@@ -40,8 +41,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function NoticiaPage({ params }: Props) {
-  const n = await noticiaPorSlug(params.slug);
+  let n = await noticiaPorSlug(params.slug);
   if (!n) notFound();
+  // capa ainda num link de fora (publicada pelo projeto News): copia agora para o portal
+  if (n.capa && !n.capa16x9 && (await importarCapaExterna(n.id))) n = (await noticiaPorSlug(params.slug)) ?? n;
   if (n.topico !== params.topico) permanentRedirect(urlNoticia(n)); // mudou de tópico: endereço novo
   return <NoticiaView n={n} />;
 }

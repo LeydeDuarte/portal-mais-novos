@@ -15,14 +15,20 @@ const DESCRICOES: Record<string, string> = {
   'comprar-e-vender': 'Documentação, negociação, taxas e os erros que custam caro na compra e na venda de imóvel.',
   investimento: 'Aluguel, valorização e renda com imóveis: onde o dinheiro trabalha e onde ele dorme.',
   curiosidades: 'Histórias da cidade, dos bairros e do mercado que ninguém te contou.',
-  'direito-imobiliario': 'Contratos, distrato, condomínio, inventário e usucapião, em português claro.'
+  'direito-imobiliario': 'Contratos, distrato, condomínio, inventário e usucapião, em português claro.',
+  'manchetes-da-semana': 'Todo sábado de manhã: o que aconteceu no Brasil e no mundo na semana e o que isso muda para quem compra, vende ou financia imóvel.'
 };
 
 export async function generateMetadata({ params }: { params: { topico: string } }): Promise<Metadata> {
   if (!topicoValido(params.topico)) return { title: 'News' };
   const nome = nomeTopico(params.topico);
   return {
-    title: { absolute: `${nome}: Notícias do Mercado Imobiliário | Mais Novos News` },
+    title: {
+      absolute:
+        params.topico === 'manchetes-da-semana'
+          ? 'Manchetes da Semana do Mercado Imobiliário | Mais Novos News'
+          : `${nome}: Notícias do Mercado Imobiliário | Mais Novos News`
+    },
     description: DESCRICOES[params.topico],
     alternates: { canonical: `${SITE_URL}/news/${params.topico}` }
   };
