@@ -116,7 +116,7 @@ export default function BotaoWhatsapp({ ctx, variante = 'bloco', rotulo }: { ctx
           className="flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-bold text-white shadow-sm hover:brightness-95"
         >
           <IconeWhats />
-          Falar com Leyde Duarte
+          {rotulo ?? 'Falar com Leyde Duarte'}
         </button>
       ) : (
         <button

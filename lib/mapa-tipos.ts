@@ -26,6 +26,8 @@ export type PontoImovel = {
   /** sem posição própria: usa a do condomínio */
   herdaPosicao: boolean;
   podeMover: boolean;
+  /** vendido há até 30 dias: aparece em vermelho ("AAAA-MM-DD") */
+  vendidoEm: string | null;
   /** SÓ NO PAINEL: proprietário do imóvel (nunca vai para o mapa público) */
   dono?: { nome: string; whatsapp: string | null } | null;
 };

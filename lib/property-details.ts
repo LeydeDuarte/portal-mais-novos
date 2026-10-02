@@ -39,6 +39,9 @@ export type Development = {
   cep?: string;
   status?: 'rascunho' | 'publicado';
   videoVertical?: boolean;
+  /** posição do condomínio (portaria); usada na posição do sol */
+  lat?: number;
+  lng?: number;
   corretorEmail?: string; // preenchido só nos condomínios cadastrados pelo painel
   units: PropertyDetail[]; // cada unit = uma tipologia (metragem/quartos/valor próprios) — inclui as vinculadas depois via imóvel avulso
 };

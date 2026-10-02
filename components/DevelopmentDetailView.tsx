@@ -16,6 +16,7 @@ import VitrineNews from '@/components/news/VitrineNews';
 import { SITE_URL } from '@/lib/seo';
 import BotaoCompartilhar from '@/components/BotaoCompartilhar';
 import ChamadaAvaliar from '@/components/ChamadaAvaliar';
+import PosicaoSol from '@/components/PosicaoSol';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import { Banner } from '@/components/news/Pecas';
 import { bannersAtivos } from '@/lib/news/dados';
@@ -204,6 +205,18 @@ export default async function DevelopmentDetailView({ development }: { developme
                 </a>
               </p>
             )}
+            {semUnidade && (
+              <a
+                href="#avise-me"
+                className="mt-3 inline-flex h-11 items-center gap-2 rounded-full bg-ink px-5 text-[14px] font-bold text-white hover:opacity-90"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                </svg>
+                Avise-me quando tiver imóvel à venda
+              </a>
+            )}
 
             {(tipologias.length > 0 || futuro) && (
               <div className="mt-6">
@@ -281,6 +294,10 @@ export default async function DevelopmentDetailView({ development }: { developme
               </div>
             )}
 
+            {development.lat != null && development.lng != null && (
+              <PosicaoSol lat={development.lat} lng={development.lng} nome={development.name} whats={whatsAtendimento} />
+            )}
+
             <ChamadaAvaliar contexto={futuro ? 'lancamento' : 'condominio'} refId={development.id} />
           </div>
 
@@ -341,9 +358,9 @@ export default async function DevelopmentDetailView({ development }: { developme
             </div>
             <BotaoWhatsapp ctx={whatsAtendimento} variante="pilula" rotulo="Fale conosco" />
           </section>
-        ) : (
-          <InterestForm developmentId={development.id} condominio={development.name} destaque={related.mesmoCondominio.length === 0} />
-        )}
+        ) : null}
+        {/* todos os condomínios: "Avise-me" com alcance (só aqui, 500 m ou 2 km) */}
+        <InterestForm developmentId={development.id} condominio={development.name} destaque={related.mesmoCondominio.length === 0} whats={whatsAtendimento} />
 
         {/* logo abaixo do quadro de interesse: últimas notícias do mercado */}
         <VitrineNews bairro={development.bairro} cidade={development.cidade} />

@@ -22,6 +22,7 @@ import VitrineNews from '@/components/news/VitrineNews';
 import { SITE_URL } from '@/lib/seo';
 import BotaoCompartilhar from '@/components/BotaoCompartilhar';
 import ChamadaAvaliar from '@/components/ChamadaAvaliar';
+import InterestForm from '@/components/InterestForm';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import { Banner } from '@/components/news/Pecas';
 import { bannersAtivos } from '@/lib/news/dados';
@@ -308,6 +309,9 @@ export default async function PropertyDetailView({
           subtitulo="Venda direta com a incorporadora, mesmo sem anúncio: fale com a gente e receba tabela e disponibilidade."
           itens={novosPerto.filter((c) => c.id !== property.empreendimentoId)}
         />
+
+        {/* "Avise-me" de imóveis parecidos: no condomínio, até 500 m ou até 2 km */}
+        <InterestForm developmentId={property.empreendimentoId} propertyId={property.id} condominio={nomeCondominio || ''} whats={whats} />
 
         <VitrineNews bairro={property.bairro} cidade={property.cidade} />
       </main>

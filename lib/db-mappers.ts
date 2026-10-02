@@ -89,6 +89,8 @@ export type DevelopmentRow = {
   capa_mini?: string | null;
   capa_mini_de?: string | null;
   video_vertical?: boolean;
+  lat?: number | null;
+  lng?: number | null;
 };
 
 // jsonb pode chegar como array ou (em casos raros) como texto — normaliza
@@ -224,6 +226,8 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     cep: row.cep ?? undefined,
     status: row.status === 'rascunho' ? 'rascunho' : 'publicado',
     videoVertical: !!row.video_vertical,
+    lat: row.lat ?? undefined,
+    lng: row.lng ?? undefined,
     units
   };
 }

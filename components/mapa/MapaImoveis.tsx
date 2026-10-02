@@ -31,6 +31,7 @@ const COR_FASE: Partial<Record<StatusBucket, string>> = {
   novo: '#1B5FCC'
 };
 const COR_COM_ANUNCIO = '#13874B';
+const COR_VENDIDO = '#E62F2F';
 const FASES_ACESAS: StatusBucket[] = ['breve_lancamento', 'lancamento', 'obras', 'novo'];
 
 export const LEGENDA: { cor: string; texto: string; borda?: string; ponto?: boolean }[] = [
@@ -41,6 +42,7 @@ export const LEGENDA: { cor: string; texto: string; borda?: string; ponto?: bool
   { cor: COR_COM_ANUNCIO, texto: 'Condomínio com anúncio' },
   { cor: '#FFFFFF', borda: '#C9CDD3', texto: 'Anúncio avulso' },
   { cor: '#20242C', texto: 'Anúncio privado (equipe)' },
+  { cor: COR_VENDIDO, texto: 'Vendido (últimos 30 dias)' },
   { cor: '#A3A8AF', texto: 'Sem anúncio (seminovo, usado, antigo)', ponto: true }
 ];
 
@@ -53,7 +55,8 @@ function prepararDados(pontos: PontoMapa[]) {
   const soltos: PontoImovel[] = [];
   for (const p of pontos) {
     if (p.tipo !== 'imovel') continue;
-    const c = p.condominioId ? condos.get(p.condominioId) : undefined;
+    // vendido fica fora do condomínio: ponto vermelho próprio por 30 dias
+    const c = p.condominioId && !p.vendidoEm ? condos.get(p.condominioId) : undefined;
     if (c) c.imoveis.push(p);
     else soltos.push(p);
   }
@@ -97,20 +100,22 @@ function prepararDados(pontos: PontoMapa[]) {
     });
   }
   for (const i of soltos) {
-    const cor = i.privado ? '#20242C' : '#FFFFFF';
+    const vendido = !!i.vendidoEm;
+    const cor = vendido ? COR_VENDIDO : i.privado ? '#20242C' : '#FFFFFF';
     ativos.push({
       type: 'Feature',
       geometry: pt(i.lng, i.lat),
       properties: {
         k: `i:${i.id}`,
-        pill: i.privado ? 'pill-#20242C' : 'pill-branca',
-        cor: i.privado ? '#20242C' : '#257CFF',
-        txt: i.privado ? '#FFFFFF' : '#14161A',
-        l1: '',
-        l2: i.preco ? precoCurto(i.preco) : 'Consulte',
-        prio: 0,
-        pmin: i.preco ?? 1e13,
-        pmax: i.preco ?? 0
+        pill: vendido ? `pill-${COR_VENDIDO}` : i.privado ? 'pill-#20242C' : 'pill-branca',
+        cor: vendido ? COR_VENDIDO : i.privado ? '#20242C' : '#257CFF',
+        txt: vendido || i.privado ? '#FFFFFF' : '#14161A',
+        l1: vendido ? 'VENDIDO' : '',
+        l2: i.preco ? precoCurto(i.preco) : vendido ? i.nome.slice(0, 20) : 'Consulte',
+        prio: vendido ? 3 : 0,
+        // vendido não entra na faixa de preço dos agrupamentos
+        pmin: vendido ? 1e13 : i.preco ?? 1e13,
+        pmax: vendido ? 0 : i.preco ?? 0
       }
     });
     if (i.aproximada && !i.herdaPosicao) aprox.push({ type: 'Feature', geometry: pt(i.lng, i.lat), properties: { cor } });
@@ -314,7 +319,7 @@ export default function MapaImoveis({
       });
       m.on('load', () => {
         // etiquetas: uma imagem por cor
-        const cores = ['#6A3CFF', '#257CFF', '#E08A00', '#1B5FCC', COR_COM_ANUNCIO, '#20242C'];
+        const cores = ['#6A3CFF', '#257CFF', '#E08A00', '#1B5FCC', COR_COM_ANUNCIO, '#20242C', COR_VENDIDO];
         for (const c of cores) {
           const { img, opcoes } = imagemPilula(c, c);
           m.addImage(`pill-${c}`, img, opcoes);
@@ -677,7 +682,11 @@ export default function MapaImoveis({
     if (!i) return null;
     const tipoU = i.tipoUnidade ? TIPO_UNIDADE_LABEL[i.tipoUnidade as TipoUnidade] ?? 'Imóvel' : 'Imóvel';
     const local = [i.bairro, i.cidade].filter(Boolean).join(', ');
-    const etiqueta = i.privado ? { texto: 'Privado', cor: '#20242C' } : undefined;
+    const etiqueta = i.vendidoEm
+      ? { texto: `Vendido em ${i.vendidoEm.split('-').reverse().join('/')}`, cor: COR_VENDIDO }
+      : i.privado
+        ? { texto: 'Privado', cor: '#20242C' }
+        : undefined;
     return el('div', 'min-width:220px', '', [
       cabecalho(i.capa, i.preco ? precoCurto(i.preco) : 'Consulte', [tipoU, local].filter(Boolean).join(' · '), etiqueta),
       el('div', 'font:12.5px/1.4 Inter,system-ui,sans-serif;color:#14161A;margin-top:2px', [i.nome !== tipoU ? i.nome : '', detalhes(i)].filter(Boolean).join(' · ')),

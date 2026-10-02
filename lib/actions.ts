@@ -29,6 +29,7 @@ import type { DepoimentoCard, DestaqueCard } from './especiais-tipos';
 import { urlImovel, urlCondominio } from './urls';
 import type { PontoMapa, ResultadoMapa } from './mapa-tipos';
 import { proprietariosDoImovel } from './proprietarios';
+import { gerarAvisos } from './avisos';
 
 const PAGE_SIZE = 24;
 const STAFF_COOKIE = 'mn_staff';
@@ -220,7 +221,9 @@ async function feedInterno(
   const propConds: string[] = [];
   const devConds: string[] = [];
   // Vendidos: privados nunca; feed inicial só os vendidos há até 15 dias; buscas sempre
-  if (ocultos || opts.mapa) propConds.push('p.vendido_em is null');
+  // mapa: vendidos aparecem por DIAS_VENDIDO_NO_MAPA (em vermelho); feed: regra própria abaixo
+  if (opts.mapa) propConds.push(`(p.vendido_em is null or p.vendido_em > now() - interval '${DIAS_VENDIDO_NO_MAPA} days')`);
+  else if (ocultos) propConds.push('p.vendido_em is null');
   else if (!buscando) propConds.push(`(p.vendido_em is null or p.vendido_em > now() - interval '${DIAS_VENDIDO_NO_FEED} days')`);
   // Destaques (2 colunas no feed): só os marcados pela equipe, dentro da mesma busca
   if (soDestaques) {
@@ -1030,7 +1033,7 @@ export async function createProperty(input: CreatePropertyInput): Promise<void> 
     [input.id, await responsavel(staff, input.corretorResponsavel), !!input.isTipologia, ...values]
   );
   if (input.proprietarios) await gravarProprietariosDoImovel(input.id, input.proprietarios);
-  if (!input.isTipologia) await avisarInteressados(input.id).catch((err) => console.error('Aviso a interessados falhou', err));
+  if (!input.isTipologia) await gerarAvisos(input.id).catch((err) => console.error('Aviso a interessados falhou', err));
   if (!input.isTipologia) await miniaturaDe('properties', input.id).catch(() => {});
 }
 
@@ -1044,6 +1047,8 @@ export async function updateProperty(id: string, input: PropertyFields): Promise
   await query(`update properties set ${sets} where id = $1`, [id, ...values]);
   if (input.corretorResponsavel && veTudo(staff.role)) await query('update properties set corretor_email = $2 where id = $1', [id, await responsavel(staff, input.corretorResponsavel)]);
   if (input.proprietarios) await gravarProprietariosDoImovel(id, input.proprietarios);
+  // editou (ex.: virou público, mudou preço ou condomínio): procura quem pediu aviso; nunca repete
+  await gerarAvisos(id).catch((err) => console.error('Aviso a interessados falhou', err));
   await miniaturaDe('properties', id).catch(() => {});
 }
 
@@ -1078,6 +1083,9 @@ export async function deleteProperty(id: string): Promise<void> {
 // - a página do próprio anúncio continua no ar (com VENDIDO).
 // Anúncio privado vendido continua privado (nunca aparece para o público).
 const DIAS_VENDIDO_NO_FEED = 15;
+const textoQuartos = (q: number[]) => q.map((n) => (n >= 4 ? '4 ou mais' : n === 0 ? 'sem quartos' : String(n))).join(', ') + (q.some((n) => n > 0) ? ' quartos' : '');
+const ROTULO_RAIO: Record<number, string> = { 0: 'Só neste condomínio', 500: 'Até 500 m ao redor', 2000: 'Até 2 km ao redor' };
+const DIAS_VENDIDO_NO_MAPA = 30;
 
 // Link de vídeo: só https de YouTube, Instagram, TikTok ou Vimeo (nada de "javascript:")
 function videoSeguro(url?: string | null): string | null {
@@ -1499,6 +1507,12 @@ export type InteresseInput = {
   quartos?: number;
   mensagem?: string;
   aceitaContato: boolean;
+  /** alcance do aviso: 0 = só neste condomínio; 500 ou 2000 metros ao redor */
+  raio?: number;
+  /** quartos que interessam, como no filtro do feed: 0 a 4 (4 = 4 ou mais); vazio = qualquer */
+  quartosOpcoes?: number[];
+  /** quando o formulário está na página de um anúncio */
+  propertyId?: string;
 };
 
 export async function registrarInteresse(input: InteresseInput): Promise<{ ok: boolean; erro?: string }> {
@@ -1526,10 +1540,22 @@ export async function registrarInteresse(input: InteresseInput): Promise<{ ok: b
   if (dup[0]) return { ok: true };
 
   const num = (n?: number) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null);
+  const raio = input.raio === 500 || input.raio === 2000 ? input.raio : 0;
+  const qOpcoes = Array.from(new Set((input.quartosOpcoes ?? []).map(Number).filter((q) => Number.isInteger(q) && q >= 0 && q <= 4))).sort();
+  // obrigatório no "Avise-me" (que sempre manda a lista); o Fale conosco lateral não manda
+  if (Array.isArray(input.quartosOpcoes) && !qOpcoes.length) return { ok: false, erro: 'Escolha quantos quartos você procura.' };
+  const propId = input.propertyId && /^[\w-]{1,80}$/.test(input.propertyId) ? input.propertyId : null;
+  // posição do ponto de referência (o condomínio ou o anúncio), para o aviso por distância
+  const pos = await query<{ lat: number | null; lng: number | null }>(
+    propId
+      ? `select coalesce(p.lat, d.lat) as lat, coalesce(p.lng, d.lng) as lng from properties p left join developments d on d.id = p.empreendimento_id where p.id = $1`
+      : `select lat, lng from developments where id = $1`,
+    [propId ?? devId]
+  ).catch(() => []);
   await query(
-    `insert into interest_leads (development_id, condominio, nome, email, telefone, finalidade, area_min, area_max, valor_max, quartos, mensagem, aceita_contato)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-    [devId, condominio, nome, email || null, telefone || null, input.finalidade === 'aluguel' ? 'aluguel' : 'venda', num(input.areaMin), num(input.areaMax), num(input.valorMax), num(input.quartos), (input.mensagem ?? '').trim().slice(0, 1000) || null, true]
+    `insert into interest_leads (development_id, condominio, nome, email, telefone, finalidade, area_min, area_max, valor_max, quartos, mensagem, aceita_contato, raio, lat, lng, property_id, quartos_opcoes)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::int[])`,
+    [devId, condominio, nome, email || null, telefone || null, input.finalidade === 'aluguel' ? 'aluguel' : 'venda', num(input.areaMin), num(input.areaMax), num(input.valorMax), num(input.quartos), (input.mensagem ?? '').trim().slice(0, 1000) || null, true, raio, pos[0]?.lat ?? null, pos[0]?.lng ?? null, propId, qOpcoes.length ? qOpcoes : null]
   );
 
   // Aviso para a equipe (se o e-mail estiver configurado)
@@ -1543,7 +1569,7 @@ export async function registrarInteresse(input: InteresseInput): Promise<{ ok: b
       `Novo interessado no ${condominio}`,
       emailLayout(
         `Novo interessado no ${escapeHtml(condominio)}`,
-        `<table style="font-size:14px">${linha('Nome', nome)}${linha('WhatsApp', telefone)}${linha('E-mail', email)}${linha('Quer', input.finalidade === 'aluguel' ? 'Alugar' : 'Comprar')}${linha('Metragem', input.areaMin || input.areaMax ? `${input.areaMin ?? '?'} a ${input.areaMax ?? '?'} m²` : null)}${linha('Até', brl(input.valorMax))}${linha('Quartos', input.quartos)}${linha('Mensagem', input.mensagem)}</table>
+        `<table style="font-size:14px">${linha('Nome', nome)}${linha('WhatsApp', telefone)}${linha('E-mail', email)}${linha('Quer', input.finalidade === 'aluguel' ? 'Alugar' : 'Comprar')}${linha('Avisar de', ROTULO_RAIO[raio])}${linha('Quartos', qOpcoes.length ? textoQuartos(qOpcoes) : null)}${linha('Metragem', input.areaMin || input.areaMax ? `${input.areaMin ?? '?'} a ${input.areaMax ?? '?'} m²` : null)}${linha('Até', brl(input.valorMax))}${linha('Quartos', input.quartos)}${linha('Mensagem', input.mensagem)}</table>
          <p style="font-size:13px;color:#6b6f76;margin-top:16px">Veja todos em Painel → Interessados.</p>`
       )
     );
@@ -1565,6 +1591,10 @@ export type InteresseLead = {
   quartos: number | null;
   mensagem: string | null;
   status: 'novo' | 'contatado' | 'descartado';
+  /** 0 = só no condomínio; 500 / 2000 = metros ao redor */
+  raio: number;
+  propertyId: string | null;
+  quartosOpcoes: number[];
   descadastrado: boolean;
   ultimoAviso: string | null;
   criadoEm: string;
@@ -1589,6 +1619,9 @@ export async function listInteresses(): Promise<InteresseLead[]> {
     quartos: n(r.quartos),
     mensagem: (r.mensagem as string) ?? null,
     status: (r.status as InteresseLead['status']) ?? 'novo',
+    raio: Number(r.raio) || 0,
+    propertyId: (r.property_id as string) ?? null,
+    quartosOpcoes: Array.isArray(r.quartos_opcoes) ? (r.quartos_opcoes as number[]).map(Number) : [],
     descadastrado: !!r.descadastrado_em,
     ultimoAviso: d(r.ultimo_aviso_em),
     criadoEm: d(r.created_at) ?? ''
@@ -1599,43 +1632,6 @@ export async function updateInteresseStatus(id: string, status: InteresseLead['s
   await requireStaff();
   if (!['novo', 'contatado', 'descartado'].includes(status)) throw new Error('Status inválido.');
   await query('update interest_leads set status = $1 where id = $2::uuid', [status, id]);
-}
-
-// Quando um imóvel entra num condomínio, avisa por e-mail quem registrou interesse nele
-async function avisarInteressados(propertyId: string): Promise<void> {
-  if (!emailConfigurado()) return;
-  const props = await query<PropertyRow>("select * from properties where id = $1 and is_tipologia = false and visibilidade = 'publico'", [propertyId]);
-  const p = props[0];
-  if (!p) return;
-  const devRows = p.empreendimento_id ? await query<{ name: string }>('select name from developments where id = $1', [p.empreendimento_id]) : [];
-  const nomeCondo = devRows[0]?.name ?? p.condominio;
-  if (!nomeCondo && !p.empreendimento_id) return;
-  const leads = await query<{ id: string; nome: string; email: string; unsubscribe_token: string; valor_max: string | null }>(
-    `select id, nome, email, unsubscribe_token, valor_max from interest_leads
-      where email is not null and aceita_contato and descadastrado_em is null and finalidade = $1
-        and (($2::text is not null and development_id = $2) or ($3::text is not null and ${norm('condominio')} = ${norm('$3::text')}))`,
-    [p.finalidade, p.empreendimento_id, nomeCondo ?? null]
-  );
-  if (!leads.length) return;
-  const imovel = mapPropertyRow(p);
-  const titulo = imovel.titulo || `${TIPO_UNIDADE_LABEL[imovel.tipoUnidade]} em ${imovel.location}`;
-  const link = `${SITE_URL}${urlImovel(p)}`;
-  for (const l of leads) {
-    const preco = Number(p.price_value);
-    if (l.valor_max && preco > Number(l.valor_max) * 1.35) continue; // bem acima do que a pessoa quer investir
-    const ok = await enviarEmail(
-      l.email,
-      `Novo imóvel no ${formatTitulo(nomeCondo ?? '')}`,
-      emailLayout(
-        `Surgiu um imóvel no ${escapeHtml(formatTitulo(nomeCondo ?? ''))}`,
-        `<p style="font-size:15px">Olá, ${escapeHtml(l.nome.split(' ')[0])}! Você pediu para ser avisado(a), e acabou de entrar:</p>
-         <p style="font-size:16px"><strong>${escapeHtml(titulo)}</strong><br>${escapeHtml(imovel.price)} · ${escapeHtml(imovel.beds)} · ${escapeHtml(imovel.area)}</p>
-         <p><a href="${link}" style="display:inline-block;background:#14161a;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:bold">Ver o imóvel</a></p>
-         <p style="font-size:11px;color:#9aa0a8;margin-top:20px">Não quer mais receber avisos deste condomínio? <a href="${SITE_URL}/api/interesse/cancelar?t=${l.unsubscribe_token}" style="color:#9aa0a8">Cancelar avisos</a></p>`
-      )
-    );
-    if (ok) await query('update interest_leads set ultimo_aviso_em = now() where id = $1::uuid', [l.id]);
-  }
 }
 
 // ---------------- Login da equipe ----------------
@@ -2350,6 +2346,7 @@ export async function getPontosMapa(filters: FilterState): Promise<ResultadoMapa
     visibilidade: string | null; bairro: string | null; cidade: string | null; uf: string | null;
     condominio: string | null; d_nome: string | null; delivery_date: string | Date | null; capa: string | null;
     corretor_email: string | null; empreendimento_id: string | null; vendedor: { nome?: string; telefone?: string } | null;
+    vendido_em: string | Date | null;
   };
   type LinhaCondo = {
     id: string; slug: string | null; name: string; tipo: string | null; lat: number | null; lng: number | null;
@@ -2364,7 +2361,7 @@ export async function getPontosMapa(filters: FilterState): Promise<ResultadoMapa
           `select p.id, p.slug, p.titulo, p.tipo_unidade, p.finalidade, p.price_value, p.quartos, p.vagas, p.area,
                   p.lat, p.lng, d.lat as d_lat, d.lng as d_lng, p.localizacao_aproximada as aproximada, p.visibilidade,
                   p.bairro, p.cidade, p.uf, p.condominio, d.name as d_nome, p.delivery_date,
-                  coalesce(p.capa_mini, p.photos->>0) as capa, p.corretor_email, p.empreendimento_id, p.vendedor
+                  coalesce(p.capa_mini, p.photos->>0) as capa, p.corretor_email, p.empreendimento_id, p.vendedor, p.vendido_em
              from properties p left join developments d on d.id = p.empreendimento_id
             where p.id = any($1::text[])`,
           [propIds]
@@ -2432,7 +2429,8 @@ export async function getPontosMapa(filters: FilterState): Promise<ResultadoMapa
       aproximada: !!r.aproximada || r.lat == null,
       herdaPosicao: r.lat == null,
       podeMover: podeMover(r.corretor_email),
-      dono: donoDe(r)
+      dono: donoDe(r),
+      vendidoEm: r.vendido_em ? (r.vendido_em instanceof Date ? r.vendido_em.toISOString() : String(r.vendido_em)).slice(0, 10) : null
     });
   }
   for (const r of condos) {

@@ -51,8 +51,11 @@ export default function InteressadosPage() {
       <main className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8">
         <h1 className="font-serif text-2xl font-semibold">Interessados</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Pessoas que pediram para ser avisadas quando surgir um imóvel num condomínio. Quando um imóvel é cadastrado no condomínio, elas recebem um e-mail
-          automático (se o envio de e-mail estiver configurado).
+          Pessoas que pediram para ser avisadas quando surgir um imóvel num condomínio, ou a até 500 m / 2 km dele. Quando um anúncio combina, ele aparece em{' '}
+          <Link href="/dashboard/avisos" className="font-semibold text-accent hover:underline">
+            Para avisar
+          </Link>{' '}
+          (e sai por e-mail sozinho, se o envio estiver configurado).
         </p>
 
         <div className="mt-5 flex flex-wrap gap-2">
@@ -103,9 +106,14 @@ export default function InteressadosPage() {
                   </span>
                   <span className="text-[var(--text-muted)]">
                     {[
+                      i.raio === 2000 ? 'Avisar até 2 km ao redor' : i.raio === 500 ? 'Avisar até 500 m ao redor' : null,
                       i.areaMin || i.areaMax ? `${i.areaMin ?? '?'} a ${i.areaMax ?? '?'} m²` : null,
                       i.valorMax ? `até ${brl(i.valorMax)}` : null,
-                      i.quartos ? `${i.quartos}+ quartos` : null
+                      i.quartosOpcoes.length
+                        ? `${i.quartosOpcoes.map((q) => (q >= 4 ? '4+' : String(q))).join(', ')} quartos`
+                        : i.quartos
+                          ? `${i.quartos}+ quartos`
+                          : null
                     ]
                       .filter(Boolean)
                       .join(' · ') || 'Sem preferências informadas'}
