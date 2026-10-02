@@ -18,6 +18,8 @@ export default function PainelPage() {
 
   useEffect(() => {
     if (loaded && !staff) router.replace('/dashboard/login');
+    // o papel Financeiro só tem a tela de custos
+    else if (loaded && staff?.role === 'financeiro') router.replace('/dashboard/custos');
   }, [loaded, staff, router]);
 
   useEffect(() => {

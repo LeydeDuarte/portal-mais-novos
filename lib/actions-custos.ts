@@ -5,10 +5,20 @@ import { query } from './db';
 import { exigirEquipe } from './staff-auth';
 import { cotacaoDolar, custoWhatsappMeta, lerPrecosIA, type PrecosIA } from './custos';
 
+// Custos: só quem tem "acesso ao financeiro" (o administrador principal e quem ele liberar)
+// ou o papel Financeiro.
 async function soAdmin() {
   const s = await exigirEquipe();
-  if (s.role !== 'admin') throw new Error('Só o admin vê os custos.');
+  if (s.role === 'financeiro') return s;
+  const r = await query<{ ok: boolean }>(`select acesso_financeiro as ok from staff_users where lower(email) = lower($1)`, [s.email]);
+  if (!r[0]?.ok) throw new Error('Os custos são vistos só pelo administrador principal ou pelo financeiro.');
   return s;
+}
+
+export async function temAcessoFinanceiro(): Promise<boolean> {
+  return soAdmin()
+    .then(() => true)
+    .catch(() => false);
 }
 
 export type Conta = {

@@ -2,16 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useStaffSession } from '@/lib/use-staff-session';
+import { temAcessoFinanceiro } from '@/lib/actions-custos';
 import { veTudo, ROLE_LABEL } from '@/lib/papeis';
 import Logo from './Logo';
 import { SITE_URL } from '@/lib/seo';
 
-const LINKS: { href: string; label: string; admin?: boolean; gestor?: boolean }[] = [
+const LINKS: { href: string; label: string; admin?: boolean; gestor?: boolean; financeiro?: boolean }[] = [
   { href: '/dashboard', label: 'Início' },
   { href: '/dashboard/crm', label: 'CRM' },
   { href: '/dashboard/resultados', label: 'Resultados', admin: true },
-  { href: '/dashboard/custos', label: 'Custos', admin: true },
+  { href: '/dashboard/custos', label: 'Custos', financeiro: true },
   { href: '/dashboard/imoveis', label: 'Imóveis' },
   { href: '/dashboard/condominios', label: 'Condomínios' },
   { href: '/dashboard/mapa', label: 'Mapa' },
@@ -39,6 +41,11 @@ export default function PainelNav() {
   const pathname = usePathname() ?? '';
   const router = useRouter();
   const { staff, logout } = useStaffSession();
+  // "Custos" só aparece para quem tem acesso ao financeiro (o papel Financeiro vê só ele)
+  const [financeiro, setFinanceiro] = useState(false);
+  useEffect(() => {
+    if (staff) temAcessoFinanceiro().then(setFinanceiro).catch(() => setFinanceiro(false));
+  }, [staff]);
 
   const sair = async () => {
     await logout();
@@ -94,7 +101,11 @@ export default function PainelNav() {
       </div>
       {staff && (
         <nav className="mx-auto flex h-12 max-w-[1680px] items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:px-6">
-          {LINKS.filter((l) => (!l.admin || staff.role === 'admin') && (!l.gestor || veTudo(staff.role))).map((l) => (
+          {LINKS.filter((l) =>
+            staff.role === 'financeiro'
+              ? l.financeiro
+              : (!l.admin || staff.role === 'admin') && (!l.gestor || veTudo(staff.role)) && (!l.financeiro || financeiro)
+          ).map((l) => (
             <Link
               key={l.href}
               href={l.href}

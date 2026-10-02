@@ -2027,28 +2027,28 @@ export async function importarCondominios(lote: CondoImport[], opcoes: { status:
 }
 
 // ---------------- Equipe (só o administrador gerencia) ----------------
-export type MembroEquipe = { email: string; name: string; role: StaffRole; criadoEm: string; imoveis: number; telefone?: string | null };
+export type MembroEquipe = { email: string; name: string; role: StaffRole; criadoEm: string; imoveis: number; telefone?: string | null; financeiro: boolean };
 
 const requireAdmin = exigirAdmin;
 
 export async function listarEquipe(): Promise<MembroEquipe[]> {
   await requireAdmin();
-  const rows = await query<{ email: string; name: string; role: StaffRole; created_at: string; imoveis: string; telefone: string | null }>(
-    `select u.email, u.name, u.role, u.created_at, u.telefone,
+  const rows = await query<{ email: string; name: string; role: StaffRole; created_at: string; imoveis: string; telefone: string | null; acesso_financeiro: boolean }>(
+    `select u.email, u.name, u.role, u.created_at, u.telefone, u.acesso_financeiro,
         (select count(*) from properties p where p.corretor_email = u.email and p.is_tipologia = false) as imoveis
        from staff_users u order by case u.role when 'admin' then 0 when 'analista' then 1 else 2 end, u.name`
   );
-  return rows.map((r) => ({ email: r.email, name: r.name, role: r.role, criadoEm: String(r.created_at), imoveis: Number(r.imoveis) || 0, telefone: r.telefone }));
+  return rows.map((r) => ({ email: r.email, name: r.name, role: r.role, criadoEm: String(r.created_at), imoveis: Number(r.imoveis) || 0, telefone: r.telefone, financeiro: !!r.acesso_financeiro || r.role === 'financeiro' }));
 }
 
 /** Cria ou altera um membro. Senha em branco numa alteração = mantém a atual. */
-export async function salvarMembro(m: { email: string; name: string; role: StaffRole; senha?: string; telefone?: string }): Promise<{ ok: boolean; erro?: string }> {
+export async function salvarMembro(m: { email: string; name: string; role: StaffRole; senha?: string; telefone?: string; financeiro?: boolean }): Promise<{ ok: boolean; erro?: string }> {
   const eu = await requireAdmin();
   const email = m.email.trim().toLowerCase();
   const name = m.name.trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, erro: 'E-mail inválido.' };
   if (!name) return { ok: false, erro: 'Informe o nome.' };
-  if (!['admin', 'analista', 'corretor'].includes(m.role)) return { ok: false, erro: 'Papel inválido.' };
+  if (!['admin', 'analista', 'corretor', 'financeiro'].includes(m.role)) return { ok: false, erro: 'Papel inválido.' };
   if (email === eu.email && m.role !== 'admin') return { ok: false, erro: 'Você não pode tirar o seu próprio acesso de administrador.' };
   const existe = (await query<{ email: string }>('select email from staff_users where lower(email) = $1', [email])).length > 0;
   const senha = (m.senha ?? '').trim();
@@ -2066,6 +2066,11 @@ export async function salvarMembro(m: { email: string; name: string; role: Staff
   }
   // telefone: aparece na marca d'água do link "compartilhar com corretor"
   if (m.telefone !== undefined) await query('update staff_users set telefone = $2 where lower(email) = $1', [email, String(m.telefone).replace(/\D/g, '').slice(0, 13) || null]);
+  // acesso aos custos: só quem já tem esse acesso pode dar ou tirar (e ninguém tira o próprio)
+  if (m.financeiro !== undefined && email !== eu.email.toLowerCase()) {
+    const meu = await query<{ ok: boolean }>('select acesso_financeiro as ok from staff_users where lower(email) = lower($1)', [eu.email]);
+    if (meu[0]?.ok) await query('update staff_users set acesso_financeiro = $2 where lower(email) = $1', [email, !!m.financeiro]);
+  }
   return { ok: true };
 }
 

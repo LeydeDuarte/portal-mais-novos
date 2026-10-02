@@ -24,7 +24,7 @@ export default function CustosPage() {
   const [editandoPrecos, setEditandoPrecos] = useState(false);
   const [precos, setPrecos] = useState<{ modelo: string; entrada: string; saida: string }[]>([]);
   useEffect(() => {
-    if (loaded && (!staff || staff.role !== 'admin')) router.replace(staff ? '/dashboard' : '/dashboard/login');
+    if (loaded && !staff) router.replace('/dashboard/login');
   }, [loaded, staff, router]);
   const carregar = () =>
     painelCustos(mes)
@@ -34,13 +34,13 @@ export default function CustosPage() {
       })
       .catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível carregar.'));
   useEffect(() => {
-    if (staff?.role === 'admin') {
+    if (staff) {
       setD(null);
       carregar();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [staff, mes]);
-  if (!loaded || staff?.role !== 'admin') return null;
+  if (!loaded || !staff) return null;
 
   const salvar = async () => {
     setErro(null);
@@ -75,7 +75,7 @@ export default function CustosPage() {
         </div>
         {erro && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{erro}</p>}
         {!d ? (
-          <p className="mt-8 text-sm text-[var(--text-muted)]">Carregando…</p>
+          !erro && <p className="mt-8 text-sm text-[var(--text-muted)]">Carregando…</p>
         ) : (
           <>
             <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">

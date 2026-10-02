@@ -6,15 +6,17 @@ import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { listarEquipe, removerMembro, salvarMembro, type MembroEquipe } from '@/lib/actions';
+import { temAcessoFinanceiro } from '@/lib/actions-custos';
 import { ROLE_LABEL, type StaffRole } from '@/lib/papeis';
 
 const DESCRICAO: Record<StaffRole, string> = {
   admin: 'Vê e edita tudo, gerencia a equipe e a migração.',
   analista: 'Vê e edita todos os anúncios e condomínios, inclusive dos corretores; cadastra imóveis e notícias.',
-  corretor: 'Cadastra e edita só os próprios anúncios.'
+  corretor: 'Cadastra e edita só os próprios anúncios.',
+  financeiro: 'Vê só os custos da operação (IA, WhatsApp e contas a pagar). Não vê imóveis, CRM nem clientes.'
 };
 
-const vazio = { email: '', name: '', role: 'corretor' as StaffRole, senha: '', telefone: '' };
+const vazio = { email: '', name: '', role: 'corretor' as StaffRole, senha: '', telefone: '', financeiro: false };
 
 export default function EquipePage() {
   const { staff, loaded } = useStaffSession();
@@ -23,13 +25,17 @@ export default function EquipePage() {
   const [form, setForm] = useState(vazio);
   const [editando, setEditando] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const [souFinanceiro, setSouFinanceiro] = useState(false);
 
   useEffect(() => {
     if (loaded && (!staff || staff.role !== 'admin')) router.replace(staff ? '/dashboard' : '/dashboard/login');
   }, [loaded, staff, router]);
   const carregar = () => listarEquipe().then(setMembros).catch(() => {});
   useEffect(() => {
-    if (staff?.role === 'admin') carregar();
+    if (staff?.role === 'admin') {
+      carregar();
+      temAcessoFinanceiro().then(setSouFinanceiro);
+    }
   }, [staff]);
 
   const salvar = async (e: React.FormEvent) => {
@@ -104,6 +110,12 @@ export default function EquipePage() {
             onChange={(e) => setForm({ ...form, telefone: e.target.value })}
             className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm sm:col-span-2"
           />
+          {souFinanceiro && form.role !== 'financeiro' && form.email !== staff?.email && (
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input type="checkbox" checked={form.financeiro} onChange={(e) => setForm({ ...form, financeiro: e.target.checked })} className="h-4 w-4 accent-[#257CFF]" />
+              Acesso ao financeiro (pode ver Painel → Custos)
+            </label>
+          )}
           <div className="flex gap-2 sm:col-span-2">
             <button type="submit" className="rounded-full bg-accent px-5 py-2 text-sm font-bold text-white hover:opacity-90">
               {editando ? 'Salvar' : 'Adicionar'}
@@ -122,6 +134,7 @@ export default function EquipePage() {
               <div>
                 <div className="font-semibold">
                   {m.name} <span className="ml-1 rounded bg-[var(--pill-bg)] px-1.5 py-0.5 text-[11px] font-bold uppercase">{ROLE_LABEL[m.role] ?? m.role}</span>
+                  {m.financeiro && m.role !== 'financeiro' && <span className="ml-1 rounded bg-[#E7F9EE] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#0B6B33]">Financeiro</span>}
                 </div>
                 <div className="text-xs text-[var(--text-muted)]">
                   {m.email} · {m.imoveis} imóvel(is)
@@ -131,7 +144,7 @@ export default function EquipePage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setForm({ email: m.email, name: m.name, role: m.role, senha: '', telefone: m.telefone ?? '' });
+                    setForm({ email: m.email, name: m.name, role: m.role, senha: '', telefone: m.telefone ?? '', financeiro: m.financeiro });
                     setEditando(true);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
