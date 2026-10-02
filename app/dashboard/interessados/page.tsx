@@ -7,6 +7,7 @@ import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { listInteresses, updateInteresseStatus, type InteresseLead } from '@/lib/actions';
+import { GRUPO_LABEL, textoAlcance, textoArea } from '@/lib/interesse-regras';
 
 const STATUS_LABEL = { novo: 'Novo', contatado: 'Contatado', descartado: 'Descartado' } as const;
 const brl = (n: number | null) => (n ? n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : null);
@@ -106,8 +107,11 @@ export default function InteressadosPage() {
                   </span>
                   <span className="text-[var(--text-muted)]">
                     {[
-                      i.raio === 2000 ? 'Avisar até 2 km ao redor' : i.raio === 500 ? 'Avisar até 500 m ao redor' : null,
-                      i.areaMin || i.areaMax ? `${i.areaMin ?? '?'} a ${i.areaMax ?? '?'} m²` : null,
+                      i.grupo ? `Procura ${GRUPO_LABEL[i.grupo].toLowerCase()}` : null,
+                      i.grupo || i.raio !== 0
+                        ? `avisar ${textoAlcance(i.raio, { condominio: i.developmentId ? i.condominio : null, bairro: i.bairroRef, cidade: i.cidadeRef })}`
+                        : null,
+                      textoArea(i.grupo, i.areaMin, i.areaMax),
                       i.valorMax ? `até ${brl(i.valorMax)}` : null,
                       i.quartosOpcoes.length
                         ? `${i.quartosOpcoes.map((q) => (q >= 4 ? '4+' : String(q))).join(', ')} quartos`

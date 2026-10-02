@@ -30,6 +30,7 @@ import { urlImovel, urlCondominio } from './urls';
 import type { PontoMapa, ResultadoMapa } from './mapa-tipos';
 import { proprietariosDoImovel } from './proprietarios';
 import { gerarAvisos } from './avisos';
+import { GRUPO_LABEL, RAIOS_VALIDOS, grupoUsaQuartos, textoAlcance, textoArea, type GrupoInteresse } from './interesse-regras';
 
 const PAGE_SIZE = 24;
 const STAFF_COOKIE = 'mn_staff';
@@ -1084,7 +1085,6 @@ export async function deleteProperty(id: string): Promise<void> {
 // Anúncio privado vendido continua privado (nunca aparece para o público).
 const DIAS_VENDIDO_NO_FEED = 15;
 const textoQuartos = (q: number[]) => q.map((n) => (n >= 4 ? '4 ou mais' : n === 0 ? 'sem quartos' : String(n))).join(', ') + (q.some((n) => n > 0) ? ' quartos' : '');
-const ROTULO_RAIO: Record<number, string> = { 0: 'Só neste condomínio', 500: 'Até 500 m ao redor', 2000: 'Até 2 km ao redor' };
 const DIAS_VENDIDO_NO_MAPA = 30;
 
 // Link de vídeo: só https de YouTube, Instagram, TikTok ou Vimeo (nada de "javascript:")
@@ -1511,6 +1511,8 @@ export type InteresseInput = {
   raio?: number;
   /** quartos que interessam, como no filtro do feed: 0 a 4 (4 = 4 ou mais); vazio = qualquer */
   quartosOpcoes?: number[];
+  /** o que a pessoa procura: apartamento, casa, comercial, lote ou rural (lib/interesse-regras.ts) */
+  grupo?: GrupoInteresse;
   /** quando o formulário está na página de um anúncio */
   propertyId?: string;
 };
@@ -1540,22 +1542,34 @@ export async function registrarInteresse(input: InteresseInput): Promise<{ ok: b
   if (dup[0]) return { ok: true };
 
   const num = (n?: number) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null);
-  const raio = input.raio === 500 || input.raio === 2000 ? input.raio : 0;
-  const qOpcoes = Array.from(new Set((input.quartosOpcoes ?? []).map(Number).filter((q) => Number.isInteger(q) && q >= 0 && q <= 4))).sort();
-  // obrigatório no "Avise-me" (que sempre manda a lista); o Fale conosco lateral não manda
-  if (Array.isArray(input.quartosOpcoes) && !qOpcoes.length) return { ok: false, erro: 'Escolha quantos quartos você procura.' };
+  const raio = RAIOS_VALIDOS.includes(Number(input.raio)) ? Number(input.raio) : 0;
+  const grupo = input.grupo && input.grupo in GRUPO_LABEL ? input.grupo : null;
+  const usaQuartos = !grupo || grupoUsaQuartos(grupo);
+  const qOpcoes = usaQuartos ? Array.from(new Set((input.quartosOpcoes ?? []).map(Number).filter((q) => Number.isInteger(q) && q >= 0 && q <= 4))).sort() : [];
+  // obrigatório no "Avise-me" (que sempre manda o grupo); o Fale conosco lateral não manda
+  if (grupo && usaQuartos && !qOpcoes.length) return { ok: false, erro: 'Escolha quantos quartos você procura.' };
+  if (grupo && !usaQuartos && !num(input.areaMin) && !num(input.areaMax)) return { ok: false, erro: 'Escolha o tamanho que você procura.' };
   const propId = input.propertyId && /^[\w-]{1,80}$/.test(input.propertyId) ? input.propertyId : null;
-  // posição do ponto de referência (o condomínio ou o anúncio), para o aviso por distância
-  const pos = await query<{ lat: number | null; lng: number | null }>(
+  // ponto de referência (o anúncio ou o condomínio): posição, bairro e cidade, para o
+  // aviso por distância, por bairro ou por município (sempre do banco, nunca do navegador)
+  const pos = await query<{ lat: number | null; lng: number | null; bairro: string | null; cidade: string | null }>(
     propId
-      ? `select coalesce(p.lat, d.lat) as lat, coalesce(p.lng, d.lng) as lng from properties p left join developments d on d.id = p.empreendimento_id where p.id = $1`
-      : `select lat, lng from developments where id = $1`,
+      ? `select coalesce(p.lat, d.lat) as lat, coalesce(p.lng, d.lng) as lng, coalesce(p.bairro, d.bairro) as bairro, coalesce(p.cidade, d.cidade) as cidade
+           from properties p left join developments d on d.id = p.empreendimento_id where p.id = $1`
+      : `select lat, lng, bairro, cidade from developments where id = $1`,
     [propId ?? devId]
   ).catch(() => []);
+  const ref = pos[0];
+  // anúncio de rua (sem condomínio): o registro fica identificado pelo bairro
+  const rotulo = condominio || (ref?.bairro ? formatTitulo(ref.bairro) : 'Anúncio');
   await query(
-    `insert into interest_leads (development_id, condominio, nome, email, telefone, finalidade, area_min, area_max, valor_max, quartos, mensagem, aceita_contato, raio, lat, lng, property_id, quartos_opcoes)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::int[])`,
-    [devId, condominio, nome, email || null, telefone || null, input.finalidade === 'aluguel' ? 'aluguel' : 'venda', num(input.areaMin), num(input.areaMax), num(input.valorMax), num(input.quartos), (input.mensagem ?? '').trim().slice(0, 1000) || null, true, raio, pos[0]?.lat ?? null, pos[0]?.lng ?? null, propId, qOpcoes.length ? qOpcoes : null]
+    `insert into interest_leads (development_id, condominio, nome, email, telefone, finalidade, area_min, area_max, valor_max, quartos, mensagem, aceita_contato, raio, lat, lng, property_id, quartos_opcoes, grupo, bairro_ref, cidade_ref)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::int[],$18,$19,$20)`,
+    [
+      devId, rotulo, nome, email || null, telefone || null, input.finalidade === 'aluguel' ? 'aluguel' : 'venda', num(input.areaMin), num(input.areaMax), num(input.valorMax),
+      num(input.quartos), (input.mensagem ?? '').trim().slice(0, 1000) || null, true, raio, ref?.lat ?? null, ref?.lng ?? null, propId, qOpcoes.length ? qOpcoes : null,
+      grupo, ref?.bairro ?? null, ref?.cidade ?? null
+    ]
   );
 
   // Aviso para a equipe (se o e-mail estiver configurado)
@@ -1566,10 +1580,10 @@ export async function registrarInteresse(input: InteresseInput): Promise<{ ok: b
     const brl = (n?: number) => (n ? n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : null);
     await enviarEmail(
       equipe,
-      `Novo interessado no ${condominio}`,
+      `Novo interessado no ${rotulo}`,
       emailLayout(
-        `Novo interessado no ${escapeHtml(condominio)}`,
-        `<table style="font-size:14px">${linha('Nome', nome)}${linha('WhatsApp', telefone)}${linha('E-mail', email)}${linha('Quer', input.finalidade === 'aluguel' ? 'Alugar' : 'Comprar')}${linha('Avisar de', ROTULO_RAIO[raio])}${linha('Quartos', qOpcoes.length ? textoQuartos(qOpcoes) : null)}${linha('Metragem', input.areaMin || input.areaMax ? `${input.areaMin ?? '?'} a ${input.areaMax ?? '?'} m²` : null)}${linha('Até', brl(input.valorMax))}${linha('Quartos', input.quartos)}${linha('Mensagem', input.mensagem)}</table>
+        `Novo interessado no ${escapeHtml(rotulo)}`,
+        `<table style="font-size:14px">${linha('Nome', nome)}${linha('WhatsApp', telefone)}${linha('E-mail', email)}${linha('Quer', input.finalidade === 'aluguel' ? 'Alugar' : 'Comprar')}${linha('Procura', grupo ? GRUPO_LABEL[grupo] : null)}${linha('Avisar de', textoAlcance(raio, { condominio: devId ? condominio : null, bairro: ref?.bairro, cidade: ref?.cidade }))}${linha('Quartos', qOpcoes.length ? textoQuartos(qOpcoes) : null)}${linha('Tamanho', textoArea(grupo, num(input.areaMin), num(input.areaMax)))}${linha('Até', brl(input.valorMax))}${linha('Quartos', input.quartos)}${linha('Mensagem', input.mensagem)}</table>
          <p style="font-size:13px;color:#6b6f76;margin-top:16px">Veja todos em Painel → Interessados.</p>`
       )
     );
@@ -1595,6 +1609,9 @@ export type InteresseLead = {
   raio: number;
   propertyId: string | null;
   quartosOpcoes: number[];
+  grupo: GrupoInteresse | null;
+  bairroRef: string | null;
+  cidadeRef: string | null;
   descadastrado: boolean;
   ultimoAviso: string | null;
   criadoEm: string;
@@ -1622,6 +1639,9 @@ export async function listInteresses(): Promise<InteresseLead[]> {
     raio: Number(r.raio) || 0,
     propertyId: (r.property_id as string) ?? null,
     quartosOpcoes: Array.isArray(r.quartos_opcoes) ? (r.quartos_opcoes as number[]).map(Number) : [],
+    grupo: (r.grupo as GrupoInteresse) ?? null,
+    bairroRef: (r.bairro_ref as string) ?? null,
+    cidadeRef: (r.cidade_ref as string) ?? null,
     descadastrado: !!r.descadastrado_em,
     ultimoAviso: d(r.ultimo_aviso_em),
     criadoEm: d(r.created_at) ?? ''

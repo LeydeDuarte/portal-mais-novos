@@ -23,6 +23,8 @@ import { SITE_URL } from '@/lib/seo';
 import BotaoCompartilhar from '@/components/BotaoCompartilhar';
 import ChamadaAvaliar from '@/components/ChamadaAvaliar';
 import InterestForm from '@/components/InterestForm';
+import PosicaoSol from '@/components/PosicaoSol';
+import { posicaoParaSol } from '@/lib/sol-posicao';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import { Banner } from '@/components/news/Pecas';
 import { bannersAtivos } from '@/lib/news/dados';
@@ -71,6 +73,7 @@ export default async function PropertyDetailView({
   const titulo = property.titulo || `${TIPO_UNIDADE_LABEL[property.tipoUnidade]} em ${property.location}`;
 
   // WhatsApp da Leyde com o link deste anúncio (vale para todos os anúncios)
+  const posSol = await posicaoParaSol(property.id);
   const whats = { titulo: tituloSeoImovel(property), caminho: urlImovel(property), condominio: nomeCondominio, developmentId: property.empreendimentoId };
 
   const badges = (
@@ -238,6 +241,8 @@ export default async function PropertyDetailView({
               </div>
             )}
 
+            {posSol && <PosicaoSol lat={posSol.lat} lng={posSol.lng} nome={nomeCondominio || 'imóvel'} whats={whats} />}
+
             <ChamadaAvaliar contexto="imovel" refId={property.id} />
           </div>
 
@@ -311,7 +316,15 @@ export default async function PropertyDetailView({
         />
 
         {/* "Avise-me" de imóveis parecidos: no condomínio, até 500 m ou até 2 km */}
-        <InterestForm developmentId={property.empreendimentoId} propertyId={property.id} condominio={nomeCondominio || ''} whats={whats} />
+        <InterestForm
+          developmentId={property.empreendimentoId}
+          propertyId={property.id}
+          condominio={nomeCondominio || ''}
+          whats={whats}
+          tipos={[property.tipoUnidade]}
+          bairro={property.bairro}
+          cidade={property.cidade}
+        />
 
         <VitrineNews bairro={property.bairro} cidade={property.cidade} />
       </main>

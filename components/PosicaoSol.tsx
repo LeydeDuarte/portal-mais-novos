@@ -9,6 +9,7 @@ import * as SunCalc from 'suncalc';
 import LoginModal from '@/components/LoginModal';
 import BotaoWhatsapp, { type WhatsappContexto } from '@/components/BotaoWhatsapp';
 import { useSession } from '@/lib/use-session';
+import { useStaffSession } from '@/lib/use-staff-session';
 
 const FUSO = 3; // Goiânia: UTC-3, sem horário de verão
 type Dia = 'hoje' | 'inverno' | 'verao';
@@ -47,7 +48,9 @@ function caminho(lat: number, lng: number, dia: Dia): string {
 
 export default function PosicaoSol({ lat, lng, nome, whats }: { lat: number; lng: number; nome: string; whats: WhatsappContexto }) {
   const { session, signIn } = useSession();
-  const loggedIn = session.loggedIn;
+  // equipe logada no painel vê direto, sem precisar do login do Google
+  const { staff } = useStaffSession();
+  const loggedIn = session.loggedIn || !!staff;
   const [login, setLogin] = useState(false);
   const [dia, setDia] = useState<Dia>('hoje');
   const [min, setMin] = useState(() => {

@@ -12,7 +12,20 @@ export type AvisoPendente = {
   criadoEm: string;
   metros: number | null;
   mesmoCondominio: boolean;
-  pessoa: { nome: string; telefone: string | null; email: string | null; condominio: string; raio: number; quartos: number[] };
+  pessoa: {
+    nome: string;
+    telefone: string | null;
+    email: string | null;
+    condominio: string;
+    temCondominio: boolean;
+    raio: number;
+    quartos: number[];
+    grupo: string | null;
+    bairro: string | null;
+    cidade: string | null;
+    areaMin: number | null;
+    areaMax: number | null;
+  };
   imovel: { id: string; titulo: string; preco: number | null; detalhes: string; bairro: string | null; condominio: string | null; url: string };
 };
 
@@ -21,6 +34,7 @@ export async function listAvisos(): Promise<AvisoPendente[]> {
   const rows = await query<Record<string, unknown>>(
     `select a.id, a.criado_em, a.metros, a.mesmo_condominio,
             l.nome, l.telefone, l.email, l.condominio as l_condominio, l.raio, l.quartos_opcoes,
+            l.grupo, l.bairro_ref, l.cidade_ref, l.area_min, l.area_max, l.development_id as l_dev,
             p.id as p_id, p.slug, p.uf, p.cidade, p.bairro, p.finalidade, p.titulo, p.tipo_unidade, p.price_value, p.quartos, p.area,
             coalesce(d.name, p.condominio) as p_condominio
        from avisos_pendentes a
@@ -41,7 +55,16 @@ export async function listAvisos(): Promise<AvisoPendente[]> {
       criadoEm: new Date(r.criado_em as string).toISOString(),
       metros: r.metros == null ? null : Number(r.metros),
       mesmoCondominio: !!r.mesmo_condominio,
-      pessoa: { nome: String(r.nome), telefone: (r.telefone as string) ?? null, email: (r.email as string) ?? null, condominio: String(r.l_condominio ?? ''), raio: Number(r.raio) || 0, quartos: Array.isArray(r.quartos_opcoes) ? (r.quartos_opcoes as number[]).map(Number) : [] },
+      pessoa: { nome: String(r.nome), telefone: (r.telefone as string) ?? null, email: (r.email as string) ?? null, condominio: String(r.l_condominio ?? ''),
+        temCondominio: !!r.l_dev,
+        raio: Number(r.raio) || 0,
+        quartos: Array.isArray(r.quartos_opcoes) ? (r.quartos_opcoes as number[]).map(Number) : [],
+        grupo: (r.grupo as string) ?? null,
+        bairro: (r.bairro_ref as string) ?? null,
+        cidade: (r.cidade_ref as string) ?? null,
+        areaMin: r.area_min == null ? null : Number(r.area_min),
+        areaMax: r.area_max == null ? null : Number(r.area_max)
+      },
       imovel: {
         id: String(r.p_id),
         titulo: String(r.titulo || tipo),

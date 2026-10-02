@@ -360,7 +360,16 @@ export default async function DevelopmentDetailView({ development }: { developme
           </section>
         ) : null}
         {/* todos os condomínios: "Avise-me" com alcance (só aqui, 500 m ou 2 km) */}
-        <InterestForm developmentId={development.id} condominio={development.name} destaque={related.mesmoCondominio.length === 0} whats={whatsAtendimento} />
+        <InterestForm
+          developmentId={development.id}
+          condominio={development.name}
+          destaque={related.mesmoCondominio.length === 0}
+          whats={whatsAtendimento}
+          tipos={[...(development.tiposUnidade ?? []), ...development.units.map((u) => u.tipoUnidade)]}
+          tipoCondominio={development.tipo}
+          bairro={development.bairro}
+          cidade={development.cidade}
+        />
 
         {/* logo abaixo do quadro de interesse: últimas notícias do mercado */}
         <VitrineNews bairro={development.bairro} cidade={development.cidade} />

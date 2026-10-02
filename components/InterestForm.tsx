@@ -6,12 +6,26 @@
 //    consentimento registrado (LGPD): recebe só o que está dentro do que escolheu;
 //  - vira lead em Painel → Interessados (com o alcance) e, quando um imóvel entra
 //    dentro do alcance, a pessoa recebe e-mail (lib/actions.ts, avisarInteressados).
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { registrarInteresse } from '@/lib/actions';
 import { maskCurrencyInput } from '@/lib/currency';
 import { useSession } from '@/lib/use-session';
 import BotaoWhatsapp, { type WhatsappContexto } from '@/components/BotaoWhatsapp';
 import { NUMEROS_FILTRO, alternarNumero, rotuloNumero } from '@/lib/filters';
+import type { TipoUnidade } from '@/lib/tipologias';
+import {
+  FAIXAS_AREA,
+  GRUPO_DO_TIPO,
+  GRUPO_LABEL,
+  RAIO_BAIRRO,
+  RAIO_CONDOMINIO,
+  RAIO_MUNICIPIO,
+  grupoUsaQuartos,
+  opcoesDeAlcance,
+  type GrupoInteresse
+} from '@/lib/interesse-regras';
+
+const ORDEM_GRUPOS: GrupoInteresse[] = ['apartamento', 'casa', 'comercial', 'lote', 'rural'];
 
 type Props = {
   developmentId?: string;
@@ -22,6 +36,11 @@ type Props = {
   /** formulário na página de um anúncio */
   propertyId?: string;
   whats?: WhatsappContexto;
+  /** tipos de imóvel do condomínio ou do anúncio: decidem a pergunta (quartos ou tamanho) e o alcance */
+  tipos?: string[];
+  tipoCondominio?: 'vertical' | 'horizontal';
+  bairro?: string;
+  cidade?: string;
 };
 
 const inputClass = 'h-12 w-full min-w-0 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3.5 text-[15px] outline-none focus:border-accent';
@@ -33,16 +52,34 @@ function maskTelefone(v: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}`;
 }
 
-export default function InterestForm({ developmentId, condominio, destaque, propertyId, whats }: Props) {
+export default function InterestForm({ developmentId, condominio, destaque, propertyId, whats, tipos, tipoCondominio, bairro, cidade }: Props) {
   const { session } = useSession();
   const cliente = session.cliente;
   const temCondominio = !!condominio;
   const noAnuncio = !!propertyId;
+  // o que dá para procurar aqui (apartamento, casa, comercial, lote, rural)
+  const grupos = useMemo(() => {
+    const g = new Set<GrupoInteresse>();
+    for (const t of tipos ?? []) {
+      const x = GRUPO_DO_TIPO[t as TipoUnidade];
+      if (x) g.add(x);
+    }
+    if (!g.size) g.add(tipoCondominio === 'horizontal' ? 'casa' : 'apartamento');
+    return ORDEM_GRUPOS.filter((x) => g.has(x));
+  }, [tipos, tipoCondominio]);
+  const refAlcance = { condominio: temCondominio ? condominio : null, bairro: bairro ?? null, cidade: cidade ?? null };
+  const raioInicial = (g: GrupoInteresse) => {
+    const ops = opcoesDeAlcance(g, refAlcance);
+    // no anúncio, começa em 500 m (ou no município, se rural); no condomínio, "Só no condomínio"
+    return g === 'rural' ? ops[0][0] : noAnuncio ? 500 : ops[0][0];
+  };
   const [f, setF] = useState({
     nome: '',
     telefone: '',
     email: '',
-    raio: temCondominio && !noAnuncio ? 0 : 500,
+    grupo: grupos[0],
+    raio: raioInicial(grupos[0]),
+    faixa: null as number | null,
     quartosOpcoes: [] as number[],
     finalidade: 'venda' as 'venda' | 'aluguel',
     areaMin: '',
@@ -63,42 +100,51 @@ export default function InterestForm({ developmentId, condominio, destaque, prop
     setF((p) => ({ ...p, nome: p.nome || cliente.nome || '', email: p.email || cliente.email || '' }));
   }, [cliente]);
 
-  const curto = condominio.length > 22 ? `${condominio.slice(0, 21)}…` : condominio;
-  const opcoes: [number, string][] = [
-    ...(temCondominio ? ([[0, `Só no ${curto}`]] as [number, string][]) : []),
-    [500, 'Até 500 m'],
-    [2000, 'Até 2 km']
-  ];
+  const usaQuartos = grupoUsaQuartos(f.grupo);
+  const faixas = usaQuartos ? [] : FAIXAS_AREA[f.grupo as 'comercial' | 'lote' | 'rural'];
+  const opcoes = opcoesDeAlcance(f.grupo, refAlcance);
   const ref = temCondominio ? ` do ${condominio}` : ' daqui';
-  const alcance = f.raio === 0 ? `no ${condominio}` : f.raio === 500 ? `a até 500 m${ref}` : `a até 2 km${ref}`;
+  const alcance =
+    f.raio === RAIO_CONDOMINIO
+      ? `no ${condominio}`
+      : f.raio === RAIO_BAIRRO
+        ? `no ${bairro ?? 'bairro'}`
+        : f.raio === RAIO_MUNICIPIO
+          ? `em ${cidade ?? 'no município'}`
+          : f.raio >= 1000
+            ? `a até ${(f.raio / 1000).toLocaleString('pt-BR')} km${ref}`
+            : `a até ${f.raio} m${ref}`;
+  const trocarGrupo = (g: GrupoInteresse) => setF((p) => ({ ...p, grupo: g, raio: raioInicial(g), faixa: null, quartosOpcoes: [], areaMin: '', areaMax: '' }));
 
   const [faltaQuartos, setFaltaQuartos] = useState(false);
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro(null);
-    // obrigatório: quantos quartos a pessoa procura (é o que filtra os avisos)
-    if (!f.quartosOpcoes.length) {
+    // obrigatório: quartos (apartamento e casa) ou tamanho (comercial, lote, rural)
+    if (usaQuartos ? !f.quartosOpcoes.length : f.faixa == null) {
       setFaltaQuartos(true);
-      setErro('Escolha quantos quartos você procura.');
+      setErro(usaQuartos ? 'Escolha quantos quartos você procura.' : 'Escolha o tamanho que você procura.');
       document.getElementById('avise-quartos')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
+    const faixaSel = !usaQuartos && f.faixa != null ? faixas[f.faixa] : null;
     setEnviando(true);
     try {
       const res = await registrarInteresse({
         developmentId,
         propertyId,
-        condominio: condominio || 'Anúncio',
+        condominio,
         nome: f.nome,
         email: f.email,
         telefone: f.telefone,
         finalidade: f.finalidade,
-        areaMin: n(f.areaMin),
-        areaMax: n(f.areaMax),
+        areaMin: faixaSel ? faixaSel.min ?? undefined : n(f.areaMin),
+        areaMax: faixaSel ? faixaSel.max ?? undefined : n(f.areaMax),
+        grupo: f.grupo,
         valorMax: n(f.valorMax),
         mensagem: f.mensagem,
         raio: f.raio,
-        quartosOpcoes: f.quartosOpcoes,
+        quartosOpcoes: usaQuartos ? f.quartosOpcoes : [],
         aceitaContato: true
       });
       if (res.ok) setOk(true);
@@ -155,6 +201,25 @@ export default function InterestForm({ developmentId, condominio, destaque, prop
           />
         </label>
 
+        {grupos.length > 1 && (
+          <fieldset className="flex flex-col gap-1.5">
+            <legend className="mb-1.5 text-[12.5px] font-semibold">Procuro</legend>
+            <div className="flex flex-wrap gap-2">
+              {grupos.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  aria-pressed={f.grupo === g}
+                  onClick={() => trocarGrupo(g)}
+                  className={`h-10 flex-1 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold ${f.grupo === g ? 'border-2 border-accent bg-[#EEF5FF] text-accent' : 'border border-[var(--border)]'}`}
+                >
+                  {GRUPO_LABEL[g]}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        )}
+
         <fieldset className="flex flex-col gap-1.5">
           <legend className="mb-1.5 text-[12.5px] font-semibold">Me avise de imóveis</legend>
           <div className="flex flex-wrap gap-2">
@@ -172,26 +237,46 @@ export default function InterestForm({ developmentId, condominio, destaque, prop
           </div>
         </fieldset>
 
-        <fieldset id="avise-quartos" className={`flex flex-col gap-1.5 ${faltaQuartos && !f.quartosOpcoes.length ? 'rounded-xl bg-red-50 p-2 ring-2 ring-red-400' : ''}`}>
+        <fieldset
+          id="avise-quartos"
+          className={`flex flex-col gap-1.5 ${faltaQuartos && (usaQuartos ? !f.quartosOpcoes.length : f.faixa == null) ? 'rounded-xl bg-red-50 p-2 ring-2 ring-red-400' : ''}`}
+        >
           <legend className="mb-1.5 text-[12.5px] font-semibold">
-            Quartos <span className="text-red-600">*</span> <span className="font-normal text-[var(--text-muted)]">(marque um ou mais; 0 para sala ou lote)</span>
+            {usaQuartos ? 'Quartos' : f.grupo === 'rural' ? 'Área' : 'Tamanho'} <span className="text-red-600">*</span>{' '}
+            {usaQuartos && <span className="font-normal text-[var(--text-muted)]">(marque um ou mais)</span>}
           </legend>
           <div className="flex flex-wrap gap-2">
-            {NUMEROS_FILTRO.map((q) => (
-              <button
-                key={q}
-                type="button"
-                aria-pressed={f.quartosOpcoes.includes(q)}
-                onClick={() => {
-                  set('quartosOpcoes', alternarNumero(f.quartosOpcoes, q));
-                  setFaltaQuartos(false);
-                  setErro(null);
-                }}
-                className={`h-10 min-w-[48px] flex-1 rounded-full px-3 text-[14px] font-semibold ${f.quartosOpcoes.includes(q) ? 'border-2 border-accent bg-[#EEF5FF] text-accent' : 'border border-[var(--border)]'}`}
-              >
-                {rotuloNumero(q)}
-              </button>
-            ))}
+            {usaQuartos
+              ? NUMEROS_FILTRO.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    aria-pressed={f.quartosOpcoes.includes(q)}
+                    onClick={() => {
+                      set('quartosOpcoes', alternarNumero(f.quartosOpcoes, q));
+                      setFaltaQuartos(false);
+                      setErro(null);
+                    }}
+                    className={`h-10 min-w-[48px] flex-1 rounded-full px-3 text-[14px] font-semibold ${f.quartosOpcoes.includes(q) ? 'border-2 border-accent bg-[#EEF5FF] text-accent' : 'border border-[var(--border)]'}`}
+                  >
+                    {rotuloNumero(q)}
+                  </button>
+                ))
+              : faixas.map((fx, i) => (
+                  <button
+                    key={fx.rotulo}
+                    type="button"
+                    aria-pressed={f.faixa === i}
+                    onClick={() => {
+                      set('faixa', i);
+                      setFaltaQuartos(false);
+                      setErro(null);
+                    }}
+                    className={`h-10 whitespace-nowrap rounded-full px-3.5 text-[13px] font-semibold ${f.faixa === i ? 'border-2 border-accent bg-[#EEF5FF] text-accent' : 'border border-[var(--border)]'}`}
+                  >
+                    {fx.rotulo}
+                  </button>
+                ))}
           </div>
         </fieldset>
 
@@ -212,10 +297,12 @@ export default function InterestForm({ developmentId, condominio, destaque, prop
                 </button>
               ))}
             </div>
+            {usaQuartos && (
             <div className="grid grid-cols-2 gap-2">
               <input className={inputClass} placeholder="Metragem de (m²)" inputMode="numeric" value={f.areaMin} onChange={(e) => set('areaMin', e.target.value.replace(/\D/g, ''))} />
               <input className={inputClass} placeholder="até (m²)" inputMode="numeric" value={f.areaMax} onChange={(e) => set('areaMax', e.target.value.replace(/\D/g, ''))} />
             </div>
+            )}
             <input
               className={inputClass}
               placeholder={f.finalidade === 'aluguel' ? 'Aluguel até (R$/mês)' : 'Quanto pretende investir (até)'}

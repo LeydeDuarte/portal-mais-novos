@@ -16,6 +16,8 @@ import { TIPO_UNIDADE_LABEL } from './tipologias';
 import { formatTitulo } from './text';
 import { SITE_URL } from './seo';
 import { urlImovel } from './urls';
+import { GRUPO_DO_TIPO } from './interesse-regras';
+import type { TipoUnidade } from './tipologias';
 
 const DE = 'áàâãäéèêëíìîïóòôõöúùûüç';
 const PARA = 'aaaaaeeeeiiiiooooouuuuc';
@@ -54,6 +56,12 @@ export async function gerarAvisos(propertyId: string, opcoes: { email: boolean }
   const lng = p.lng ?? dev?.lng ?? null;
   if (!nomeCondo && !p.empreendimento_id && lat == null) return 0;
 
+  // grupo do anúncio (apartamento, casa, comercial, lote, rural) e a área que vale para ele
+  const extra = p as unknown as { tipo_unidade?: string | null; area?: string | number | null; area_total?: string | number | null; area_lote?: string | number | null; bairro?: string | null; cidade?: string | null };
+  const grupo = GRUPO_DO_TIPO[(extra.tipo_unidade ?? '') as TipoUnidade] ?? null;
+  const nn = (v: unknown) => (v == null || v === '' ? null : Number(v) || null);
+  const area = grupo === 'lote' || grupo === 'rural' ? nn(extra.area_lote) ?? nn(extra.area_total) ?? nn(extra.area) : nn(extra.area) ?? nn(extra.area_total);
+
   const dist = `(6371000 * 2 * asin(sqrt(power(sin(radians(l.lat - $4) / 2), 2) + cos(radians($4)) * cos(radians(l.lat)) * power(sin(radians(l.lng - $5) / 2), 2))))`;
   const mesmo = `(($2::text is not null and l.development_id = $2) or ($3::text is not null and ${norm('l.condominio')} = ${norm('$3::text')}))`;
   const leads = await query<Combina>(
@@ -63,13 +71,21 @@ export async function gerarAvisos(propertyId: string, opcoes: { email: boolean }
       where l.aceita_contato and l.descadastrado_em is null and l.finalidade = $1
         and coalesce(l.status, 'novo') <> 'descartado'
         and (l.property_id is null or l.property_id <> $6)
-        -- quartos: mesma regra do filtro do feed (4 = 4 ou mais; 0 = sem quartos); vazio = qualquer
-        and (l.quartos_opcoes is null or cardinality(l.quartos_opcoes) = 0
-             or coalesce($7::int, 0) = any(l.quartos_opcoes)
-             or (4 = any(l.quartos_opcoes) and coalesce($7::int, 0) >= 4))
-        and (l.quartos is null or l.quartos_opcoes is not null or coalesce($7::int, 0) >= l.quartos)
-        and (${mesmo} or (l.raio > 0 and l.lat is not null and $4::float8 is not null and ${dist} <= l.raio))`,
-    [p.finalidade, p.empreendimento_id, nomeCondo, lat, lng, propertyId, p.quartos ?? null]
+        -- mesmo grupo: quem pediu comercial não recebe apartamento, quem pediu lote não recebe casa
+        and (l.grupo is null or l.grupo = $8::text)
+        -- quartos (só apartamento e casa): regra do filtro do feed (4 = 4 ou mais; 0 = sem quartos)
+        and (l.grupo in ('comercial', 'lote', 'rural')
+             or ((l.quartos_opcoes is null or cardinality(l.quartos_opcoes) = 0
+                  or coalesce($7::int, 0) = any(l.quartos_opcoes)
+                  or (4 = any(l.quartos_opcoes) and coalesce($7::int, 0) >= 4))
+                 and (l.quartos is null or l.quartos_opcoes is not null or coalesce($7::int, 0) >= l.quartos)))
+        -- tamanho pedido (comercial, lote, rural, ou a metragem detalhada); área desconhecida não exclui
+        and ($9::float8 is null or ((l.area_min is null or $9::float8 >= l.area_min) and (l.area_max is null or $9::float8 <= l.area_max)))
+        and (${mesmo}
+             or (l.raio > 0 and l.lat is not null and $4::float8 is not null and ${dist} <= l.raio)
+             or (l.raio = -1 and ${norm('l.bairro_ref')} = ${norm('$10::text')} and ${norm('l.cidade_ref')} = ${norm('$11::text')})
+             or (l.raio = -2 and ${norm('l.cidade_ref')} = ${norm('$11::text')}))`,
+    [p.finalidade, p.empreendimento_id, nomeCondo, lat, lng, propertyId, p.quartos ?? null, grupo, area, extra.bairro ?? null, extra.cidade ?? null]
   );
   const preco = Number(p.price_value);
   const validos = leads.filter((l) => !(l.valor_max && preco > Number(l.valor_max) * 1.35)); // bem acima do que a pessoa quer investir

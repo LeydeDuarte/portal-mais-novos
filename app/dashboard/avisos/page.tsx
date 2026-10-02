@@ -11,10 +11,12 @@ import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { listAvisos, marcarAviso, procurarAvisosRecentes, type AvisoPendente } from '@/lib/actions-avisos';
 import { SITE_URL } from '@/lib/seo';
+import { GRUPO_LABEL, textoAlcance, textoArea, type GrupoInteresse } from '@/lib/interesse-regras';
 
 const brl = (n: number | null) => (n ? n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : 'Consulte');
 const dist = (m: number) => (m < 1000 ? `${Math.max(100, Math.round(m / 100) * 100)} m` : `${(m / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`);
-const alcance = (raio: number, condo: string) => (raio === 2000 ? `até 2 km do ${condo}` : raio === 500 ? `até 500 m do ${condo}` : `só no ${condo}`);
+const alcance = (a: AvisoPendente) =>
+  textoAlcance(a.pessoa.raio, { condominio: a.pessoa.temCondominio ? a.pessoa.condominio : null, bairro: a.pessoa.bairro, cidade: a.pessoa.cidade });
 
 function linkWhats(a: AvisoPendente): string | null {
   let d = (a.pessoa.telefone ?? '').replace(/\D/g, '');
@@ -99,8 +101,10 @@ export default function AvisosPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-base font-bold">{a.pessoa.nome}</span>
                       <span className="rounded bg-[#EEF5FF] px-1.5 py-0.5 text-[11px] font-bold text-accent">
-                        pediu {alcance(a.pessoa.raio, a.pessoa.condominio)}
+                        pediu {a.pessoa.grupo ? `${GRUPO_LABEL[a.pessoa.grupo as GrupoInteresse].toLowerCase()} · ` : ''}
+                        {alcance(a)}
                         {a.pessoa.quartos.length ? ` · ${a.pessoa.quartos.map((q) => (q >= 4 ? '4+' : String(q))).join(', ')} quartos` : ''}
+                        {textoArea(a.pessoa.grupo, a.pessoa.areaMin, a.pessoa.areaMax) ? ` · ${textoArea(a.pessoa.grupo, a.pessoa.areaMin, a.pessoa.areaMax)}` : ''}
                       </span>
                     </div>
                     <span className="text-[var(--text-muted)]">{[a.pessoa.telefone, a.pessoa.email].filter(Boolean).join(' · ') || 'sem contato'}</span>
