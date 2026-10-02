@@ -16,6 +16,7 @@ import { getBadgeCondominio, getStatusBucket, temEntrega, BUCKET_LABEL, type Sta
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { linkWhatsapp, precoCurto, type PontoCondominio, type PontoImovel, type PontoMapa } from '@/lib/mapa-tipos';
 import { SITE_URL } from '@/lib/seo';
+import * as SunCalc from 'suncalc';
 
 const ESTILO = 'https://tiles.openfreemap.org/styles/positron';
 const CENTRO_GOIANIA: [number, number] = [-49.2648, -16.6869];
@@ -184,6 +185,76 @@ const detalhes = (i: { quartos: number | null; area: number | null; vagas: numbe
     .filter(Boolean)
     .join(' · ');
 
+// ---------- posição do sol (teste no painel) ----------
+// Desenho tipo "cúpula do céu" vista de cima: a borda do círculo é o horizonte e o
+// centro é o sol a pino. Quanto mais alto o sol, mais perto do centro fica o ponto.
+const RAIO_SOL = 160; // metros
+const FUSO_GOIANIA = 3; // UTC-3, sem horário de verão
+type DiaSol = 'hoje' | 'inverno' | 'verao';
+function destino(lat: number, lng: number, azimute: number, metros: number): [number, number] {
+  const r = (azimute * Math.PI) / 180;
+  return [lng + (metros * Math.sin(r)) / (111320 * Math.cos((lat * Math.PI) / 180)), lat + (metros * Math.cos(r)) / 111320];
+}
+function dataDoDia(dia: DiaSol): { y: number; m: number; d: number } {
+  const agora = new Date(Date.now() - FUSO_GOIANIA * 3600000);
+  const y = agora.getUTCFullYear();
+  if (dia === 'inverno') return { y, m: 5, d: 21 };
+  if (dia === 'verao') return { y, m: 11, d: 21 };
+  return { y, m: agora.getUTCMonth(), d: agora.getUTCDate() };
+}
+const instante = (dia: { y: number; m: number; d: number }, minutos: number) =>
+  new Date(Date.UTC(dia.y, dia.m, dia.d, 0, 0) + (minutos + FUSO_GOIANIA * 60) * 60000);
+const horaTexto = (dt: Date) => dt.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+function rumo(az: number): string {
+  const nomes = ['norte', 'nordeste', 'leste', 'sudeste', 'sul', 'sudoeste', 'oeste', 'noroeste'];
+  return nomes[Math.round((((az % 360) + 360) % 360) / 45) % 8];
+}
+function trajetoria(lat: number, lng: number, dia: { y: number; m: number; d: number }): [number, number][] {
+  const pts: [number, number][] = [];
+  for (let min = 4 * 60; min <= 20 * 60; min += 10) {
+    const p = SunCalc.getPosition(instante(dia, min), lat, lng);
+    if (p.altitude < 0) continue;
+    pts.push(destino(lat, lng, p.azimuth, RAIO_SOL * (1 - p.altitude / 90)));
+  }
+  return pts;
+}
+function geoSol(lat: number, lng: number, diaSel: DiaSol, minutos: number) {
+  const f: GeoJSON.Feature[] = [];
+  const anel: [number, number][] = [];
+  for (let a = 0; a <= 360; a += 5) anel.push(destino(lat, lng, a, RAIO_SOL));
+  f.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: anel }, properties: { k: 'anel' } });
+  for (const [t, az] of [['N', 0], ['L', 90], ['S', 180], ['O', 270]] as [string, number][])
+    f.push({ type: 'Feature', geometry: { type: 'Point', coordinates: destino(lat, lng, az, RAIO_SOL * 1.14) }, properties: { k: 'rotulo', t } });
+  // referências do ano: inverno (sol mais ao norte) e verão (quase a pino)
+  if (diaSel !== 'inverno') f.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: trajetoria(lat, lng, dataDoDia('inverno')) }, properties: { k: 'inverno' } });
+  if (diaSel !== 'verao') f.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: trajetoria(lat, lng, dataDoDia('verao')) }, properties: { k: 'verao' } });
+  const dia = dataDoDia(diaSel);
+  f.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: trajetoria(lat, lng, dia) }, properties: { k: 'dia' } });
+  const tempos = SunCalc.getTimes(instante(dia, 12 * 60), lat, lng);
+  // em Goiânia o sol sempre nasce e se põe; o reserva só satisfaz os tipos
+  const nasce = tempos.sunrise ?? instante(dia, 6 * 60);
+  const poe = tempos.sunset ?? instante(dia, 18 * 60);
+  const azNascer = SunCalc.getPosition(nasce, lat, lng).azimuth;
+  const azPor = SunCalc.getPosition(poe, lat, lng).azimuth;
+  f.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [[lng, lat], destino(lat, lng, azNascer, RAIO_SOL)] }, properties: { k: 'nascer' } });
+  f.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [[lng, lat], destino(lat, lng, azPor, RAIO_SOL)] }, properties: { k: 'por' } });
+  const agora = SunCalc.getPosition(instante(dia, minutos), lat, lng);
+  if (agora.altitude > 0) {
+    const ponto = destino(lat, lng, agora.azimuth, RAIO_SOL * (1 - agora.altitude / 90));
+    f.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [[lng, lat], ponto] }, properties: { k: 'agora' } });
+    f.push({ type: 'Feature', geometry: { type: 'Point', coordinates: ponto }, properties: { k: 'sol' } });
+  }
+  const resumo = {
+    nascer: `${horaTexto(nasce)} (${rumo(azNascer)})`,
+    por: `${horaTexto(poe)} (${rumo(azPor)})`,
+    agora:
+      agora.altitude > 0
+        ? `O sol está a ${Math.round(agora.altitude)}° de altura, vindo do ${rumo(agora.azimuth)} (${Math.round(agora.azimuth)}°).`
+        : 'O sol está abaixo do horizonte nesse horário.'
+  };
+  return { geo: { type: 'FeatureCollection', features: f } as GeoJSON.FeatureCollection, resumo };
+}
+
 export type Foco = { lat: number; lng: number; texto: string; ts: number };
 
 export default function MapaImoveis({
@@ -205,6 +276,13 @@ export default function MapaImoveis({
   const [erroMapa, setErroMapa] = useState<string | null>(null);
   const [movendo, setMovendo] = useState<{ tipo: 'imovel' | 'condominio'; id: string; nome: string } | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [sol, setSol] = useState<{ lat: number; lng: number; nome: string } | null>(null);
+  const [diaSol, setDiaSol] = useState<DiaSol>('hoje');
+  const [minSol, setMinSol] = useState(() => {
+    const agora = new Date(Date.now() - FUSO_GOIANIA * 3600000);
+    const m = agora.getUTCHours() * 60 + agora.getUTCMinutes();
+    return m >= 6 * 60 && m <= 18 * 60 ? m - (m % 10) : 12 * 60;
+  });
   const enquadrou = useRef('');
   const dados = useMemo(() => prepararDados(pontos), [pontos]);
   const dadosRef = useRef(dados);
@@ -271,6 +349,24 @@ export default function MapaImoveis({
             'circle-stroke-width': 1,
             'circle-stroke-opacity': 0.5
           }
+        });
+        // posição do sol (fica embaixo das etiquetas)
+        m.addSource('sol', { type: 'geojson', data: vazio });
+        m.addLayer({ id: 'sol-anel', type: 'line', source: 'sol', filter: ['==', ['get', 'k'], 'anel'], paint: { 'line-color': '#5B6068', 'line-width': 1.2, 'line-dasharray': [2, 2] } });
+        m.addLayer({ id: 'sol-inverno', type: 'line', source: 'sol', filter: ['==', ['get', 'k'], 'inverno'], paint: { 'line-color': '#3B82F6', 'line-width': 2, 'line-opacity': 0.6 } });
+        m.addLayer({ id: 'sol-verao', type: 'line', source: 'sol', filter: ['==', ['get', 'k'], 'verao'], paint: { 'line-color': '#DC2626', 'line-width': 2, 'line-opacity': 0.6 } });
+        m.addLayer({ id: 'sol-dia', type: 'line', source: 'sol', filter: ['==', ['get', 'k'], 'dia'], paint: { 'line-color': '#F59E0B', 'line-width': 4 } });
+        m.addLayer({ id: 'sol-nascer', type: 'line', source: 'sol', filter: ['==', ['get', 'k'], 'nascer'], paint: { 'line-color': '#F59E0B', 'line-width': 2, 'line-dasharray': [1, 1.5] } });
+        m.addLayer({ id: 'sol-por', type: 'line', source: 'sol', filter: ['==', ['get', 'k'], 'por'], paint: { 'line-color': '#B45309', 'line-width': 2, 'line-dasharray': [1, 1.5] } });
+        m.addLayer({ id: 'sol-agora', type: 'line', source: 'sol', filter: ['==', ['get', 'k'], 'agora'], paint: { 'line-color': '#F59E0B', 'line-width': 3 } });
+        m.addLayer({ id: 'sol-ponto', type: 'circle', source: 'sol', filter: ['==', ['get', 'k'], 'sol'], paint: { 'circle-radius': 11, 'circle-color': '#FBBF24', 'circle-stroke-color': '#FFFFFF', 'circle-stroke-width': 3 } });
+        m.addLayer({
+          id: 'sol-rotulos',
+          type: 'symbol',
+          source: 'sol',
+          filter: ['==', ['get', 'k'], 'rotulo'],
+          layout: { 'text-field': ['get', 't'], 'text-font': FONTE, 'text-size': 14, 'text-allow-overlap': true },
+          paint: { 'text-color': '#14161A', 'text-halo-color': '#FFFFFF', 'text-halo-width': 2 }
         });
         // apagados: ponto cinza; o nome aparece só bem de perto
         m.addLayer({
@@ -427,6 +523,29 @@ export default function MapaImoveis({
     marcadorFoco.current = new L.Marker({ color: '#FF385C' }).setLngLat([foco.lng, foco.lat]).setPopup(new L.Popup({ offset: 24 }).setText(foco.texto)).addTo(m);
   }, [foco]);
 
+  // desenha (ou apaga) a posição do sol
+  const resumoSol = useMemo(() => (sol ? geoSol(sol.lat, sol.lng, diaSol, minSol) : null), [sol, diaSol, minSol]);
+  useEffect(() => {
+    const m = mapa.current;
+    if (!m || !pronto) return;
+    const src = m.getSource('sol') as GeoJSONSource | undefined;
+    src?.setData(resumoSol ? resumoSol.geo : { type: 'FeatureCollection', features: [] });
+  }, [resumoSol, pronto]);
+
+  function iniciarSol(lat: number, lng: number, nome: string) {
+    popup.current?.remove();
+    setSol({ lat, lng, nome });
+    mapa.current?.easeTo({ center: [lng, lat], zoom: 17, duration: 700 });
+  }
+
+  function botaoSol(lat: number, lng: number, nome: string) {
+    const b = el('button', botaoCss, '☀ Sol') as HTMLButtonElement;
+    b.type = 'button';
+    b.title = 'Ver a posição do sol neste ponto';
+    b.onclick = () => iniciarSol(lat, lng, nome);
+    return b;
+  }
+
   function abrirPopup(e: MapLayerMouseEvent) {
     const m = mapa.current;
     const L = lib.current;
@@ -526,6 +645,7 @@ export default function MapaImoveis({
         linkBotao('Abrir página', `${SITE_URL}${c.url}`, true),
         linkBotao('Editar', `/dashboard/condominios/${c.id}/editar`),
         linkBotao('Street View', streetView(c.lat, c.lng)),
+        botaoSol(c.lat, c.lng, c.nome),
         c.podeMover && onMover ? botaoMover('condominio', c.id, c.nome, c.lat, c.lng) : null
       ])
     ]);
@@ -567,6 +687,7 @@ export default function MapaImoveis({
         linkBotao('Abrir anúncio', `${SITE_URL}${i.url}`, true),
         linkBotao('Editar', `/dashboard/imoveis/${i.id}/editar`),
         linkBotao('Street View', streetView(i.lat, i.lng)),
+        botaoSol(i.lat, i.lng, i.nome),
         i.podeMover && onMover ? botaoMover('imovel', i.id, i.nome, i.lat, i.lng) : null
       ])
     ]);
@@ -609,6 +730,61 @@ export default function MapaImoveis({
       <div ref={caixa} className="h-full w-full" />
       {erroMapa && (
         <div className="absolute inset-x-4 top-4 rounded-xl bg-red-50 p-3 text-[13px] text-red-700 shadow">Mapa indisponível agora: {erroMapa}</div>
+      )}
+      {sol && resumoSol && !movendo && (
+        <div className="absolute inset-x-3 bottom-4 z-10 mx-auto max-w-[520px] rounded-2xl bg-[var(--bg)] p-3.5 text-[13px] shadow-2xl md:inset-x-auto md:left-1/2 md:w-[520px] md:-translate-x-1/2">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[14px] font-bold">Sol em {sol.nome}</div>
+              <div className="mt-0.5 text-[12.5px] text-[var(--text-muted)]">
+                Nascer {resumoSol.resumo.nascer} · Pôr {resumoSol.resumo.por}
+              </div>
+            </div>
+            <button type="button" onClick={() => setSol(null)} className="h-9 shrink-0 rounded-full border border-[var(--border)] px-3.5 text-[12.5px] font-semibold">
+              Fechar
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {(
+              [
+                ['hoje', 'Hoje'],
+                ['inverno', '21 de junho (inverno)'],
+                ['verao', '21 de dezembro (verão)']
+              ] as [DiaSol, string][]
+            ).map(([v, t]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setDiaSol(v)}
+                className={`h-8 rounded-full px-3 text-[12.5px] font-semibold ${diaSol === v ? 'bg-accent text-white' : 'border border-[var(--border)]'}`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <label className="mt-3 flex items-center gap-3">
+            <span className="w-12 text-[14px] font-bold tabular-nums">
+              {String(Math.floor(minSol / 60)).padStart(2, '0')}:{String(minSol % 60).padStart(2, '0')}
+            </span>
+            <input
+              type="range"
+              min={5 * 60}
+              max={19 * 60 + 30}
+              step={10}
+              value={minSol}
+              onChange={(e) => setMinSol(Number(e.target.value))}
+              className="flex-1 accent-[#F59E0B]"
+              aria-label="Horário"
+            />
+          </label>
+          <p className="mt-1.5 text-[12.5px]">{resumoSol.resumo.agora}</p>
+          <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-[var(--text-muted)]">
+            <span><b style={{ color: '#F59E0B' }}>━</b> caminho do dia</span>
+            <span><b style={{ color: '#3B82F6' }}>━</b> inverno</span>
+            <span><b style={{ color: '#DC2626' }}>━</b> verão</span>
+            <span>Borda do círculo = horizonte · centro = sol a pino</span>
+          </p>
+        </div>
       )}
       {movendo && (
         <div className="absolute inset-x-3 bottom-4 z-10 mx-auto flex max-w-[560px] flex-wrap items-center gap-2 rounded-2xl bg-[var(--bg)] p-3 shadow-2xl md:inset-x-auto md:left-1/2 md:-translate-x-1/2">

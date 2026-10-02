@@ -21,6 +21,7 @@ import BannerFundadora from '@/components/news/BannerFundadora';
 import VitrineNews from '@/components/news/VitrineNews';
 import { SITE_URL } from '@/lib/seo';
 import BotaoCompartilhar from '@/components/BotaoCompartilhar';
+import ChamadaAvaliar from '@/components/ChamadaAvaliar';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import { Banner } from '@/components/news/Pecas';
 import { bannersAtivos } from '@/lib/news/dados';
@@ -235,6 +236,8 @@ export default async function PropertyDetailView({
                 </Link>
               </div>
             )}
+
+            <ChamadaAvaliar contexto="imovel" refId={property.id} />
           </div>
 
           {/* coluna da direita: região, contato e o corretor responsável embaixo */}

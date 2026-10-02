@@ -15,6 +15,7 @@ import BannerFundadora from '@/components/news/BannerFundadora';
 import VitrineNews from '@/components/news/VitrineNews';
 import { SITE_URL } from '@/lib/seo';
 import BotaoCompartilhar from '@/components/BotaoCompartilhar';
+import ChamadaAvaliar from '@/components/ChamadaAvaliar';
 import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import { Banner } from '@/components/news/Pecas';
 import { bannersAtivos } from '@/lib/news/dados';
@@ -279,6 +280,8 @@ export default async function DevelopmentDetailView({ development }: { developme
                 </ul>
               </div>
             )}
+
+            <ChamadaAvaliar contexto={futuro ? 'lancamento' : 'condominio'} refId={development.id} />
           </div>
 
           {/* coluna da direita: região (mapa + números) e contato; fica fixa ao rolar no computador */}
