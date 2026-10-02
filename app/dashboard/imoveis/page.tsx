@@ -10,6 +10,7 @@ import PainelNav from '@/components/PainelNav';
 import ImovelCardPainel from '@/components/painel/ImovelCardPainel';
 import LinkPrivadoModal from '@/components/LinkPrivadoModal';
 import { BarraSelecao, BuscaGrande, Chips, marcados, FiltrosAtivos, SecaoFiltro, TituloPainel, Vazio, botaoBarra, botaoBarraSec, campoPainel } from '@/components/painel/ui';
+import VincularCondominioModal from '@/components/forms/VincularCondominioModal';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { deleteProperty, marcarComoVendido, marcarDestaqueFeed } from '@/lib/actions';
 import { linkParaCorretor, listarImoveisPainel, mudarVisibilidade, type ImovelPainel } from '@/lib/actions-painel-imoveis';
@@ -49,6 +50,7 @@ export default function ImoveisPainelPage() {
   const [pagina, setPagina] = useState(1);
   const [aviso, setAviso] = useState<string | null>(null);
   const [linkDe, setLinkDe] = useState<ImovelPainel | null>(null);
+  const [vincular, setVincular] = useState<string[] | null>(null);
   const [filtrosCel, setFiltrosCel] = useState(false);
   const [sel, setSel] = useState<string[]>([]);
 
@@ -307,6 +309,7 @@ export default function ImoveisPainelPage() {
                         : []),
                       { rotulo: 'Link privado para cliente', onClick: () => setLinkDe(i) },
                       { rotulo: 'Ver página no site', href: urlImovel(i), novaAba: true },
+                      { rotulo: 'Ligar a um condomínio', onClick: () => setVincular([i.id]) },
                       ...(veTudo(staff.role)
                         ? [
                             ...([
@@ -365,6 +368,9 @@ export default function ImoveisPainelPage() {
       </div>
 
       <BarraSelecao n={sel.length} onLimpar={() => setSel([])}>
+        <button type="button" className={botaoBarraSec} onClick={() => setVincular(sel)}>
+          Ligar a condomínio
+        </button>
         <button type="button" className={botaoBarra} onClick={() => compartilhar((itens ?? []).filter((i) => sel.includes(i.id)))}>
           Enviar p/ corretor
         </button>
@@ -405,6 +411,18 @@ export default function ImoveisPainelPage() {
             {Filtros}
           </div>
         </div>
+      )}
+      {vincular && (
+        <VincularCondominioModal
+          ids={vincular}
+          onClose={() => setVincular(null)}
+          onDone={(_, nome) => {
+            setItens((l) => l?.map((x) => (vincular.includes(x.id) ? { ...x, condominio: nome } : x)) ?? l);
+            setAviso(`${vincular.length} anúncio${vincular.length === 1 ? '' : 's'} ligado${vincular.length === 1 ? '' : 's'} ao ${nome}.`);
+            setVincular(null);
+            setSel([]);
+          }}
+        />
       )}
       {linkDe && <LinkPrivadoModal propertyId={linkDe.id} titulo={linkDe.condominio ?? linkDe.titulo ?? 'Imóvel'} linha={linhaImovel(linkDe)} onClose={() => setLinkDe(null)} />}
     </div>

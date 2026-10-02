@@ -28,6 +28,8 @@ export type PontoImovel = {
   podeMover: boolean;
   /** vendido há até 30 dias: aparece em vermelho ("AAAA-MM-DD") */
   vendidoEm: string | null;
+  /** mapa público: quem anunciou (foto, primeiro nome e WhatsApp de trabalho) */
+  anunciante?: { nome: string; foto: string | null; whatsapp: string };
   /** SÓ NO PAINEL: proprietário do imóvel (nunca vai para o mapa público) */
   dono?: { nome: string; whatsapp: string | null } | null;
 };

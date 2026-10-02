@@ -30,6 +30,7 @@ import { urlImovel, urlCondominio } from './urls';
 import type { PontoMapa, ResultadoMapa } from './mapa-tipos';
 import { proprietariosDoImovel } from './proprietarios';
 import { gerarAvisos } from './avisos';
+import { WHATSAPP_ATENDIMENTO } from './marca';
 import { GRUPO_LABEL, RAIOS_VALIDOS, grupoUsaQuartos, textoAlcance, textoArea, type GrupoInteresse } from './interesse-regras';
 
 const PAGE_SIZE = 24;
@@ -2534,6 +2535,7 @@ export async function getPontosMapaPublico(filters: FilterState, area: AreaMapa)
     quartos: number | null; vagas: number | null; area: string | number | null; lat: number | null; lng: number | null; d_lat: number | null; d_lng: number | null;
     bairro: string | null; cidade: string | null; uf: string | null; condominio: string | null; d_nome: string | null; delivery_date: string | Date | null;
     capa: string | null; empreendimento_id: string | null; vendido_em: string | Date | null;
+    c_nome: string | null; c_foto: string | null; c_tel: string | null;
   };
   type LinhaC = {
     id: string; slug: string | null; name: string; tipo: string | null; lat: number; lng: number; delivery_date: string | Date | null; bairro: string | null;
@@ -2544,8 +2546,10 @@ export async function getPontosMapaPublico(filters: FilterState, area: AreaMapa)
     propIds.length
       ? query<LinhaI>(
           `select p.id, p.slug, p.titulo, p.tipo_unidade, p.finalidade, p.price_value, p.quartos, p.vagas, p.area, p.lat, p.lng, d.lat as d_lat, d.lng as d_lng,
-                  p.bairro, p.cidade, p.uf, p.condominio, d.name as d_nome, p.delivery_date, coalesce(p.capa_mini, p.photos->>0) as capa, p.empreendimento_id, p.vendido_em
+                  p.bairro, p.cidade, p.uf, p.condominio, d.name as d_nome, p.delivery_date, coalesce(p.capa_mini, p.photos->>0) as capa, p.empreendimento_id, p.vendido_em,
+                  coalesce(nullif(su.nome_publico, ''), su.name) as c_nome, su.foto as c_foto, su.telefone as c_tel
              from properties p left join developments d on d.id = p.empreendimento_id
+             left join staff_users su on lower(su.email) = lower(p.corretor_email)
             where p.id = any($1::text[])
               and coalesce(d.lat, p.lat) between $2 and $3 and coalesce(d.lng, p.lng) between $4 and $5
             limit 2000`,
@@ -2600,7 +2604,17 @@ export async function getPontosMapaPublico(filters: FilterState, area: AreaMapa)
       aproximada,
       herdaPosicao: false,
       podeMover: false,
-      vendidoEm: privado ? null : dia(r.vendido_em)
+      vendidoEm: privado ? null : dia(r.vendido_em),
+      // quem anunciou: foto e primeiro nome; WhatsApp de trabalho do corretor (ou o do atendimento)
+      anunciante: {
+        nome: (r.c_nome || 'Leyde Duarte').trim().split(/\s+/)[0],
+        foto: r.c_foto,
+        whatsapp: (() => {
+          let d = (r.c_tel ?? '').replace(/\D/g, '');
+          if (d.length === 10 || d.length === 11) d = `55${d}`;
+          return d.length >= 12 && d.length <= 13 ? d : WHATSAPP_ATENDIMENTO;
+        })()
+      }
     });
   }
   for (const r of condos)

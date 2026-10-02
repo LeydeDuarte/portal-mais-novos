@@ -9,6 +9,7 @@ import PosicaoSol from '@/components/PosicaoSol';
 import { getBadgeCondominio, getStatusBucket, temEntrega } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { precoCurto, type PontoCondominio, type PontoImovel } from '@/lib/mapa-tipos';
+import { SITE_URL } from '@/lib/seo';
 
 export type CondoComImoveis = PontoCondominio & { imoveis: PontoImovel[] };
 export type Selecionado = { tipo: 'condominio'; c: CondoComImoveis } | { tipo: 'imovel'; i: PontoImovel };
@@ -19,6 +20,39 @@ const det = (i: { quartos: number | null; vagas: number | null; area: number | n
   [i.quartos ? `${i.quartos} qto${i.quartos > 1 ? 's' : ''}` : '', i.vagas ? `${i.vagas} vaga${i.vagas > 1 ? 's' : ''}` : '', i.area ? `${Math.round(i.area)} m²` : '']
     .filter(Boolean)
     .join(' · ');
+
+/** bolinha de quem anunciou: foto, selo do WhatsApp e primeiro nome; abre o WhatsApp com o link do anúncio */
+function Anunciante({ i }: { i: PontoImovel }) {
+  const a = i.anunciante;
+  if (!a) return null;
+  const msg = `Olá, ${a.nome}! Vi este anúncio no Mais Novos Imóveis e quero saber mais: ${SITE_URL}${i.url}`;
+  return (
+    <a
+      href={`https://wa.me/${a.whatsapp}?text=${encodeURIComponent(msg)}`}
+      target="_blank"
+      rel="noopener"
+      data-rastro="whatsapp"
+      data-rastro-ref={i.id}
+      aria-label={`Falar com ${a.nome} no WhatsApp sobre este anúncio`}
+      className="flex w-[54px] shrink-0 flex-col items-center gap-0.5"
+    >
+      <span className="relative h-11 w-11">
+        {a.foto ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={a.foto} alt="" className="h-11 w-11 rounded-full object-cover ring-2 ring-[#25D366]" loading="lazy" />
+        ) : (
+          <span className="grid h-11 w-11 place-items-center rounded-full bg-accent/15 text-[16px] font-bold text-accent ring-2 ring-[#25D366]">{a.nome.slice(0, 1).toUpperCase()}</span>
+        )}
+        <span className="absolute -bottom-0.5 -right-0.5 grid h-[18px] w-[18px] place-items-center rounded-full bg-[#25D366] ring-2 ring-[var(--bg)]">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="#fff" aria-hidden>
+            <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.6-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.9 0-1.4.7-2 1-2.3.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.7-.1 1.4Z" />
+          </svg>
+        </span>
+      </span>
+      <span className="max-w-full truncate text-[10.5px] font-semibold text-[var(--text-muted)]">{a.nome}</span>
+    </a>
+  );
+}
 
 export type SolNoMapa = { lat: number; lng: number; dia: 'hoje' | 'inverno' | 'verao'; minutos: number } | null;
 
@@ -158,25 +192,31 @@ export default function GavetaMapa({ sel, onFechar, onSol }: { sel: Selecionado;
               </p>
             ) : (
               condo.imoveis.map((i) => (
-                <a key={i.id} href={i.url} className="flex items-center gap-3 rounded-2xl border border-[var(--border)] p-2 hover:bg-[var(--pill-bg)]">
-                  <span className="h-14 w-16 shrink-0 overflow-hidden rounded-xl bg-[#DDE1E6]">
-                    {i.capa && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={i.capa} alt="" className="h-full w-full object-cover" loading="lazy" />
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-bold tabular-nums">{brl(i.preco)}</span>
-                    <span className="block truncate text-[12px] text-[var(--text-muted)]">{[tipoTxt(i.tipoUnidade), det(i)].filter(Boolean).join(' · ')}</span>
-                  </span>
-                </a>
+                <div key={i.id} className="flex items-center gap-2 rounded-2xl border border-[var(--border)] p-2">
+                  <a href={i.url} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl hover:bg-[var(--pill-bg)]">
+                    <span className="h-14 w-16 shrink-0 overflow-hidden rounded-xl bg-[#DDE1E6]">
+                      {i.capa && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={i.capa} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[14px] font-bold tabular-nums">{brl(i.preco)}</span>
+                      <span className="block truncate text-[12px] text-[var(--text-muted)]">{[tipoTxt(i.tipoUnidade), det(i)].filter(Boolean).join(' · ')}</span>
+                    </span>
+                  </a>
+                  <Anunciante i={i} />
+                </div>
               ))
             )}
           </div>
         )}
         {aba === 'principal' && imovel && (
           <div className="mt-3 flex flex-col gap-2 text-[14px]">
-            <p>{[tipoTxt(imovel.tipoUnidade), det(imovel)].filter(Boolean).join(' · ')}</p>
+            <div className="flex items-center justify-between gap-3">
+              <p>{[tipoTxt(imovel.tipoUnidade), det(imovel)].filter(Boolean).join(' · ')}</p>
+              {!imovel.vendidoEm && <Anunciante i={imovel} />}
+            </div>
             {imovel.aproximada && <p className="text-[12.5px] text-[var(--text-muted)]">Localização aproximada: o círculo mostra a região. O endereço é informado na visita.</p>}
             {imovel.privado && <p className="text-[12.5px] text-[var(--text-muted)]">Anúncio reservado a pedido do proprietário. Fale com a gente para ver fotos, valor e disponibilidade.</p>}
             {imovel.vendidoEm && <p className="text-[12.5px] text-[var(--text-muted)]">Este imóvel foi vendido. Fale com o corretor: temos opções parecidas na região.</p>}

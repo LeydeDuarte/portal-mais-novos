@@ -317,6 +317,7 @@ export default function CondominiosPage() {
                     <MenuAcoes
                       itens={[
                         { rotulo: 'Ver página no site', href: `/empreendimento/${c.slug ?? c.id}`, novaAba: true },
+                        { rotulo: 'Ligar anúncios a este condomínio', href: `/dashboard/condominios/${c.id}/editar#anuncios` },
                         { rotulo: 'Fazer proposta', href: `/dashboard/propostas/nova?condominio=${c.id}` },
                         ...(gestor
                           ? [

@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import DevelopmentForm from '@/components/forms/DevelopmentForm';
+import AnunciosDoCondominio from '@/components/forms/AnunciosDoCondominio';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { getDevelopmentForEdit, updateDevelopment, saveTipologias, type DevelopmentEditData } from '@/lib/actions';
 
@@ -88,6 +89,7 @@ export default function EditarCondominioPage() {
             />
           </div>
         )}
+        {status === 'ok' && data && <AnunciosDoCondominio developmentId={id} />}
       </main>
     </div>
   );
