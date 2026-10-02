@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { temAcessoFinanceiro } from '@/lib/actions-custos';
 import { veTudo, ROLE_LABEL } from '@/lib/papeis';
@@ -43,6 +43,39 @@ export default function PainelNav() {
   const { staff, logout } = useStaffSession();
   // "Custos" só aparece para quem tem acesso ao financeiro (o papel Financeiro vê só ele)
   const [financeiro, setFinanceiro] = useState(false);
+  // setas para rolar o menu no computador (as seções não cabem numa linha)
+  const menuRef = useRef<HTMLElement>(null);
+  const [setas, setSetas] = useState({ esq: false, dir: false });
+  const medir = useCallback(() => {
+    const el = menuRef.current;
+    if (!el) return;
+    setSetas({ esq: el.scrollLeft > 4, dir: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+  }, []);
+  useEffect(() => {
+    const el = menuRef.current;
+    if (!el) return;
+    medir();
+    // a seção aberta fica à vista
+    el.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    el.addEventListener('scroll', medir, { passive: true });
+    // roda do mouse (para cima/baixo) também anda o menu para o lado
+    const roda = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && el.scrollWidth > el.clientWidth) {
+        el.scrollLeft += e.deltaY;
+        e.preventDefault();
+      }
+    };
+    el.addEventListener('wheel', roda, { passive: false });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener('scroll', medir);
+      el.removeEventListener('wheel', roda);
+    };
+  }, [medir, staff, financeiro]);
+  const rolar = (lado: 1 | -1) => menuRef.current?.scrollBy({ left: lado * Math.max(240, (menuRef.current?.clientWidth ?? 600) * 0.7), behavior: 'smooth' });
   useEffect(() => {
     if (staff) temAcessoFinanceiro().then(setFinanceiro).catch(() => setFinanceiro(false));
   }, [staff]);
@@ -100,7 +133,28 @@ export default function PainelNav() {
         </div>
       </div>
       {staff && (
-        <nav className="mx-auto flex h-12 max-w-[1680px] items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:px-6">
+        <div className="relative mx-auto max-w-[1680px]">
+        {setas.esq && (
+          <button
+            type="button"
+            onClick={() => rolar(-1)}
+            aria-label="Ver seções anteriores"
+            className="absolute left-0 top-0 z-10 hidden h-12 w-14 items-center justify-start bg-gradient-to-r from-[var(--bg)] via-[var(--bg)] to-transparent pl-2 md:flex"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg)] text-lg shadow-sm hover:border-accent hover:text-accent">‹</span>
+          </button>
+        )}
+        {setas.dir && (
+          <button
+            type="button"
+            onClick={() => rolar(1)}
+            aria-label="Ver mais seções"
+            className="absolute right-0 top-0 z-10 hidden h-12 w-14 items-center justify-end bg-gradient-to-l from-[var(--bg)] via-[var(--bg)] to-transparent pr-2 md:flex"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg)] text-lg shadow-sm hover:border-accent hover:text-accent">›</span>
+          </button>
+        )}
+        <nav ref={menuRef} className="flex h-12 items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:px-6">
           {LINKS.filter((l) =>
             staff.role === 'financeiro'
               ? l.financeiro
@@ -109,12 +163,14 @@ export default function PainelNav() {
             <Link
               key={l.href}
               href={l.href}
+              aria-current={ativo(l.href) ? 'page' : undefined}
               className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition ${ativo(l.href) ? 'bg-ink text-white' : 'hover:bg-[var(--pill-bg)]'}`}
             >
               {l.href === '/dashboard/imoveis' && !veTudo(staff.role) ? 'Meus imóveis' : l.label}
             </Link>
           ))}
         </nav>
+        </div>
       )}
     </div>
   );
