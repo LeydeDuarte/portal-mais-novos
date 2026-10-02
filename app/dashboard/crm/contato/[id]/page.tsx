@@ -7,14 +7,25 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
-import { CrmNav, Iniciais, NotaChip, OrigemChip, brl, dataHora, linkWhats, tempoDesde } from '@/components/crm/comum';
+import { CanalChip, CrmNav, Iniciais, NotaChip, OrigemChip, brl, dataHora, linkWhats, tempoDesde } from '@/components/crm/comum';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { atribuirContato, concluirTarefa, crmContato, marcarTipo, moverNegocio, registrarAtividade, salvarTarefa, type FichaContato } from '@/lib/actions-crm';
 import { FUNIS } from '@/lib/crm-tipos';
+import SelecionarImoveis from '@/components/crm/SelecionarImoveis';
 
-const ICONE_ATV: Record<string, string> = { entrada: '→', whatsapp: 'W', ligacao: 'L', visita: 'V', nota: 'N', simulacao: 'S', sistema: '•' };
-const NOME_ATV: Record<string, string> = { entrada: 'Entrou pelo portal', whatsapp: 'WhatsApp', ligacao: 'Ligação', visita: 'Visita', nota: 'Nota interna', simulacao: 'Simulação', sistema: 'Sistema' };
+const ICONE_ATV: Record<string, string> = { entrada: '→', whatsapp: 'W', ligacao: 'L', visita: 'V', nota: 'N', simulacao: 'S', sistema: '•', envio: '↗', abriu: '✓' };
+const NOME_ATV: Record<string, string> = {
+  entrada: 'Entrou pelo portal',
+  whatsapp: 'WhatsApp',
+  ligacao: 'Ligação',
+  visita: 'Visita',
+  nota: 'Nota interna',
+  simulacao: 'Simulação',
+  sistema: 'Sistema',
+  envio: 'Imóveis enviados',
+  abriu: 'Abriu o link'
+};
 const minutos = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)}h${String(Math.round((s % 3600) / 60)).padStart(2, '0')}` : `${Math.max(1, Math.round(s / 60))} min`);
 
 export default function FichaPage() {
@@ -26,6 +37,7 @@ export default function FichaPage() {
   const [texto, setTexto] = useState('');
   const [tarefa, setTarefa] = useState({ titulo: '', tipo: 'tarefa' as 'tarefa' | 'visita' | 'ligacao', quando: '' });
   const [todasPaginas, setTodasPaginas] = useState(false);
+  const [selecionando, setSelecionando] = useState(false);
   useEffect(() => {
     if (loaded && !staff) router.replace('/dashboard/login');
   }, [loaded, staff, router]);
@@ -83,6 +95,7 @@ export default function FichaPage() {
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <OrigemChip origem={c.tipo === 'corretor' ? 'corretor' : c.origem} />
+            <CanalChip canal={c.canal} />
             <NotaChip nota={d.nota} comMotivo />
             {c.possivelCorretor && c.tipo !== 'corretor' && (
               <span className="rounded-full bg-[#FDECEC] px-2 py-0.5 text-[11.5px] font-bold text-[#B42318]">Possível corretor: {c.possivelCorretor}</span>
@@ -90,6 +103,12 @@ export default function FichaPage() {
           </div>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
+          <button type="button" onClick={() => setSelecionando(true)} className="h-10 rounded-full bg-accent px-4 text-[13px] font-bold text-white">
+            Selecionar imóveis
+          </button>
+          <Link href={`/dashboard/propostas/nova?contato=${c.id}`} className="flex h-10 items-center rounded-full border border-[var(--border)] px-3.5 text-[13px] font-semibold">
+            Fazer proposta
+          </Link>
           {c.tipo === 'corretor' ? (
             <button type="button" onClick={() => marcarTipo(c.id, 'cliente').then(carregar)} className="h-10 rounded-full border border-[var(--border)] px-3.5 text-[13px] font-semibold">
               Não é corretor
@@ -198,7 +217,7 @@ export default function FichaPage() {
           <ol className="flex-1 overflow-y-auto px-4 py-2">
             {d.atividades.map((a) => (
               <li key={a.id} className="flex gap-3 border-t border-[var(--border)] py-2.5 first:border-t-0">
-                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-bold ${a.tipo === 'whatsapp' ? 'bg-[#E7F9EE] text-[#0B6B33]' : a.tipo === 'entrada' ? 'bg-[#EAF2FF] text-accent' : a.tipo === 'simulacao' ? 'bg-[#FFF4E5] text-[#8A4B00]' : 'bg-[var(--pill-bg)] text-[var(--text-muted)]'}`}>
+                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-bold ${a.tipo === 'whatsapp' || a.tipo === 'abriu' ? 'bg-[#E7F9EE] text-[#0B6B33]' : a.tipo === 'envio' ? 'bg-[#EAF2FF] text-accent' : a.tipo === 'entrada' ? 'bg-[#EAF2FF] text-accent' : a.tipo === 'simulacao' ? 'bg-[#FFF4E5] text-[#8A4B00]' : 'bg-[var(--pill-bg)] text-[var(--text-muted)]'}`}>
                   {ICONE_ATV[a.tipo] ?? '•'}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -246,6 +265,27 @@ export default function FichaPage() {
                   <option value="perdido">Perdido</option>
                 </select>
               </div>
+            ))}
+          </section>
+          <section className="rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[14px] font-bold">Propostas ({d.propostas.length})</h2>
+              <Link href={`/dashboard/propostas/nova?contato=${c.id}`} className="text-[12.5px] font-semibold text-accent">
+                + Nova
+              </Link>
+            </div>
+            {d.propostas.length === 0 && <p className="mt-1 text-[12.5px] text-[var(--text-muted)]">Nenhuma proposta ainda.</p>}
+            {d.propostas.map((p) => (
+              <Link key={p.id} href={`/dashboard/propostas/${p.id}`} className="mt-2 block rounded-xl border border-[var(--border)] p-2.5 hover:border-accent">
+                <span className="flex items-center justify-between gap-2">
+                  <b className="text-[13px]">{p.numero ? `Nº ${String(p.numero).padStart(4, '0')}` : 'Proposta'}</b>
+                  <span className="rounded-full bg-[var(--pill-bg)] px-2 py-0.5 text-[11px] font-semibold">{p.status ?? 'rascunho'}</span>
+                </span>
+                <span className="block truncate text-[12.5px] text-[var(--text-muted)]">{p.imovel}</span>
+                <span className="block text-[12.5px] font-semibold">
+                  {brl(p.valor)} · {dataHora(p.criadaEm)}
+                </span>
+              </Link>
             ))}
           </section>
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4">
@@ -297,6 +337,83 @@ export default function FichaPage() {
           )}
         </div>
       </main>
+
+      {/* imóveis enviados: o que foi mandado, se abriu, quanto tempo ficou na página */}
+      <section className="mx-5 mb-8 rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4 md:mx-8">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-[15px] font-bold">Imóveis enviados ({d.envios.length})</h2>
+          <button type="button" onClick={() => setSelecionando(true)} className="text-[13px] font-semibold text-accent">
+            + Selecionar imóveis
+          </button>
+        </div>
+        {d.envios.length === 0 ? (
+          <p className="mt-2 text-sm text-[var(--text-muted)]">Nada enviado ainda. Use "Selecionar imóveis": cada link avisa aqui quando ele abrir.</p>
+        ) : (
+          <div className="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {d.envios.map((e) => {
+              const caminho = (() => {
+                try {
+                  return new URL(e.destino).pathname;
+                } catch {
+                  return '';
+                }
+              })();
+              const segundos = d.caminho.filter((x) => x.pagina === caminho).reduce((a, x) => Math.max(a, x.segundos), 0);
+              return (
+                <div key={e.id} className="flex gap-3 rounded-2xl border border-[var(--border)] p-2.5">
+                  <span className="h-16 w-20 shrink-0 overflow-hidden rounded-xl bg-[#DDE1E6]">
+                    {e.capa && !e.privado && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={e.capa} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <a href={e.destino} target="_blank" rel="noopener" className="block truncate text-[13.5px] font-bold hover:underline">
+                      {e.titulo}
+                    </a>
+                    <span className="block truncate text-[12px] text-[var(--text-muted)]">
+                      {[e.preco ? brl(e.preco) : null, e.sub, e.privado ? 'privado' : null].filter(Boolean).join(' · ')}
+                    </span>
+                    <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {e.aberturas > 0 ? (
+                        <span className="rounded-full bg-[#E7F9EE] px-2 py-0.5 text-[11.5px] font-bold text-[#0B6B33]">
+                          Abriu {e.aberturas}x · {tempoDesde(e.ultimoAberto)}
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-[var(--pill-bg)] px-2 py-0.5 text-[11.5px] font-semibold text-[var(--text-muted)]">Ainda não abriu</span>
+                      )}
+                      {segundos > 0 && <span className="text-[11.5px] text-[var(--text-muted)]">ficou {minutos(segundos)} na página</span>}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-[var(--text-faint)]">
+                      enviado {dataHora(e.enviadoEm)}
+                      {e.tipo === 'imovel' && (
+                        <>
+                          {' · '}
+                          <Link href={`/dashboard/propostas/nova?contato=${c.id}&imovel=${e.refId}`} className="font-semibold text-accent">
+                            fazer proposta
+                          </Link>
+                        </>
+                      )}
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {selecionando && (
+        <SelecionarImoveis
+          contatoId={c.id}
+          telefone={c.telefone}
+          onClose={() => setSelecionando(false)}
+          onEnviado={() => {
+            setSelecionando(false);
+            carregar();
+          }}
+        />
+      )}
     </div>
   );
 }

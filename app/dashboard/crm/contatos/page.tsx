@@ -6,11 +6,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
-import { CrmNav, Iniciais, OrigemChip, dataHora } from '@/components/crm/comum';
+import { CanalChip, CrmNav, Iniciais, OrigemChip, dataHora } from '@/components/crm/comum';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { crmContatos, novoContato } from '@/lib/actions-crm';
-import { FUNIS, type Funil } from '@/lib/crm-tipos';
+import { CANAIS_MANUAIS, FUNIS, type Funil } from '@/lib/crm-tipos';
 
 type Item = Awaited<ReturnType<typeof crmContatos>>[number];
 const campo = 'h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-sm outline-none focus:border-accent';
@@ -22,7 +22,7 @@ export default function CrmContatosPage() {
   const [busca, setBusca] = useState('');
   const [tipo, setTipo] = useState('todos');
   const [novo, setNovo] = useState(false);
-  const [f, setF] = useState({ nome: '', telefone: '', email: '', funil: 'comprar' as Funil, titulo: '', observacao: '' });
+  const [f, setF] = useState({ nome: '', telefone: '', email: '', funil: 'comprar' as Funil, titulo: '', observacao: '', canal: 'Indicação' });
   const [erro, setErro] = useState<string | null>(null);
   useEffect(() => {
     if (loaded && !staff) router.replace('/dashboard/login');
@@ -83,6 +83,14 @@ export default function CrmContatosPage() {
                   </option>
                 ))}
               </select>
+              <label className="flex flex-col gap-1 text-[12px] font-semibold text-[var(--text-muted)] sm:col-span-2">
+                Como chegou
+                <select className={campo} value={f.canal} onChange={(e) => setF({ ...f, canal: e.target.value })}>
+                  {CANAIS_MANUAIS.map((x) => (
+                    <option key={x}>{x}</option>
+                  ))}
+                </select>
+              </label>
               <input className={`${campo} sm:col-span-2`} placeholder="Interesse (condomínio, imóvel ou região)" value={f.titulo} onChange={(e) => setF({ ...f, titulo: e.target.value })} />
               <textarea className={`${campo} h-20 py-2 sm:col-span-2`} placeholder="Observação (como chegou, o que procura…)" value={f.observacao} onChange={(e) => setF({ ...f, observacao: e.target.value })} />
             </div>
@@ -111,6 +119,7 @@ export default function CrmContatosPage() {
                   <span className="flex flex-wrap items-center gap-1.5">
                     <b className="text-[14px]">{c.nome}</b>
                     <OrigemChip origem={c.tipo === 'corretor' ? 'corretor' : c.origem} />
+                    <CanalChip canal={c.canal} />
                     {c.possivelCorretor && c.tipo !== 'corretor' && <span className="rounded-full bg-[#FDECEC] px-2 py-0.5 text-[11px] font-bold text-[#B42318]">Possível corretor</span>}
                   </span>
                   <span className="block text-[12.5px] text-[var(--text-muted)]">

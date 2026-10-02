@@ -7,6 +7,7 @@ import { query } from './db';
 import { exigirEquipe } from './staff-auth';
 import { veTudo } from './session';
 import { ETAPAS, FUNIS, calcularNota, etapaValida, jornada, normTel, sincronizarCRM, type Funil, type Nota, type PassoJornada, type ResumoPortal } from './crm';
+import { CANAIS_MANUAIS } from './crm-tipos';
 
 type Staff = Awaited<ReturnType<typeof exigirEquipe>>;
 const escopo = (s: Staff, col = 'c.corretor_email') => (veTudo(s.role) ? { sql: 'true', params: [] as unknown[] } : { sql: `lower(coalesce(${col}, '')) = lower($X)`, params: [s.email] });
@@ -35,6 +36,7 @@ export type CardContato = {
   corretor: string | null;
   esperandoDesde: string | null;
   ultimaEntrada: string | null;
+  canal: { nome: string | null; pago: boolean; campanha: string | null };
 };
 
 // ---------------- Hoje ----------------
@@ -49,7 +51,7 @@ export async function crmHoje(): Promise<Hoje> {
   await sincronizarCRM().catch(() => 0);
   const r1 = comEscopo(
     s,
-    `select c.id, c.nome, c.telefone, c.tipo, c.possivel_corretor, c.origem, c.corretor_email, c.ultimo_contato_em,
+    `select c.id, c.nome, c.telefone, c.tipo, c.possivel_corretor, c.origem, c.corretor_email, c.ultimo_contato_em, c.canal, c.canal_pago, c.campanha,
             (select texto from crm_atividades a where a.contato_id = c.id and a.tipo = 'entrada' order by a.criado_em desc limit 1) as ultima
        from crm_contatos c
       where c.ultimo_contato_em is not null and (c.ultima_resposta_em is null or c.ultima_resposta_em < c.ultimo_contato_em)
@@ -79,7 +81,8 @@ export async function crmHoje(): Promise<Hoje> {
     origem: (r.origem as string) ?? null,
     corretor: (r.corretor_email as string) ?? null,
     esperandoDesde: r.ultimo_contato_em ? new Date(r.ultimo_contato_em as string).toISOString() : null,
-    ultimaEntrada: (r.ultima as string) ?? null
+    ultimaEntrada: (r.ultima as string) ?? null,
+    canal: { nome: (r.canal as string) ?? null, pago: !!r.canal_pago, campanha: (r.campanha as string) ?? null },
   }));
   const tarefas = tar.map((t) => ({
     id: String(t.id),
@@ -114,6 +117,7 @@ export type CardNegocio = {
   valor: number | null;
   etapa: string;
   origem: string | null;
+  canal: { nome: string | null; pago: boolean; campanha: string | null };
   corretor: string | null;
   diasNaEtapa: number;
   proximaTarefa: { titulo: string; venceEm: string | null; atrasada: boolean } | null;
@@ -139,7 +143,7 @@ async function statsDe(contatos: { id: string; visitantes: string[]; telefone: s
     ids.length ? query<{ contato_id: string; n: string }>(`select contato_id, count(*) n from crm_atividades where contato_id = any($1::uuid[]) and tipo = 'simulacao' group by 1`, [ids]) : Promise.resolve([]),
     ids.length
       ? query<{ contato_id: string; n: string }>(
-          `select c.id contato_id, count(p.*) n from crm_contatos c join propostas p on (c.telefone is not null and regexp_replace(coalesce(p.telefone, ''), '\\D', '', 'g') in (c.telefone, substr(c.telefone, 3))) or (c.email is not null and lower(p.email) = lower(c.email))
+          `select c.id contato_id, count(p.*) n from crm_contatos c join propostas p on p.contato_id = c.id or (c.telefone is not null and regexp_replace(coalesce(p.telefone, ''), '\\D', '', 'g') in (c.telefone, substr(c.telefone, 3))) or (c.email is not null and lower(p.email) = lower(c.email))
             where c.id = any($1::uuid[]) group by 1`,
           [ids]
         )
@@ -179,7 +183,7 @@ export async function crmFunil(funil: Funil, corretor?: string): Promise<{ etapa
   const r = comEscopo(
     s,
     `select n.id, n.contato_id, n.titulo, n.valor, n.etapa, n.etapa_desde, coalesce(n.corretor_email, c.corretor_email) corretor, c.nome, c.origem, c.visitantes, c.telefone, c.email,
-            c.ultimo_contato_em, c.preferencias,
+            c.ultimo_contato_em, c.preferencias, c.canal, c.canal_pago, c.campanha,
             (select json_build_object('titulo', t.titulo, 'vence', t.vence_em) from crm_tarefas t where t.negocio_id = n.id and t.feita_em is null order by t.vence_em asc nulls last limit 1) prox
        from crm_negocios n join crm_contatos c on c.id = n.contato_id
       where n.funil = $1 and n.etapa not in ('ganho', 'perdido') and {ESCOPO}${filtroCorretor}
@@ -201,6 +205,7 @@ export async function crmFunil(funil: Funil, corretor?: string): Promise<{ etapa
       valor: x.valor == null ? null : Number(x.valor),
       etapa: String(x.etapa),
       origem: (x.origem as string) ?? null,
+      canal: { nome: (x.canal as string) ?? null, pago: !!x.canal_pago, campanha: (x.campanha as string) ?? null },
       corretor: (x.corretor as string) ?? null,
       diasNaEtapa: Math.floor((agora - new Date(x.etapa_desde as string).getTime()) / 86400000),
       proximaTarefa: prox ? { titulo: prox.titulo, venceEm: prox.vence, atrasada: !!prox.vence && new Date(prox.vence).getTime() < agora } : null,
@@ -262,6 +267,7 @@ export async function crmContatos(busca: string, tipo: string): Promise<(CardCon
     corretor: (r.corretor_email as string) ?? null,
     esperandoDesde: null,
     ultimaEntrada: null,
+    canal: { nome: (r.canal as string) ?? null, pago: !!r.canal_pago, campanha: (r.campanha as string) ?? null },
     criadoEm: new Date(r.criado_em as string).toISOString()
   }));
 }
@@ -270,6 +276,7 @@ export type FichaContato = {
   contato: {
     id: string; nome: string; telefone: string | null; email: string | null; tipo: string; possivelCorretor: string | null; origem: string | null;
     corretor: string | null; preferencias: Record<string, unknown>; criadoEm: string; iaAtiva: boolean;
+    canal: { nome: string | null; pago: boolean; campanha: string | null };
   };
   negocios: { id: string; funil: string; etapa: string; titulo: string | null; valor: number | null; criadoEm: string }[];
   atividades: { id: string; tipo: string; texto: string | null; autor: string | null; quando: string }[];
@@ -280,6 +287,8 @@ export type FichaContato = {
   corretores: { email: string; nome: string }[];
   podeTransferir: boolean;
   etapas: Record<string, { id: string; nome: string }[]>;
+  envios: Envio[];
+  propostas: { id: string; numero: number | null; imovel: string | null; valor: number | null; status: string | null; criadaEm: string }[];
 };
 
 export async function crmContato(id: string): Promise<FichaContato> {
@@ -287,10 +296,19 @@ export async function crmContato(id: string): Promise<FichaContato> {
   await podeVerContato(s, id);
   const c = (await query<Record<string, unknown>>(`select * from crm_contatos where id = $1`, [id]))[0];
   if (!c) throw new Error('Contato não encontrado.');
-  const [neg, atv, tar] = await Promise.all([
+  const [neg, atv, tar, env, props] = await Promise.all([
     query<Record<string, unknown>>(`select * from crm_negocios where contato_id = $1 order by (etapa in ('ganho', 'perdido')), criado_em desc`, [id]),
     query<Record<string, unknown>>(`select * from crm_atividades where contato_id = $1 order by criado_em desc limit 200`, [id]),
-    query<Record<string, unknown>>(`select * from crm_tarefas where contato_id = $1 order by feita_em nulls first, vence_em asc nulls last limit 50`, [id])
+    query<Record<string, unknown>>(`select * from crm_tarefas where contato_id = $1 order by feita_em nulls first, vence_em asc nulls last limit 50`, [id]),
+    query<Record<string, unknown>>(`select * from crm_envios where contato_id = $1 order by enviado_em desc limit 100`, [id]),
+    query<Record<string, unknown>>(
+      `select p.id, p.numero, p.imovel_texto, p.valor_proposta, p.status, p.created_at from propostas p, crm_contatos c
+        where c.id = $1 and (p.contato_id = c.id
+           or (c.telefone is not null and regexp_replace(coalesce(p.telefone, ''), '\\D', '', 'g') in (c.telefone, substr(c.telefone, 3)))
+           or (c.email is not null and lower(p.email) = lower(c.email)))
+        order by p.created_at desc limit 50`,
+      [id]
+    )
   ]);
   const visitantes = (c.visitantes as string[]) ?? [];
   const [j, st] = await Promise.all([jornada(visitantes), statsDe([{ id, visitantes, telefone: (c.telefone as string) ?? null, email: (c.email as string) ?? null }])]);
@@ -309,7 +327,8 @@ export async function crmContato(id: string): Promise<FichaContato> {
       corretor: (c.corretor_email as string) ?? null,
       preferencias: prefs,
       criadoEm: new Date(c.criado_em as string).toISOString(),
-      iaAtiva: !!c.ia_ativa
+      iaAtiva: !!c.ia_ativa,
+      canal: { nome: (c.canal as string) ?? null, pago: !!c.canal_pago, campanha: (c.campanha as string) ?? null }
     },
     negocios: neg.map((n) => ({ id: String(n.id), funil: String(n.funil), etapa: String(n.etapa), titulo: (n.titulo as string) ?? null, valor: n.valor == null ? null : Number(n.valor), criadoEm: new Date(n.criado_em as string).toISOString() })),
     atividades: atv.map((a) => ({ id: String(a.id), tipo: String(a.tipo), texto: (a.texto as string) ?? null, autor: (a.autor_email as string) ?? null, quando: new Date(a.criado_em as string).toISOString() })),
@@ -327,7 +346,32 @@ export async function crmContato(id: string): Promise<FichaContato> {
     }),
     corretores: veTudo(s.role) ? await query<{ email: string; nome: string }>(`select email, coalesce(nullif(nome_publico, ''), name) nome from staff_users order by 2`) : [],
     podeTransferir: veTudo(s.role),
-    etapas: ETAPAS
+    etapas: ETAPAS,
+    envios: env.map((e) => ({
+      id: String(e.id),
+      codigo: String(e.codigo),
+      tipo: String(e.tipo),
+      refId: String(e.ref_id),
+      titulo: (e.titulo as string) ?? null,
+      sub: (e.sub as string) ?? null,
+      preco: e.preco == null ? null : Number(e.preco),
+      capa: (e.capa as string) ?? null,
+      privado: !!e.privado,
+      destino: String(e.destino),
+      enviadoEm: new Date(e.enviado_em as string).toISOString(),
+      enviadoPor: (e.enviado_por as string) ?? null,
+      aberturas: Number(e.aberturas) || 0,
+      primeiroAberto: e.primeiro_aberto_em ? new Date(e.primeiro_aberto_em as string).toISOString() : null,
+      ultimoAberto: e.ultimo_aberto_em ? new Date(e.ultimo_aberto_em as string).toISOString() : null
+    })),
+    propostas: props.map((p) => ({
+      id: String(p.id),
+      numero: p.numero == null ? null : Number(p.numero),
+      imovel: (p.imovel_texto as string) ?? null,
+      valor: p.valor_proposta == null ? null : Number(p.valor_proposta),
+      status: (p.status as string) ?? null,
+      criadaEm: new Date(p.created_at as string).toISOString()
+    }))
   };
 }
 
@@ -416,7 +460,7 @@ export async function salvarPreferencias(contatoId: string, p: { quartos?: numbe
 }
 
 /** Novo contato cadastrado à mão (ligação, indicação, plantão) */
-export async function novoContato(d: { nome: string; telefone: string; email?: string; funil: Funil; titulo?: string; observacao?: string }): Promise<{ id: string }> {
+export async function novoContato(d: { nome: string; telefone: string; email?: string; funil: Funil; titulo?: string; observacao?: string; canal?: string }): Promise<{ id: string }> {
   const s = await exigirEquipe();
   const nome = String(d.nome ?? '').trim().slice(0, 120);
   const tel = normTel(d.telefone);
@@ -431,8 +475,8 @@ export async function novoContato(d: { nome: string; telefone: string; email?: s
     return { id: ja[0].id };
   }
   const r = await query<{ id: string }>(
-    `insert into crm_contatos (nome, telefone, email, corretor_email, origem, ultimo_contato_em, ultima_resposta_em) values ($1, $2, $3, $4, 'manual', now(), now()) returning id`,
-    [nome, tel, email, s.email]
+    `insert into crm_contatos (nome, telefone, email, corretor_email, origem, ultimo_contato_em, ultima_resposta_em, canal) values ($1, $2, $3, $4, 'manual', now(), now(), $5) returning id`,
+    [nome, tel, email, s.email, CANAIS_MANUAIS.includes(String(d.canal)) ? d.canal : 'Outro']
   );
   const id = r[0].id;
   const f = (FUNIS.find((x) => x.id === d.funil)?.id ?? 'comprar') as Funil;
@@ -472,7 +516,8 @@ export async function crmEquipe(): Promise<{
       origem: (r.origem as string) ?? null,
       corretor: null,
       esperandoDesde: r.ultimo_contato_em ? new Date(r.ultimo_contato_em as string).toISOString() : null,
-      ultimaEntrada: (r.ultima as string) ?? null
+      ultimaEntrada: (r.ultima as string) ?? null,
+      canal: { nome: (r.canal as string) ?? null, pago: !!r.canal_pago, campanha: (r.campanha as string) ?? null },
     })),
     carteira: cart.map((r) => ({
       email: String(r.email),
@@ -485,4 +530,185 @@ export async function crmEquipe(): Promise<{
       propostas: Number(r.propostas) || 0
     }))
   };
+}
+
+// ---------------- Imóveis enviados (links rastreados) ----------------
+export type OpcaoEnvio = { tipo: 'imovel' | 'condominio'; id: string; titulo: string; sub: string; preco: number | null; capa: string | null; privado: boolean; url: string; motivo?: string };
+
+/** Busca imóveis e condomínios para enviar; sem texto, sugere pelo que a pessoa procura */
+export async function opcoesParaEnviar(contatoId: string, texto: string): Promise<OpcaoEnvio[]> {
+  const s = await exigirEquipe();
+  await podeVerContato(s, contatoId);
+  const { urlImovel, urlCondominio } = await import('./urls');
+  const t = String(texto ?? '').trim().slice(0, 80);
+  const c = (await query<{ preferencias: Record<string, unknown> }>(`select preferencias from crm_contatos where id = $1`, [contatoId]))[0];
+  const prefs = (c?.preferencias ?? {}) as { quartos?: number[]; valorMax?: number; bairros?: string[] };
+  const DE = 'áàâãäéèêëíìîïóòôõöúùûüç';
+  const PARA = 'aaaaaeeeeiiiiooooouuuuc';
+  const norm = (x: string) => `translate(lower(${x}), '${DE}', '${PARA}')`;
+  const params: unknown[] = [];
+  const conds = [`not p.is_tipologia`, `p.vendido_em is null`];
+  let ordem = 'p.destaque desc, p.created_at desc';
+  if (t) {
+    params.push(`%${t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()}%`);
+    conds.push(`${norm("concat_ws(' ', p.titulo, p.condominio, p.bairro, p.cidade, p.jetimob_codigo, p.id)")} like $${params.length}`);
+  } else {
+    if (prefs.quartos?.length) {
+      params.push(prefs.quartos);
+      conds.push(`(coalesce(p.quartos, 0) = any($${params.length}::int[]) or (4 = any($${params.length}::int[]) and p.quartos >= 4))`);
+    }
+    if (prefs.valorMax) {
+      params.push(prefs.valorMax * 1.1);
+      conds.push(`p.price_value <= $${params.length}`);
+    }
+    if (prefs.bairros?.length) {
+      params.push(prefs.bairros.map((b) => b.toLowerCase()));
+      ordem = `(lower(p.bairro) = any($${params.length}::text[])) desc, ${ordem}`;
+    }
+  }
+  const imoveis = await query<Record<string, unknown>>(
+    `select p.id, p.slug, p.titulo, p.condominio, p.bairro, p.cidade, p.uf, p.finalidade, p.price_value, p.quartos, p.area, p.visibilidade,
+            coalesce(p.capa_mini, p.photos->>0) capa, d.name d_nome
+       from properties p left join developments d on d.id = p.empreendimento_id
+      where ${conds.join(' and ')} order by ${ordem} limit 24`,
+    params
+  );
+  const out: OpcaoEnvio[] = imoveis.map((r) => ({
+    tipo: 'imovel',
+    id: String(r.id),
+    titulo: String(r.d_nome || r.condominio || r.titulo || 'Imóvel'),
+    sub: [r.quartos ? `${r.quartos} qtos` : null, r.area ? `${Math.round(Number(r.area))} m²` : null, r.bairro].filter(Boolean).join(' · '),
+    preco: r.price_value == null ? null : Number(r.price_value),
+    capa: (r.capa as string) ?? null,
+    privado: r.visibilidade === 'privado',
+    url: urlImovel({ id: String(r.id), slug: r.slug as string, uf: r.uf as string, cidade: r.cidade as string, bairro: r.bairro as string, finalidade: r.finalidade as string })
+  }));
+  if (t) {
+    const condos = await query<Record<string, unknown>>(
+      `select d.id, d.slug, d.name, d.bairro, d.cidade, d.uf, coalesce(d.capa_mini, d.photos->>0) capa,
+              (select min(x.price_value) from properties x where x.empreendimento_id = d.id and x.price_value > 0 and x.vendido_em is null) preco
+         from developments d where d.status = 'publicado' and ${norm('d.name')} like $1 order by d.delivery_date desc nulls last limit 8`,
+      [params[0]]
+    );
+    for (const r of condos)
+      out.push({
+        tipo: 'condominio',
+        id: String(r.id),
+        titulo: String(r.name),
+        sub: ['Condomínio', r.bairro].filter(Boolean).join(' · '),
+        preco: r.preco == null ? null : Number(r.preco),
+        capa: (r.capa as string) ?? null,
+        privado: false,
+        url: urlCondominio({ id: String(r.id), slug: r.slug as string, uf: r.uf as string, cidade: r.cidade as string, bairro: r.bairro as string })
+      });
+  }
+  return out;
+}
+
+export type Envio = {
+  id: string; codigo: string; tipo: string; refId: string; titulo: string | null; sub: string | null; preco: number | null; capa: string | null; privado: boolean;
+  destino: string; enviadoEm: string; enviadoPor: string | null; aberturas: number; primeiroAberto: string | null; ultimoAberto: string | null;
+};
+
+/** Gera um link rastreado para cada imóvel escolhido e devolve a mensagem pronta para o WhatsApp */
+export async function enviarImoveis(contatoId: string, itens: { tipo: 'imovel' | 'condominio'; id: string }[]): Promise<{ mensagem: string; enviados: number; avisos: string[] }> {
+  const s = await exigirEquipe();
+  await podeVerContato(s, contatoId);
+  const { SITE_URL } = await import('./seo');
+  const { criarLinkPrivado } = await import('./links-privados');
+  const c = (await query<{ nome: string; telefone: string | null }>(`select nome, telefone from crm_contatos where id = $1`, [contatoId]))[0];
+  const lista = (itens ?? []).filter((i) => (i.tipo === 'imovel' || i.tipo === 'condominio') && /^[\w-]{1,80}$/.test(i.id)).slice(0, 12);
+  const todas = await opcoesPorId(lista);
+  const linhas: string[] = [];
+  const avisos: string[] = [];
+  const brl = (n: number | null) => (n ? n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : '');
+  for (const o of todas) {
+    let destino = `${SITE_URL}${o.url}`;
+    // privado: link privado preso ao celular da pessoa (sem telefone, não dá para enviar)
+    if (o.privado) {
+      if (!c.telefone) {
+        avisos.push(`${o.titulo}: é privado e o contato não tem telefone. Cadastre o WhatsApp dele para enviar.`);
+        continue;
+      }
+      const r = await criarLinkPrivado(o.id, { telefone: c.telefone.replace(/^55/, ''), nome: c.nome }).catch((e) => ({ ok: false as const, erro: String(e?.message ?? e) }));
+      if (!r.ok) {
+        avisos.push(`${o.titulo}: ${r.erro}`);
+        continue;
+      }
+      destino = r.link.url;
+    }
+    const codigo = (await import('crypto')).randomBytes(6).toString('base64url');
+    await query(
+      `insert into crm_envios (codigo, contato_id, tipo, ref_id, titulo, sub, preco, capa, destino, privado, enviado_por) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [codigo, contatoId, o.tipo, o.id, o.titulo, o.sub, o.preco, o.capa, destino, o.privado, s.email]
+    );
+    linhas.push(`*${o.titulo}*${o.preco ? ` · ${brl(o.preco)}` : ''}${o.sub ? `\n${o.sub}` : ''}\n${SITE_URL}/r/${codigo}`);
+  }
+  if (linhas.length) {
+    await query(`insert into crm_atividades (contato_id, tipo, texto, autor_email) values ($1, 'envio', $2, $3)`, [
+      contatoId,
+      `Enviou ${linhas.length} imóve${linhas.length > 1 ? 'is' : 'l'}: ${todas.filter((o) => !avisos.some((a) => a.startsWith(o.titulo))).map((o) => o.titulo).join(', ')}`,
+      s.email
+    ]);
+    await respondeu(contatoId);
+    await query(`update crm_negocios set etapa = 'atendimento', etapa_desde = now() where contato_id = $1 and etapa = 'novo' and funil in ('comprar', 'alugar')`, [contatoId]);
+  }
+  const primeiro = c.nome.split(' ')[0];
+  const mensagem = linhas.length ? `Olá, ${primeiro}! Separei ${linhas.length > 1 ? 'estes imóveis' : 'este imóvel'} para você:\n\n${linhas.join('\n\n')}\n\nQual te chamou mais atenção?` : '';
+  return { mensagem, enviados: linhas.length, avisos };
+}
+
+async function opcoesPorId(itens: { tipo: 'imovel' | 'condominio'; id: string }[]): Promise<OpcaoEnvio[]> {
+  const { urlImovel, urlCondominio } = await import('./urls');
+  const ims = itens.filter((i) => i.tipo === 'imovel').map((i) => i.id);
+  const cos = itens.filter((i) => i.tipo === 'condominio').map((i) => i.id);
+  const [a, b] = await Promise.all([
+    ims.length
+      ? query<Record<string, unknown>>(
+          `select p.id, p.slug, p.titulo, p.condominio, p.bairro, p.cidade, p.uf, p.finalidade, p.price_value, p.quartos, p.area, p.visibilidade, coalesce(p.capa_mini, p.photos->>0) capa, d.name d_nome
+             from properties p left join developments d on d.id = p.empreendimento_id where p.id = any($1::text[])`,
+          [ims]
+        )
+      : Promise.resolve([]),
+    cos.length
+      ? query<Record<string, unknown>>(
+          `select d.id, d.slug, d.name, d.bairro, d.cidade, d.uf, coalesce(d.capa_mini, d.photos->>0) capa,
+                  (select min(x.price_value) from properties x where x.empreendimento_id = d.id and x.price_value > 0 and x.vendido_em is null) preco
+             from developments d where d.id = any($1::text[])`,
+          [cos]
+        )
+      : Promise.resolve([])
+  ]);
+  return [
+    ...a.map((r) => ({
+      tipo: 'imovel' as const,
+      id: String(r.id),
+      titulo: String(r.d_nome || r.condominio || r.titulo || 'Imóvel'),
+      sub: [r.quartos ? `${r.quartos} qtos` : null, r.area ? `${Math.round(Number(r.area))} m²` : null, r.bairro].filter(Boolean).join(' · '),
+      preco: r.price_value == null ? null : Number(r.price_value),
+      capa: (r.capa as string) ?? null,
+      privado: r.visibilidade === 'privado',
+      url: urlImovel({ id: String(r.id), slug: r.slug as string, uf: r.uf as string, cidade: r.cidade as string, bairro: r.bairro as string, finalidade: r.finalidade as string })
+    })),
+    ...b.map((r) => ({
+      tipo: 'condominio' as const,
+      id: String(r.id),
+      titulo: String(r.name),
+      sub: ['Condomínio', r.bairro].filter(Boolean).join(' · '),
+      preco: r.preco == null ? null : Number(r.preco),
+      capa: (r.capa as string) ?? null,
+      privado: false,
+      url: urlCondominio({ id: String(r.id), slug: r.slug as string, uf: r.uf as string, cidade: r.cidade as string, bairro: r.bairro as string })
+    }))
+  ];
+}
+
+/** Dados básicos para abrir uma proposta já com o comprador preenchido */
+export async function contatoParaProposta(id: string): Promise<{ nome: string; telefone: string | null; email: string | null } | null> {
+  const s = await exigirEquipe();
+  await podeVerContato(s, id);
+  const c = (await query<{ nome: string; telefone: string | null; email: string | null }>(`select nome, telefone, email from crm_contatos where id = $1`, [id]))[0];
+  if (!c) return null;
+  const t = c.telefone?.replace(/^55/, '') ?? null;
+  return { nome: c.nome, telefone: t ? `(${t.slice(0, 2)}) ${t.slice(2, t.length - 4)}-${t.slice(-4)}` : null, email: c.email };
 }

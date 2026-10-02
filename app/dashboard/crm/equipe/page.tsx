@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
-import { CrmNav, Iniciais, OrigemChip, tempoDesde } from '@/components/crm/comum';
+import { CanalChip, CrmNav, Iniciais, OrigemChip, tempoDesde } from '@/components/crm/comum';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { atribuirContato, crmEquipe } from '@/lib/actions-crm';
@@ -54,6 +54,7 @@ export default function CrmEquipePage() {
                     <span className="flex flex-wrap items-center gap-1.5">
                       <b className="text-[14px]">{c.nome}</b>
                       <OrigemChip origem={c.tipo === 'corretor' ? 'corretor' : c.origem} />
+                      <CanalChip canal={c.canal} />
                     </span>
                     <span className="block truncate text-[12.5px] text-[var(--text-muted)]">{c.ultimaEntrada}</span>
                   </Link>

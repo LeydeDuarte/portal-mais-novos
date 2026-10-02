@@ -15,8 +15,41 @@ const enviar = (corpo: object) => {
   }
 };
 
+// De onde a pessoa veio (etiquetas de campanha do link e o site de origem): guardado
+// no cookie mn_origem por 90 dias e copiado para o pedido quando ela entra em contato.
+// Vale a última chegada com origem (um acesso direto depois não apaga a campanha).
+function guardarOrigem() {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const pega = (k: string) => q.get(k)?.trim().slice(0, 100) || undefined;
+    let ref: string | undefined;
+    try {
+      const h = document.referrer ? new URL(document.referrer).hostname : '';
+      if (h && !/maisnovosimoveis\.com$|vercel\.app$|localhost$/.test(h)) ref = h.replace(/^www\.|^m\.|^l\.|^lm\./, '');
+    } catch {
+      /* sem origem */
+    }
+    const o = {
+      s: pega('utm_source'),
+      m: pega('utm_medium'),
+      c: pega('utm_campaign'),
+      t: pega('utm_content'),
+      clid: q.get('fbclid') ? 'fb' : q.get('gclid') ? 'gg' : q.get('ttclid') ? 'tt' : undefined,
+      ref
+    };
+    if (!o.s && !o.c && !o.clid && !o.ref) return;
+    const v = encodeURIComponent(JSON.stringify({ ...o, em: Date.now() }));
+    document.cookie = `mn_origem=${v}; path=/; max-age=${60 * 60 * 24 * 90}; samesite=lax${location.protocol === 'https:' ? '; secure' : ''}`;
+  } catch {
+    /* ignora */
+  }
+}
+
 export default function Rastreador() {
   const pathname = usePathname();
+  useEffect(() => {
+    guardarOrigem();
+  }, []);
   // tempo na página: soma só os trechos com a aba visível
   const tempo = useRef<{ p: string | null; soma: number; desde: number | null }>({ p: null, soma: 0, desde: null });
   const fecharTempo = () => {

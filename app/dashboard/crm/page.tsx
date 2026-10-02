@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
-import { CrmNav, Iniciais, OrigemChip, dataHora, linkWhats, tempoDesde } from '@/components/crm/comum';
+import { CanalChip, CrmNav, Iniciais, OrigemChip, dataHora, linkWhats, tempoDesde } from '@/components/crm/comum';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { concluirTarefa, crmHoje, marcarRespondido, registrarAtividade, type Hoje } from '@/lib/actions-crm';
@@ -96,6 +96,7 @@ export default function CrmHojePage() {
                         <span className="flex flex-wrap items-center gap-1.5">
                           <b className="text-[14px]">{r.nome}</b>
                           <OrigemChip origem={r.tipo === 'corretor' ? 'corretor' : r.origem} />
+                          <CanalChip canal={r.canal} />
                           {r.possivelCorretor && r.tipo !== 'corretor' && <span className="rounded-full bg-[#FDECEC] px-2 py-0.5 text-[11px] font-bold text-[#B42318]">Possível corretor</span>}
                         </span>
                         <span className="block truncate text-[13px] text-[var(--text-muted)]">{r.ultimaEntrada}</span>

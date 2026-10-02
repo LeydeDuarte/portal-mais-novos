@@ -10,6 +10,7 @@
 // contato, o mn_vid daquele navegador fica no contato, e o histórico passa a aparecer
 // na ficha (inclusive o de antes do contato). Só de quem virou contato.
 import { query } from './db';
+import { classificarOrigem, type OrigemBruta } from './origem-lead';
 import { ETAPAS, FUNIS, etapaValida, type Funil, type Nota, type PassoJornada, type ResumoPortal } from './crm-tipos';
 export { ETAPAS, FUNIS, etapaValida };
 export type { Funil, Nota, PassoJornada, ResumoPortal };
@@ -45,6 +46,7 @@ type Lead = {
   development_id: string | null; property_id: string | null; finalidade: string | null; valor_max: string | null; quartos: number | null;
   quartos_opcoes: number[] | null; grupo: string | null; raio: number | null; bairro_ref: string | null; cidade_ref: string | null;
   visitante: string | null; sou_corretor: boolean; created_at: string | Date; p_corretor: string | null; p_preco: string | null; p_titulo: string | null;
+  origem_web: OrigemBruta | null;
 };
 
 function origemDoLead(l: Lead): { origem: string; funil: Funil; etapa: string; texto: string } {
@@ -61,7 +63,8 @@ function origemDoLead(l: Lead): { origem: string; funil: Funil; etapa: string; t
 }
 
 /** acha (pelo telefone ou e-mail) ou cria o contato; devolve o id */
-async function acharOuCriar(c: { nome: string; telefone: string | null; email: string | null; origem: string; corretor: string | null; visitante: string | null; quando: Date; tipo: string; possivel: string | null; prefs: Record<string, unknown> }): Promise<string> {
+type CanalLead = { canal: string; pago: boolean; campanha: string | null };
+async function acharOuCriar(c: { nome: string; telefone: string | null; email: string | null; origem: string; corretor: string | null; visitante: string | null; quando: Date; tipo: string; possivel: string | null; prefs: Record<string, unknown>; canal: CanalLead }): Promise<string> {
   // mesma pessoa: mesmo telefone, mesmo e-mail ou (sem os dois) o mesmo navegador
   const achado = await query<{ id: string }>(
     `select id from crm_contatos
@@ -79,17 +82,21 @@ async function acharOuCriar(c: { nome: string; telefone: string | null; email: s
           tipo = case when $7 = 'corretor' then 'corretor' else tipo end,
           possivel_corretor = coalesce(possivel_corretor, $8),
           preferencias = preferencias || $9::jsonb,
+          -- a primeira fonte fica (quem trouxe a pessoa); "Direto" é trocado por uma fonte conhecida
+          canal = case when canal is null or canal = 'Direto' then $10 else canal end,
+          canal_pago = case when canal is null or canal = 'Direto' then $11 else canal_pago end,
+          campanha = coalesce(campanha, $12),
           ultimo_contato_em = greatest(coalesce(ultimo_contato_em, $6), $6), atualizado_em = now()
         where id = $1`,
-      [achado[0].id, c.telefone, c.email, c.corretor, c.visitante, c.quando, c.tipo, c.possivel, JSON.stringify(c.prefs)]
+      [achado[0].id, c.telefone, c.email, c.corretor, c.visitante, c.quando, c.tipo, c.possivel, JSON.stringify(c.prefs), c.canal.canal, c.canal.pago, c.canal.campanha]
     );
     return achado[0].id;
   }
   const r = await query<{ id: string }>(
     // entradas antigas (mais de 3 dias, ex.: importadas da Jetimob) não entram como "esperando resposta"
-    `insert into crm_contatos (nome, telefone, email, tipo, possivel_corretor, corretor_email, origem, visitantes, criado_em, ultimo_contato_em, preferencias, ultima_resposta_em)
-     values ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, $9, $10::jsonb, case when $9::timestamptz < now() - interval '3 days' then $9::timestamptz end) returning id`,
-    [c.nome, c.telefone, c.email, c.tipo, c.possivel, c.corretor, c.origem, c.visitante ? [c.visitante] : [], c.quando, JSON.stringify(c.prefs)]
+    `insert into crm_contatos (nome, telefone, email, tipo, possivel_corretor, corretor_email, origem, visitantes, criado_em, ultimo_contato_em, preferencias, ultima_resposta_em, canal, canal_pago, campanha)
+     values ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, $9, $10::jsonb, case when $9::timestamptz < now() - interval '3 days' then $9::timestamptz end, $11, $12, $13) returning id`,
+    [c.nome, c.telefone, c.email, c.tipo, c.possivel, c.corretor, c.origem, c.visitante ? [c.visitante] : [], c.quando, JSON.stringify(c.prefs), c.canal.canal, c.canal.pago, c.canal.campanha]
   );
   return r[0].id;
 }
@@ -165,7 +172,13 @@ export async function sincronizarCRM(limite = 300): Promise<number> {
       quando,
       tipo: l.sou_corretor ? 'corretor' : 'cliente',
       possivel,
-      prefs
+      prefs,
+      canal:
+        o.origem === 'jetimob'
+          ? { canal: 'Jetimob (importado)', pago: false, campanha: null }
+          : o.origem === 'proposta' && !l.origem_web
+            ? { canal: 'Cadastrado pela equipe', pago: false, campanha: null }
+            : classificarOrigem(l.origem_web)
     });
     await query(`insert into crm_atividades (contato_id, tipo, texto, dados, criado_em) values ($1, 'entrada', $2, $3::jsonb, $4)`, [
       id,
@@ -186,7 +199,7 @@ export async function sincronizarCRM(limite = 300): Promise<number> {
     n++;
   }
   // "Venda seu imóvel"
-  const cap = await query<{ id: string; nome: string; telefone: string | null; email: string | null; condominio: string | null; bairro: string | null; cidade: string | null; tipo_unidade: string | null; area: string | null; valor_pretendido: string | null; observacoes: string | null; visitante: string | null; created_at: string | Date }>(
+  const cap = await query<{ id: string; nome: string; telefone: string | null; email: string | null; condominio: string | null; bairro: string | null; cidade: string | null; tipo_unidade: string | null; area: string | null; valor_pretendido: string | null; observacoes: string | null; visitante: string | null; created_at: string | Date; origem_web: OrigemBruta | null }>(
     `select * from captacoes where contato_id is null order by created_at asc limit $1`,
     [limite]
   );
@@ -198,7 +211,7 @@ export async function sincronizarCRM(limite = 300): Promise<number> {
       continue;
     }
     const quando = new Date(c.created_at);
-    const id = await acharOuCriar({ nome: c.nome, telefone: tel, email, origem: 'vender', corretor: null, visitante: c.visitante, quando, tipo: 'cliente', possivel: motivoCorretor(c.nome, c.observacoes), prefs: {} });
+    const id = await acharOuCriar({ nome: c.nome, telefone: tel, email, origem: 'vender', corretor: null, visitante: c.visitante, quando, tipo: 'cliente', possivel: motivoCorretor(c.nome, c.observacoes), prefs: {}, canal: classificarOrigem(c.origem_web) });
     const texto = `Quer vender: ${[c.tipo_unidade?.replace(/_/g, ' '), c.area ? `${c.area} m²` : null, c.condominio, c.bairro, c.cidade].filter(Boolean).join(' · ')}${c.valor_pretendido ? ` · pede R$ ${Number(c.valor_pretendido).toLocaleString('pt-BR')}` : ''}`;
     await query(`insert into crm_atividades (contato_id, tipo, texto, criado_em) values ($1, 'entrada', $2, $3)`, [id, texto, quando]);
     await abrirNegocio(id, 'vender', 'novo', { titulo: c.condominio || c.bairro || 'Imóvel para vender', valor: c.valor_pretendido ? Number(c.valor_pretendido) : null, property_id: null, development_id: null, corretor: null, quando });

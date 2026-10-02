@@ -93,3 +93,20 @@ export function CrmNav({ ativo, gestor }: { ativo: string; gestor: boolean }) {
     </nav>
   );
 }
+
+/** de onde veio: rede ou site, se foi anúncio pago e a campanha */
+export function CanalChip({ canal }: { canal: { nome: string | null; pago: boolean; campanha: string | null } }) {
+  const nome = canal.nome ?? 'Direto';
+  const cor = canal.pago ? { bg: '#14161A', tx: '#FFFFFF' } : { bg: '#FFFFFF', tx: '#14161A' };
+  return (
+    <span
+      className="inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded-full border border-[#C9CDD3] px-2 py-0.5 text-[11.5px] font-semibold"
+      style={{ background: cor.bg, color: cor.tx, borderColor: canal.pago ? '#14161A' : '#C9CDD3' }}
+      title={canal.campanha ? `Campanha: ${canal.campanha}` : undefined}
+    >
+      {nome}
+      {canal.pago ? ' · anúncio' : ''}
+      {canal.campanha && <span className="truncate font-normal opacity-80">· {canal.campanha}</span>}
+    </span>
+  );
+}

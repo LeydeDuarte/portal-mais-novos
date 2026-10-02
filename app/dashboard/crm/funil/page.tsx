@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
-import { CrmNav, Iniciais, NotaChip, OrigemChip, brl } from '@/components/crm/comum';
+import { CanalChip, CrmNav, Iniciais, NotaChip, OrigemChip, brl } from '@/components/crm/comum';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { crmFunil, moverNegocio, type CardNegocio } from '@/lib/actions-crm';
@@ -79,6 +79,7 @@ export default function CrmFunilPage() {
       <div className="flex flex-wrap items-center gap-1">
         {c.valor ? <span className="rounded-full bg-[var(--pill-bg)] px-2 py-0.5 text-[11.5px] font-bold">{brl(c.valor)}</span> : null}
         <OrigemChip origem={c.origem} />
+        <CanalChip canal={c.canal} />
         <NotaChip nota={c.nota} />
       </div>
       <div className="flex gap-2.5 border-t border-dashed border-[var(--border)] pt-1.5 text-[11.5px] text-[var(--text-muted)]">

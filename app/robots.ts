@@ -8,7 +8,7 @@ import { ehHostApp } from '@/lib/dominios';
 export default function robots(): MetadataRoute.Robots {
   // app.maisnovosimoveis.com (área da equipe): nada é indexado
   if (ehHostApp(headers().get('host'))) return { rules: [{ userAgent: '*', disallow: '/' }] };
-  const bloqueado = ['/dashboard', '/painel', '/c/', '/api/', '/favoritos', '/*?l=', '/*&l='];
+  const bloqueado = ['/r/', '/dashboard', '/painel', '/c/', '/api/', '/favoritos', '/*?l=', '/*&l='];
   return {
     rules: [
       { userAgent: '*', allow: '/', disallow: bloqueado },

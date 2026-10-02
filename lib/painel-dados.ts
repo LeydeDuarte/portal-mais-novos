@@ -5,6 +5,7 @@
 // contatos (interest_leads). Visitas da equipe logada e de robôs não entram.
 import { query } from './db';
 import { exigirEquipe } from './staff-auth';
+import { sincronizarCRM } from './crm';
 
 export type Periodo = 'hoje' | '7d' | 'mes' | 'mes-passado' | '30d' | 'personalizado';
 export type LinhaTop = { nome: string; sub?: string | null; url?: string | null; n: number; whatsapp?: number; contatos?: number };
@@ -40,7 +41,23 @@ export type DadosPainel = {
   noticias: LinhaTop[];
   banners: LinhaTop[];
   origens: LinhaTop[];
+  /** de onde vêm os CONTATOS (leads) e quanto cada fonte avança no funil do CRM */
+  fontes: LinhaFonte[];
+  campanhas: LinhaFonte[];
 };
+export type LinhaFonte = { canal: string; pago: boolean; campanha?: string | null; leads: number; andamento: number; avancados: number; ganhos: number; perdidos: number; valorGanho: number };
+
+const fonte = (x: Record<string, string>): LinhaFonte => ({
+  canal: x.canal,
+  pago: String(x.pago) === 'true',
+  campanha: x.campanha ?? null,
+  leads: Number(x.leads) || 0,
+  andamento: Number(x.andamento) || 0,
+  avancados: Number(x.avancados) || 0,
+  ganhos: Number(x.ganhos) || 0,
+  perdidos: Number(x.perdidos) || 0,
+  valorGanho: Number(x.valor) || 0
+});
 
 const DATA = /^\d{4}-\d{2}-\d{2}$/;
 function intervalo(p: Periodo, de?: string, ate?: string): [string, string] {
@@ -73,6 +90,19 @@ export async function dadosDoPainel(periodo: Periodo = 'mes', de?: string, ate?:
   const [deSql, ateSql] = intervalo(periodo, de, ate);
   // eventos no período (em horário de Brasília)
   const EV = `(created_at at time zone 'America/Sao_Paulo')::date >= ${deSql} and (created_at at time zone 'America/Sao_Paulo')::date < ${ateSql}`;
+  // fontes dos contatos (crm_contatos criados no período) e o que virou no funil
+  await sincronizarCRM().catch(() => 0);
+  const fontesSql = (grupo: string, extra = '', limite = 30) => `
+    with c as (select c.id, coalesce(c.canal, 'Direto') canal, c.canal_pago pago, c.campanha from crm_contatos c
+                where (c.criado_em at time zone 'America/Sao_Paulo')::date >= ${deSql} and (c.criado_em at time zone 'America/Sao_Paulo')::date < ${ateSql} ${extra}),
+         n as (select contato_id, bool_or(etapa = 'ganho') ganho, bool_or(etapa = 'perdido') perdido, bool_or(etapa not in ('ganho', 'perdido')) aberto,
+                      bool_or(etapa in ('visita', 'proposta', 'negociacao', 'avaliacao', 'documentos', 'analise', 'aprovado', 'anunciado', 'contrato', 'parceria')) avancou,
+                      sum(valor) filter (where etapa = 'ganho') valor
+                 from crm_negocios group by 1)
+    select ${grupo}, count(*) leads, count(*) filter (where n.aberto) andamento, count(*) filter (where n.avancou or n.ganho) avancados,
+           count(*) filter (where n.ganho) ganhos, count(*) filter (where n.perdido and not coalesce(n.ganho, false) and not coalesce(n.aberto, false)) perdidos,
+           coalesce(sum(n.valor), 0) valor
+      from c left join n on n.contato_id = c.id group by ${grupo} order by leads desc limit ${limite}`;
   const ultimo = `regexp_replace(pagina, '^.*/', '')`;
 
   // nome legível de uma página (condomínio, imóvel ou notícia pelo fim do endereço)
@@ -112,7 +142,7 @@ export async function dadosDoPainel(periodo: Periodo = 'mes', de?: string, ate?:
     )
   ]);
 
-  const [tot, leads, dias, paginas, imoveis, condos, noticias, banners, origens, datas] = await Promise.all([
+  const [tot, leads, dias, paginas, imoveis, condos, noticias, banners, origens, fontes, campanhas, datas] = await Promise.all([
     query<Record<string, string>>(
       `select count(*) filter (where tipo = 'visita') acessos,
               count(distinct visitante) filter (where tipo = 'visita') visitantes,
@@ -172,6 +202,8 @@ export async function dadosDoPainel(periodo: Periodo = 'mes', de?: string, ate?:
     query<Record<string, string>>(
       `select coalesce(origem, 'Direto ou sem origem') nome, count(*) n from eventos where ${EV} and tipo = 'visita' group by 1 order by 2 desc limit 8`
     ),
+    query<Record<string, string>>(fontesSql('canal, pago')),
+    query<Record<string, string>>(fontesSql('canal, pago, campanha', 'and c.campanha is not null', 15)),
     query<Record<string, string>>(`select to_char(${deSql}, 'YYYY-MM-DD') de, to_char(${ateSql} - 1, 'YYYY-MM-DD') ate`)
   ]);
   const t = tot[0] ?? {};
@@ -206,7 +238,9 @@ export async function dadosDoPainel(periodo: Periodo = 'mes', de?: string, ate?:
     condominios: condos.map((p) => ({ nome: p.nome, sub: p.sub, url: p.url, n: n(p.n), whatsapp: n(p.whatsapp), contatos: n(p.contatos) })),
     noticias: noticias.map((p) => ({ nome: p.nome, sub: p.sub, url: p.url, n: n(p.n) })),
     banners: banners.map((p) => ({ nome: p.nome, sub: p.url ? `mais clicado em ${p.url}` : null, url: p.url, n: n(p.n) })),
-    origens: origens.map((p) => ({ nome: p.nome, n: n(p.n) }))
+    origens: origens.map((p) => ({ nome: p.nome, n: n(p.n) })),
+    fontes: fontes.map(fonte),
+    campanhas: campanhas.map(fonte)
   };
 }
 

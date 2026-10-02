@@ -48,3 +48,6 @@ export type PassoJornada = { quando: string; pagina: string; titulo: string; seg
 export type ResumoPortal = { paginas: number; segundos: number; condominios: number; imoveis: number; simulacoes: number; propostas: number; voltas: number; desde: string | null };
 
 export type Nota = { valor: number; faixa: 'quente' | 'morno' | 'frio'; motivos: string[] };
+
+/** como chegou, para contatos cadastrados à mão */
+export const CANAIS_MANUAIS = ['Indicação', 'Ligação', 'Plantão', 'Instagram (direct)', 'WhatsApp da empresa', 'Facebook', 'TikTok', 'Placa ou panfleto', 'Outro'];

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { dadosDoPainel, type DadosPainel, type LinhaTop, type Periodo } from '@/lib/painel-dados';
+import { dadosDoPainel, type DadosPainel, type LinhaFonte, type LinhaTop, type Periodo } from '@/lib/painel-dados';
 
 // Painel de dados do Início: monitoramento do portal inteiro no período escolhido.
 const PERIODOS: [Periodo, string][] = [
@@ -52,6 +52,52 @@ function Cartao({ rotulo, valor, detalhe, destaque = false }: { rotulo: string; 
       <span className="font-sans text-[28px] font-bold leading-none tabular-nums">{typeof valor === 'number' ? num(valor) : valor}</span>
       {detalhe && <span className={`text-xs ${destaque ? 'text-[#C5CAD3]' : 'text-[var(--text-muted)]'}`}>{detalhe}</span>}
     </div>
+  );
+}
+
+function TabelaFontes({ titulo, linhas, campanha = false }: { titulo: string; linhas: LinhaFonte[]; campanha?: boolean }) {
+  const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : '–');
+  const brl = (v: number) => (v ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : '–');
+  return (
+    <section className="overflow-x-auto rounded-2xl border border-[var(--border)] bg-[var(--bg)]">
+      <h3 className="border-b border-[var(--border)] px-4 py-3 text-sm font-bold">{titulo}</h3>
+      {linhas.length === 0 ? (
+        <p className="p-4 text-sm text-[var(--text-muted)]">
+          {campanha ? 'Nenhum contato com campanha no período. Use etiquetas UTM nos links dos anúncios (utm_source, utm_medium=cpc, utm_campaign).' : 'Nenhum contato novo no período.'}
+        </p>
+      ) : (
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+              <th className="px-4 py-2 font-semibold">{campanha ? 'Campanha' : 'Fonte'}</th>
+              <th className="px-2 py-2 text-right font-semibold">Contatos</th>
+              <th className="px-2 py-2 text-right font-semibold">Em andamento</th>
+              <th className="px-2 py-2 text-right font-semibold">Visita ou proposta</th>
+              <th className="px-2 py-2 text-right font-semibold">Ganhos</th>
+              <th className="px-2 py-2 text-right font-semibold">Conversão</th>
+              <th className="px-4 py-2 text-right font-semibold">Valor ganho</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((l, i) => (
+              <tr key={i} className="border-t border-[var(--border)]">
+                <td className="px-4 py-2.5">
+                  <span className="font-semibold">{campanha ? l.campanha : l.canal}</span>
+                  {l.pago && <span className="ml-1.5 rounded-full bg-[#14161A] px-1.5 py-0.5 text-[10.5px] font-bold text-white">anúncio</span>}
+                  {campanha && <span className="block text-xs text-[var(--text-muted)]">{l.canal}</span>}
+                </td>
+                <td className="px-2 py-2.5 text-right font-bold tabular-nums">{l.leads}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums">{l.andamento}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums">{l.avancados} <span className="text-xs text-[var(--text-muted)]">({pct(l.avancados, l.leads)})</span></td>
+                <td className="px-2 py-2.5 text-right font-bold tabular-nums">{l.ganhos}</td>
+                <td className="px-2 py-2.5 text-right tabular-nums">{pct(l.ganhos, l.leads)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{brl(l.valorGanho)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }
 
@@ -198,6 +244,10 @@ export default function PainelDados() {
               </div>
             </section>
           )}
+
+          {/* de onde vêm os contatos e quanto cada fonte vende */}
+          <TabelaFontes titulo="Fontes de contatos (leads) e resultado no CRM" linhas={d.fontes} />
+          <TabelaFontes titulo="Campanhas" linhas={d.campanhas} campanha />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Tabela titulo="Condomínios mais visitados" linhas={d.condominios} colunas={[{ k: 'n', l: 'Visitas' }, { k: 'whatsapp', l: 'WhatsApp' }, { k: 'contatos', l: 'Contatos' }]} vazio="Nenhuma visita a condomínio no período." />

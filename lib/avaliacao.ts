@@ -10,6 +10,7 @@
 //    de confiança de 80% (t de Student). É uma estimativa estatística, não um laudo.
 import { query } from './db';
 import { cookies } from 'next/headers';
+import { origemDoNavegador } from './origem-servidor';
 import { getCliente } from './cliente-auth';
 // grupos de tipo (mesma divisão usada nos similares)
 const GRUPO_TIPO: Record<string, string> = {
@@ -53,9 +54,9 @@ export async function avaliarImovel(e: EntradaAvaliacao): Promise<ResultadoAvali
   if (!(area >= 15 && area <= 5000)) return { ok: false, erro: 'Informe a área privativa em m² (entre 15 e 5.000).' };
   const registrar = (resumo: string) =>
     query(
-      `insert into interest_leads (nome, email, condominio, mensagem, finalidade, area_min, quartos, aceita_contato, visitante)
-       values ($1, $2, 'Avaliação de imóvel', $3, 'venda', $4, $5, true, $6)`,
-      [cliente.nome || cliente.email, cliente.email, `Avaliação: ${e.tipo} de ${area} m² no ${e.bairro} (${e.cidade}). ${resumo}`, area, e.quartos ? Math.round(e.quartos) : null, cookies().get('mn_vid')?.value?.slice(0, 64) ?? null]
+      `insert into interest_leads (nome, email, condominio, mensagem, finalidade, area_min, quartos, aceita_contato, visitante, origem_web)
+       values ($1, $2, 'Avaliação de imóvel', $3, 'venda', $4, $5, true, $6, $7::jsonb)`,
+      [cliente.nome || cliente.email, cliente.email, `Avaliação: ${e.tipo} de ${area} m² no ${e.bairro} (${e.cidade}). ${resumo}`, area, e.quartos ? Math.round(e.quartos) : null, cookies().get('mn_vid')?.value?.slice(0, 64) ?? null, JSON.stringify(origemDoNavegador())]
     ).catch(() => {});
   const grupo = GRUPO_TIPO[e.tipo] ?? 'vertical';
   const tipos = Object.entries(GRUPO_TIPO).filter(([, g]) => g === grupo).map(([t]) => t);

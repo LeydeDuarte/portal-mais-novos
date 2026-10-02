@@ -238,6 +238,7 @@ export type PropostaInput = {
   condicoes?: string;
   validadeDias: number;
   guardarVendedor?: 'imovel' | 'condominio' | null; // guarda o vendedor como padrão
+  contatoId?: string | null; // aberta pela ficha do CRM: fica ligada ao contato
 };
 
 const FORMAS = ['a_vista', 'financiamento', 'fgts', 'consorcio', 'permuta', 'parcelamento_direto', 'outro'];
@@ -325,6 +326,7 @@ export async function salvarProposta(d: PropostaInput): Promise<{ ok: boolean; i
       [...vals, eu.email]
     );
     id = r[0].id;
+    if (d.contatoId && /^[0-9a-f-]{36}$/i.test(d.contatoId)) await query(`update propostas set contato_id = $2 where id = $1`, [id, d.contatoId]).catch(() => {});
     // compradores entram em Interessados (base para o futuro CRM), com o histórico da proposta
     const numero = (r[0] as { numero?: number }).numero;
     for (const c of compradores) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useRef, useState } from 'react';
+import { contatoParaProposta } from '@/lib/actions-crm';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
@@ -36,6 +37,7 @@ function NovaProposta() {
   const [imovelTexto, setImovelTexto] = useState('');
   const [unidade, setUnidade] = useState('');
   const [compradores, setCompradores] = useState<PessoaForm[]>([{ nome: '' }]);
+  const [contatoId, setContatoId] = useState<string | null>(null);
   const [vendedores, setVendedores] = useState<(PessoaForm & { pj?: boolean })[]>([{ nome: '' }]);
   const [guardarVendedor, setGuardarVendedor] = useState(false);
   const [corretor, setCorretor] = useState<Corretor>({ nome: '' });
@@ -82,6 +84,14 @@ function NovaProposta() {
       });
       return;
     }
+    // aberta pela ficha do CRM (?contato=): o comprador já vem preenchido
+    const ct = sp.get('contato');
+    if (ct) {
+      setContatoId(ct);
+      contatoParaProposta(ct)
+        .then((c) => c && setCompradores([{ nome: c.nome, telefone: c.telefone ?? undefined, email: c.email ?? undefined }]))
+        .catch(() => {});
+    }
     const im = sp.get('imovel') ?? sp.get('tipologia');
     const co = sp.get('condominio');
     if (im) escolherAlvo('imovel', im);
@@ -104,6 +114,7 @@ function NovaProposta() {
     setSalvando(true);
     try {
       const r = await salvarProposta({
+        contatoId,
         id: editId ?? undefined,
         alvo: alvo ? { tipo: alvo.tipo, id: alvo.id } : null,
         imovelTexto,
