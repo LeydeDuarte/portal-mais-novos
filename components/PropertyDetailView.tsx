@@ -29,7 +29,7 @@ import DetailFavoriteButton from '@/components/DetailFavoriteButton';
 import { Banner } from '@/components/news/Pecas';
 import { bannersAtivos } from '@/lib/news/dados';
 import { SecaoCondominios, BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
-import { getStatusBadge } from '@/lib/classification';
+import { getStatusBadge, lancamentoOuNovo } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 import { urlImovel, urlCondominio } from '@/lib/urls';
@@ -241,7 +241,7 @@ export default async function PropertyDetailView({
               </div>
             )}
 
-            {posSol && <PosicaoSol lat={posSol.lat} lng={posSol.lng} nome={nomeCondominio || 'imóvel'} whats={whats} aproximado={posSol.aproximado} />}
+            {posSol && <PosicaoSol lat={posSol.lat} lng={posSol.lng} nome={nomeCondominio || 'imóvel'} whats={whats} aproximado={posSol.aproximado} mostrarBotao={lancamentoOuNovo(property.deliveryDate)} />}
 
             <ChamadaAvaliar contexto="imovel" refId={property.id} />
           </div>

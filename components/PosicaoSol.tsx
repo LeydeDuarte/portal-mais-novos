@@ -54,6 +54,7 @@ export default function PosicaoSol({
   whats,
   aproximado = false,
   compacto = false,
+  mostrarBotao = true,
   onMudar
 }: {
   lat: number;
@@ -64,6 +65,8 @@ export default function PosicaoSol({
   aproximado?: boolean;
   /** dentro da gaveta do mapa: uma coluna, letras menores, sem título nem botão próprio */
   compacto?: boolean;
+  /** botão "Falar com o consultor": só em lançamento e novo (quem decide é a página) */
+  mostrarBotao?: boolean;
   /** avisa dia e horário escolhidos (o mapa público desenha o sol em volta do prédio) */
   onMudar?: (v: { dia: 'hoje' | 'inverno' | 'verao'; minutos: number } | null) => void;
 }) {
@@ -262,8 +265,8 @@ export default function PosicaoSol({
           </div>
         ))}
       </div>
-      <div className={compacto ? 'hidden' : 'mt-4'}>
-        <BotaoWhatsapp ctx={whats} variante="bloco" rotulo="Qual unidade pega o sol que eu prefiro?" />
+      <div className={compacto || !mostrarBotao ? 'hidden' : 'mt-4'}>
+        <BotaoWhatsapp ctx={whats} variante="bloco" rotulo="Falar com o consultor" />
       </div>
     </section>
   );

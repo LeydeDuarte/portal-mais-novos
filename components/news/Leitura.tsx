@@ -54,19 +54,6 @@ export function Compartilhar({ url, titulo, refId, rotulo = false }: { url: stri
           </svg>
         </button>
       )}
-      <a
-        href={`https://wa.me/?text=${encodeURIComponent(`${titulo}\n${url}`)}`}
-        target="_blank"
-        rel="noopener"
-        aria-label="Compartilhar no WhatsApp"
-        data-rastro="compartilhar"
-        data-rastro-ref={refId}
-        className="grid h-10 w-10 place-items-center rounded-full border border-[var(--border)] text-[#1BA84F] hover:bg-[var(--pill-bg)]"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20l1.2-5.1A8.5 8.5 0 1 1 21 11.5z" />
-        </svg>
-      </a>
       <button
         type="button"
         aria-label="Copiar link"

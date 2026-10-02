@@ -22,7 +22,7 @@ import { Banner } from '@/components/news/Pecas';
 import { bannersAtivos } from '@/lib/news/dados';
 import { SecaoCondominios, BarraContatoFixa, CaixaPreco, CardRegiao, ChipsPerfil, EspacoBarra, SecaoPrivados, TituloPerfil, brl, textoEntrega, type Chip } from '@/components/perfil/BlocosPerfil';
 import { getAveragePricePerM2, formatPricePerM2, type Development } from '@/lib/property-details';
-import { FASES_EXIGEM_CONCEPCAO, ehFutura, getBadgeCondominio, getStatusBucket } from '@/lib/classification';
+import { FASES_EXIGEM_CONCEPCAO, ehFutura, getBadgeCondominio, getStatusBucket, lancamentoOuNovo } from '@/lib/classification';
 import { getEmbedInfo, getYouTubeAspectRatio } from '@/lib/video-embed';
 import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 import ContarVisita from '@/components/ContarVisita';
@@ -295,7 +295,7 @@ export default async function DevelopmentDetailView({ development }: { developme
             )}
 
             {development.lat != null && development.lng != null && (
-              <PosicaoSol lat={development.lat} lng={development.lng} nome={development.name} whats={whatsAtendimento} />
+              <PosicaoSol lat={development.lat} lng={development.lng} nome={development.name} whats={whatsAtendimento} mostrarBotao={lancamentoOuNovo(development.deliveryDate)} />
             )}
 
             <ChamadaAvaliar contexto={futuro ? 'lancamento' : 'condominio'} refId={development.id} />

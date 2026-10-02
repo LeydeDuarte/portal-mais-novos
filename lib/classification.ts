@@ -125,3 +125,10 @@ export function getBadgeCondominio(deliveryDate: string | null | undefined, tipo
     color: '#FFFFFF'
   };
 }
+
+/** Lançamento, em obras ou novo (até 36 meses da entrega): onde faz sentido escolher unidade pelo sol */
+export function lancamentoOuNovo(deliveryDate?: string | null, today: Date = new Date()): boolean {
+  if (!temEntrega(deliveryDate)) return false;
+  const f = getStatusBucket(deliveryDate as string, today);
+  return FASES_FUTURAS.includes(f) || f === 'novo';
+}
