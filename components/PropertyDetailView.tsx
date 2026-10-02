@@ -241,7 +241,7 @@ export default async function PropertyDetailView({
               </div>
             )}
 
-            {posSol && <PosicaoSol lat={posSol.lat} lng={posSol.lng} nome={nomeCondominio || 'imóvel'} whats={whats} />}
+            {posSol && <PosicaoSol lat={posSol.lat} lng={posSol.lng} nome={nomeCondominio || 'imóvel'} whats={whats} aproximado={posSol.aproximado} />}
 
             <ChamadaAvaliar contexto="imovel" refId={property.id} />
           </div>

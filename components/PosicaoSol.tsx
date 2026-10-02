@@ -10,6 +10,7 @@ import LoginModal from '@/components/LoginModal';
 import BotaoWhatsapp, { type WhatsappContexto } from '@/components/BotaoWhatsapp';
 import { useSession } from '@/lib/use-session';
 import { useStaffSession } from '@/lib/use-staff-session';
+import MapaFundoSol from '@/components/MapaFundoSol';
 
 const FUSO = 3; // Goiânia: UTC-3, sem horário de verão
 type Dia = 'hoje' | 'inverno' | 'verao';
@@ -46,7 +47,20 @@ function caminho(lat: number, lng: number, dia: Dia): string {
   return pts.length ? `M${pts.join(' L')}` : '';
 }
 
-export default function PosicaoSol({ lat, lng, nome, whats }: { lat: number; lng: number; nome: string; whats: WhatsappContexto }) {
+export default function PosicaoSol({
+  lat,
+  lng,
+  nome,
+  whats,
+  aproximado = false
+}: {
+  lat: number;
+  lng: number;
+  nome: string;
+  whats: WhatsappContexto;
+  /** posição arredondada (anúncio de rua): mostra a região, sem marcar o ponto */
+  aproximado?: boolean;
+}) {
   const { session, signIn } = useSession();
   // equipe logada no painel vê direto, sem precisar do login do Google
   const { staff } = useStaffSession();
@@ -138,23 +152,43 @@ export default function PosicaoSol({ lat, lng, nome, whats }: { lat: number; lng
   return (
     <section className="mt-8 rounded-[20px] border border-[var(--border)] p-5">
       {titulo}
-      <div className="mt-4 grid gap-5 sm:grid-cols-[240px_minmax(0,1fr)] sm:items-center">
-        <svg viewBox="0 0 260 260" className="mx-auto h-[240px] w-[240px]" role="img" aria-label={`Caminho do sol sobre o ${nome}`}>
-          <circle cx={C} cy={C} r={R} fill="#FFFBEB" stroke="#D6B66E" strokeWidth="1.5" strokeDasharray="5 5" />
-          {calc.inverno && <path d={calc.inverno} stroke="#3B82F6" strokeWidth="2.5" fill="none" opacity="0.75" />}
-          {calc.verao && <path d={calc.verao} stroke="#DC2626" strokeWidth="2.5" fill="none" opacity="0.75" />}
-          <line x1={C} y1={C} x2={calc.nascer[0]} y2={calc.nascer[1]} stroke="#F59E0B" strokeWidth="2" strokeDasharray="3 4" />
-          <line x1={C} y1={C} x2={calc.por[0]} y2={calc.por[1]} stroke="#B45309" strokeWidth="2" strokeDasharray="3 4" />
-          <path d={calc.dia} stroke="#F59E0B" strokeWidth="5" fill="none" strokeLinecap="round" />
-          <rect x={C - 11} y={C - 11} width="22" height="22" rx="3" fill="#1A5FD0" />
-          {calc.sol && <circle cx={calc.sol[0]} cy={calc.sol[1]} r="11" fill="#FBBF24" stroke="#fff" strokeWidth="3" />}
-          <g fontSize="15" fontWeight="700" fill="currentColor" textAnchor="middle">
-            <text x={C} y="14">N</text>
-            <text x="252" y={C + 5}>L</text>
-            <text x={C} y="256">S</text>
-            <text x="8" y={C + 5}>O</text>
-          </g>
-        </svg>
+      <div className="mt-4 grid gap-5 sm:grid-cols-[300px_minmax(0,1fr)] sm:items-center">
+        <figure className="m-0">
+          <div className="relative mx-auto aspect-square w-full max-w-[300px] overflow-hidden rounded-2xl border border-[var(--border)]">
+            {/* mapa de verdade atrás do desenho: ruas e nomes, para a pessoa se localizar */}
+            <MapaFundoSol lat={lat} lng={lng} zoom={aproximado ? 14 : 16.6} />
+            <svg viewBox="0 0 260 260" className="absolute inset-0 h-full w-full" role="img" aria-label={`Caminho do sol sobre o ${nome}`}>
+              {/* fora do círculo um véu claro; dentro, o mapa aparece */}
+              <path d={`M0 0H260V260H0Z M${C - R} ${C}a${R} ${R} 0 1 0 ${2 * R} 0a${R} ${R} 0 1 0 ${-2 * R} 0Z`} fill="rgba(255,255,255,0.55)" fillRule="evenodd" />
+              <circle cx={C} cy={C} r={R} fill="rgba(255,251,235,0.18)" stroke="#B45309" strokeWidth="1.5" strokeDasharray="5 5" />
+              <g fill="none" strokeLinecap="round">
+                {calc.inverno && <path d={calc.inverno} stroke="#fff" strokeWidth="5.5" opacity="0.9" />}
+                {calc.inverno && <path d={calc.inverno} stroke="#3B82F6" strokeWidth="2.8" />}
+                {calc.verao && <path d={calc.verao} stroke="#fff" strokeWidth="5.5" opacity="0.9" />}
+                {calc.verao && <path d={calc.verao} stroke="#DC2626" strokeWidth="2.8" />}
+                <line x1={C} y1={C} x2={calc.nascer[0]} y2={calc.nascer[1]} stroke="#F59E0B" strokeWidth="2.2" strokeDasharray="3 4" />
+                <line x1={C} y1={C} x2={calc.por[0]} y2={calc.por[1]} stroke="#B45309" strokeWidth="2.2" strokeDasharray="3 4" />
+                <path d={calc.dia} stroke="#fff" strokeWidth="8" opacity="0.95" />
+                <path d={calc.dia} stroke="#F59E0B" strokeWidth="5" />
+              </g>
+              {aproximado ? (
+                <circle cx={C} cy={C} r="16" fill="rgba(26,95,208,0.18)" stroke="#1A5FD0" strokeWidth="2" strokeDasharray="4 3" />
+              ) : (
+                <rect x={C - 10} y={C - 10} width="20" height="20" rx="3" fill="#1A5FD0" stroke="#fff" strokeWidth="2.5" />
+              )}
+              {calc.sol && <circle cx={calc.sol[0]} cy={calc.sol[1]} r="11" fill="#FBBF24" stroke="#fff" strokeWidth="3" />}
+              <g fontSize="15" fontWeight="800" fill="#14161A" textAnchor="middle" stroke="#fff" strokeWidth="3.5" paintOrder="stroke">
+                <text x={C} y="15">N</text>
+                <text x="251" y={C + 5}>L</text>
+                <text x={C} y="255">S</text>
+                <text x="9" y={C + 5}>O</text>
+              </g>
+            </svg>
+          </div>
+          <figcaption className="mt-1.5 text-center text-[11.5px] text-[var(--text-muted)]">
+            {aproximado ? 'Região aproximada do imóvel' : <><span className="inline-block h-2.5 w-2.5 rounded-[2px] bg-[#1A5FD0] align-middle" /> {nome} no mapa</>}
+          </figcaption>
+        </figure>
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-1.5">
             {(
