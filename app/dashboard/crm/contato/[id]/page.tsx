@@ -10,7 +10,19 @@ import PainelNav from '@/components/PainelNav';
 import { CanalChip, CrmNav, Iniciais, NotaChip, OrigemChip, brl, dataHora, linkWhats, tempoDesde } from '@/components/crm/comum';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
-import { atribuirContato, concluirTarefa, crmContato, marcarTipo, moverNegocio, registrarAtividade, salvarTarefa, type FichaContato } from '@/lib/actions-crm';
+import {
+  atribuirContato,
+  concluirTarefa,
+  conversaWhatsapp,
+  crmContato,
+  enviarMensagemWhatsapp,
+  ligarIaNoContato,
+  marcarTipo,
+  moverNegocio,
+  registrarAtividade,
+  salvarTarefa,
+  type FichaContato
+} from '@/lib/actions-crm';
 import { FUNIS } from '@/lib/crm-tipos';
 import SelecionarImoveis from '@/components/crm/SelecionarImoveis';
 
@@ -38,13 +50,18 @@ export default function FichaPage() {
   const [tarefa, setTarefa] = useState({ titulo: '', tipo: 'tarefa' as 'tarefa' | 'visita' | 'ligacao', quando: '' });
   const [todasPaginas, setTodasPaginas] = useState(false);
   const [selecionando, setSelecionando] = useState(false);
+  const [conversa, setConversa] = useState<Awaited<ReturnType<typeof conversaWhatsapp>> | null>(null);
   useEffect(() => {
     if (loaded && !staff) router.replace('/dashboard/login');
   }, [loaded, staff, router]);
-  const carregar = () =>
-    crmContato(id)
+  const carregar = () => {
+    conversaWhatsapp(id)
+      .then(setConversa)
+      .catch(() => {});
+    return crmContato(id)
       .then(setD)
       .catch((e) => setErro(e instanceof Error ? e.message : 'Não foi possível abrir.'));
+  };
   useEffect(() => {
     if (staff) carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,6 +77,13 @@ export default function FichaPage() {
   const p = d.contato.preferencias as { quartos?: number[]; valorMax?: number; bairros?: string[]; grupo?: string; alcance?: { raio: number; ref: string } };
 
   const registrar = async (tipo: 'nota' | 'whatsapp' | 'ligacao') => {
+    // com a API ligada, a mensagem sai pelo número da empresa e fica na conversa
+    if (tipo === 'whatsapp' && conversa?.api && texto.trim()) {
+      const r = await enviarMensagemWhatsapp(c.id, texto);
+      if (!r.ok) return setErro(r.erro ?? 'Não foi possível enviar.');
+      setTexto('');
+      return carregar();
+    }
     if (tipo === 'whatsapp' && wa) window.open(texto.trim() ? linkWhats(c.telefone, texto)! : wa, '_blank');
     await registrarAtividade(c.id, tipo, texto || (tipo === 'whatsapp' ? 'Conversa pelo WhatsApp' : tipo === 'ligacao' ? 'Ligação' : '')).catch((e) => setErro(e.message));
     setTexto('');
@@ -194,9 +218,48 @@ export default function FichaPage() {
 
         {/* centro: linha do tempo */}
         <section className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg)]">
+          {conversa && (conversa.api || conversa.mensagens.length > 0) && (
+            <div className="border-b border-[var(--border)]">
+              <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+                <h2 className="text-[14px] font-bold">Conversa no WhatsApp</h2>
+                {conversa.iaLigada && (
+                  <label className="ml-auto flex items-center gap-2 text-[12.5px] font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={conversa.iaAtiva}
+                      onChange={(e) => ligarIaNoContato(c.id, e.target.checked).then(carregar)}
+                      className="h-4 w-4 accent-[#3B3FB5]"
+                    />
+                    IA responde este contato
+                  </label>
+                )}
+              </div>
+              <div className="flex max-h-[420px] flex-col gap-2 overflow-y-auto bg-[#FAFAF7] px-4 py-3">
+                {conversa.mensagens.length === 0 && <p className="text-[12.5px] text-[var(--text-muted)]">Nenhuma mensagem pelo número da empresa ainda.</p>}
+                {conversa.mensagens.map((m) =>
+                  m.direcao === 'entrada' ? (
+                    <div key={m.id} className="max-w-[80%] self-start whitespace-pre-line rounded-2xl rounded-bl-sm border border-[var(--border)] bg-white px-3 py-2 text-[13.5px]">
+                      {m.texto}
+                      <div className="mt-1 text-[10.5px] text-[var(--text-muted)]">{dataHora(m.quando)}</div>
+                    </div>
+                  ) : (
+                    <div key={m.id} className={`max-w-[80%] self-end whitespace-pre-line rounded-2xl rounded-br-sm px-3 py-2 text-[13.5px] ${m.autor === 'ia' ? 'bg-[#EEF2FF]' : 'bg-[#DCF8C6]'}`}>
+                      {m.texto}
+                      <div className="mt-1 text-right text-[10.5px] text-[var(--text-muted)]">
+                        {m.autor === 'ia' ? <b className="text-[#3B3FB5]">IA</b> : m.autor.split('@')[0]} · {dataHora(m.quando)}
+                        {m.status ? ` · ${m.status === 'read' ? 'lida' : m.status === 'delivered' ? 'entregue' : m.status.startsWith('erro') ? m.status : 'enviada'}` : ''}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          )}
           <div className="border-b border-[var(--border)] px-4 py-3">
             <h2 className="text-[14px] font-bold">Histórico</h2>
-            <p className="text-[11.5px] text-[var(--text-muted)]">Quando a API do WhatsApp for ligada, a conversa aparece aqui, inclusive as respostas da IA.</p>
+            <p className="text-[11.5px] text-[var(--text-muted)]">
+              {conversa?.api ? 'Escreva abaixo e clique em "Enviar no WhatsApp": sai pelo número da empresa (e a IA pausa neste contato).' : 'Notas, ligações, envios e tudo o que a pessoa fez.'}
+            </p>
           </div>
           <div className="border-b border-[var(--border)] p-3">
             <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={2} placeholder="Escreva uma nota, ou a mensagem para enviar no WhatsApp" className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-accent" />

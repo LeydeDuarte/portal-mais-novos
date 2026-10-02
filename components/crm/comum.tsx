@@ -78,7 +78,7 @@ const ABAS = [
   { href: '/dashboard/avisos', nome: 'Para avisar' }
 ];
 export function CrmNav({ ativo, gestor }: { ativo: string; gestor: boolean }) {
-  const abas = gestor ? [...ABAS, { href: '/dashboard/crm/equipe', nome: 'Equipe e distribuição' }] : ABAS;
+  const abas = gestor ? [...ABAS, { href: '/dashboard/crm/equipe', nome: 'Equipe e distribuição' }, { href: '/dashboard/crm/ia', nome: 'IA e WhatsApp' }] : ABAS;
   return (
     <nav aria-label="CRM" className="flex gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--bg)] px-5 md:px-8">
       {abas.map((a) => (

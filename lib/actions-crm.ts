@@ -52,7 +52,8 @@ export async function crmHoje(): Promise<Hoje> {
   const r1 = comEscopo(
     s,
     `select c.id, c.nome, c.telefone, c.tipo, c.possivel_corretor, c.origem, c.corretor_email, c.ultimo_contato_em, c.canal, c.canal_pago, c.campanha,
-            (select texto from crm_atividades a where a.contato_id = c.id and a.tipo = 'entrada' order by a.criado_em desc limit 1) as ultima
+            coalesce((select texto from crm_mensagens m where m.contato_id = c.id and m.direcao = 'entrada' order by m.criado_em desc limit 1),
+                     (select texto from crm_atividades a where a.contato_id = c.id and a.tipo = 'entrada' order by a.criado_em desc limit 1)) as ultima
        from crm_contatos c
       where c.ultimo_contato_em is not null and (c.ultima_resposta_em is null or c.ultima_resposta_em < c.ultimo_contato_em)
         and {ESCOPO}
@@ -711,4 +712,101 @@ export async function contatoParaProposta(id: string): Promise<{ nome: string; t
   if (!c) return null;
   const t = c.telefone?.replace(/^55/, '') ?? null;
   return { nome: c.nome, telefone: t ? `(${t.slice(0, 2)}) ${t.slice(2, t.length - 4)}-${t.slice(-4)}` : null, email: c.email };
+}
+
+// ---------------- WhatsApp pela API e IA ----------------
+export type MensagemWa = { id: string; direcao: string; autor: string; texto: string | null; status: string | null; quando: string };
+
+export async function conversaWhatsapp(contatoId: string): Promise<{ mensagens: MensagemWa[]; api: boolean; iaLigada: boolean; iaAtiva: boolean }> {
+  const s = await exigirEquipe();
+  await podeVerContato(s, contatoId);
+  const { whatsappConfigurado } = await import('./whatsapp');
+  const { lerConfigIA } = await import('./crm-config');
+  const [ms, cfg, c] = await Promise.all([
+    query<Record<string, unknown>>(`select * from crm_mensagens where contato_id = $1 order by criado_em asc limit 300`, [contatoId]),
+    lerConfigIA(),
+    query<{ ia_ativa: boolean }>(`select ia_ativa from crm_contatos where id = $1`, [contatoId])
+  ]);
+  return {
+    mensagens: ms.map((m) => ({
+      id: String(m.id),
+      direcao: String(m.direcao),
+      autor: String(m.autor),
+      texto: (m.texto as string) ?? null,
+      status: (m.status as string) ?? null,
+      quando: new Date(m.criado_em as string).toISOString()
+    })),
+    api: whatsappConfigurado(),
+    iaLigada: cfg.ligada && !!process.env.ANTHROPIC_API_KEY,
+    iaAtiva: !!c[0]?.ia_ativa
+  };
+}
+
+/** O corretor responde pelo próprio CRM (pela API). A IA fica pausada neste contato. */
+export async function enviarMensagemWhatsapp(contatoId: string, texto: string): Promise<{ ok: boolean; erro?: string }> {
+  const s = await exigirEquipe();
+  await podeVerContato(s, contatoId);
+  const t = String(texto ?? '').trim().slice(0, 4000);
+  if (!t) return { ok: false, erro: 'Escreva a mensagem.' };
+  const c = (await query<{ telefone: string | null }>(`select telefone from crm_contatos where id = $1`, [contatoId]))[0];
+  if (!c?.telefone) return { ok: false, erro: 'Contato sem WhatsApp.' };
+  const { enviarTextoWhatsapp } = await import('./whatsapp');
+  const r = await enviarTextoWhatsapp(c.telefone, t);
+  if (!r.ok) return { ok: false, erro: r.erro };
+  await query(`insert into crm_mensagens (contato_id, direcao, autor, texto, wa_id, status) values ($1, 'saida', $2, $3, $4, 'enviada')`, [contatoId, s.email, t, r.id]);
+  await query(`update crm_contatos set ia_ativa = false where id = $1`, [contatoId]);
+  await respondeu(contatoId);
+  await query(`update crm_negocios set etapa = 'atendimento', etapa_desde = now() where contato_id = $1 and etapa = 'novo' and funil in ('comprar', 'vender', 'alugar')`, [contatoId]);
+  return { ok: true };
+}
+
+export async function ligarIaNoContato(contatoId: string, ativa: boolean): Promise<void> {
+  const s = await exigirEquipe();
+  await podeVerContato(s, contatoId);
+  await query(`update crm_contatos set ia_ativa = $2 where id = $1`, [contatoId, !!ativa]);
+  await query(`insert into crm_atividades (contato_id, tipo, texto, autor_email) values ($1, 'sistema', $2, $3)`, [contatoId, ativa ? 'IA ligada para este contato' : 'IA pausada para este contato', s.email]);
+}
+
+export async function lerConfiguracaoIA() {
+  const s = await exigirEquipe();
+  if (s.role !== 'admin') throw new Error('Só o admin configura a IA.');
+  const { lerConfigIA } = await import('./crm-config');
+  const { whatsappConfigurado } = await import('./whatsapp');
+  return {
+    config: await lerConfigIA(),
+    status: {
+      whatsapp: whatsappConfigurado(),
+      assinatura: !!process.env.WHATSAPP_APP_SECRET,
+      verificacao: !!process.env.WHATSAPP_VERIFY_TOKEN,
+      ia: !!process.env.ANTHROPIC_API_KEY,
+      modelo: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5'
+    }
+  };
+}
+
+export async function salvarConfiguracaoIA(c: import('./crm-config').ConfigIA): Promise<void> {
+  const s = await exigirEquipe();
+  if (s.role !== 'admin') throw new Error('Só o admin configura a IA.');
+  const { gravarConfigIA, CONFIG_PADRAO } = await import('./crm-config');
+  const num = (v: unknown, min: number, max: number, padrao: number) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= min && n <= max ? n : padrao;
+  };
+  const taxas: Record<string, number> = {};
+  for (const [b, t] of Object.entries(c.taxasBancos ?? {})) {
+    const n = Number(t);
+    if (b.trim() && Number.isFinite(n) && n > 0 && n < 40) taxas[b.trim().slice(0, 40)] = n;
+  }
+  await gravarConfigIA({
+    ligada: !!c.ligada,
+    modoTeste: c.modoTeste !== false,
+    numerosTeste: (c.numerosTeste ?? []).map((n) => normTel(n)).filter((n): n is string => !!n).slice(0, 20),
+    nomeAssistente: String(c.nomeAssistente || CONFIG_PADRAO.nomeAssistente).slice(0, 60),
+    taxaMediaAa: c.taxaMediaAa ? num(c.taxaMediaAa, 1, 40, 0) || null : null,
+    entradaPct: num(c.entradaPct, 5, 90, 20),
+    prazoMeses: num(c.prazoMeses, 12, 480, 420),
+    taxasBancos: taxas,
+    bancos: String(c.bancos || CONFIG_PADRAO.bancos).slice(0, 200),
+    instrucoesExtras: String(c.instrucoesExtras ?? '').slice(0, 3000)
+  });
 }

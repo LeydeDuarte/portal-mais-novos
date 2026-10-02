@@ -313,3 +313,39 @@ export function calcularNota(x: {
   const valor = Math.max(0, Math.min(100, Math.round(n)));
   return { valor, faixa: valor >= 60 ? 'quente' : valor >= 30 ? 'morno' : 'frio', motivos };
 }
+
+// ---------------- Entrada pelo WhatsApp (API) ----------------
+/** Acha ou cria o contato de quem escreveu no WhatsApp da empresa (e abre um negócio se não houver) */
+export async function contatoDoWhatsapp(d: {
+  telefone: string;
+  nome: string;
+  texto: string;
+  anuncio?: { headline?: string; source_url?: string; source_type?: string } | null;
+}): Promise<{ id: string; novo: boolean }> {
+  const tel = normTel(d.telefone);
+  const ja = tel ? (await query<{ id: string }>(`select id from crm_contatos where telefone = $1`, [tel]))[0] : undefined;
+  const canal = d.anuncio
+    ? { canal: /instagram/i.test(d.anuncio.source_url ?? '') ? 'Instagram' : 'Facebook', pago: true, campanha: d.anuncio.headline?.slice(0, 80) ?? null }
+    : { canal: 'WhatsApp da empresa', pago: false, campanha: null };
+  const id = await acharOuCriar({
+    nome: d.nome || 'Contato do WhatsApp',
+    telefone: tel,
+    email: null,
+    origem: 'whatsapp',
+    corretor: null,
+    visitante: null,
+    quando: new Date(),
+    tipo: 'cliente',
+    possivel: motivoCorretor(d.nome, d.texto),
+    prefs: {},
+    canal
+  });
+  if (!ja) {
+    await query(`insert into crm_atividades (contato_id, tipo, texto) values ($1, 'entrada', $2)`, [
+      id,
+      d.anuncio ? `Escreveu no WhatsApp pelo anúncio${d.anuncio.headline ? ` "${d.anuncio.headline}"` : ''}` : 'Escreveu no WhatsApp da empresa'
+    ]);
+    await abrirNegocio(id, 'comprar', 'novo', { titulo: d.anuncio?.headline ?? null, valor: null, property_id: null, development_id: null, corretor: null, quando: new Date() });
+  }
+  return { id, novo: !ja };
+}
