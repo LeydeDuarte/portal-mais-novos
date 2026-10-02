@@ -66,7 +66,7 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
               '@id': `${url}#artigo`,
               headline: n.titulo.slice(0, 110),
               description: n.linhaFina ?? texto.slice(0, 160),
-              image: [n.capa16x9, n.capa].filter(Boolean),
+              image: n.capa16x9 || n.capa ? [n.capa16x9, n.capa].filter(Boolean) : [`${SITE_URL}/api/news/og?s=${encodeURIComponent(n.slug)}`],
               datePublished: n.publicadoEm,
               dateModified: n.atualizadoEm,
               inLanguage: 'pt-BR',

@@ -16,7 +16,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const url = `${SITE_URL}${urlNoticia(c)}`;
   const titulo = c.seoTitulo || caber([c.titulo]);
   const desc = (c.seoDescricao || c.linhaFina || textoPuro(c.corpo)).slice(0, 160);
-  const img = c.capa16x9 ?? c.capa ?? undefined;
+  // sem capa: imagem automática com o título (Discover e redes sociais pedem uma imagem grande)
+  const img = c.capa16x9 ?? c.capa ?? `${SITE_URL}/api/news/og?s=${encodeURIComponent(c.slug)}`;
   return {
     title: { absolute: titulo },
     description: desc,

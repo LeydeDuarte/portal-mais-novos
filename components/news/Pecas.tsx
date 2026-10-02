@@ -111,8 +111,17 @@ export function Midia({ n, grande = false, className = '' }: { n: Noticia; grand
         // eslint-disable-next-line @next/next/no-img-element
         <img src={img} alt={n.capaAlt || n.titulo} className="absolute inset-0 h-full w-full object-cover" loading={grande ? 'eager' : 'lazy'} />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-[var(--pill-bg)] p-4 text-center font-serif text-lg font-semibold text-[var(--text-muted)]">
-          {nomeTopico(n.topico)}
+        // sem capa: cartão escuro e elegante, no estilo da revista (não fica "faltando foto")
+        <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-br from-[#0E1014] via-[#1B2029] to-[#232A36] p-[6%] text-[#F4F1EA]">
+          <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#C9A45C] sm:text-[11px]">
+            <span className="h-[2px] w-5 bg-[#C9A45C]" aria-hidden />
+            {nomeTopico(n.topico)}
+          </span>
+          {grande ? (
+            <span className="line-clamp-3 font-serif text-[22px] font-semibold leading-tight sm:text-[30px]">{n.titulo}</span>
+          ) : (
+            <span className="font-serif text-[15px] font-semibold leading-tight opacity-90 sm:text-[17px]">Mais Novos News</span>
+          )}
         </div>
       )}
       {!embed && n.videoUrl && (
