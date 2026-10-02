@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
+import ChamadasProprietario from '@/components/news/ChamadasProprietario';
+import ImoveisDaRegiao from '@/components/news/ImoveisDaRegiao';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import JsonLd from '@/components/JsonLd';
-import RelatedListings from '@/components/RelatedListings';
 import { SugestaoRegiao } from '@/components/news/SeletorRegiao';
 import BannerFundadora from '@/components/news/BannerFundadora';
 import { Banner, CardNoticia, FaixaIndicadores, MaisLidas, Regioes, TopoNews } from '@/components/news/Pecas';
@@ -93,12 +94,7 @@ export default async function NewsCapa({ searchParams }: { searchParams: { q?: s
             <aside className="flex flex-col gap-6">
               <BannerFundadora className="hidden lg:flex" />
               <MaisLidas itens={lidas.length ? lidas : resto.slice(0, 5)} />
-              <Link href="/avaliar" className="group flex flex-col gap-1.5 rounded-2xl border-2 border-accent/30 bg-[#F3F7FF] p-4 hover:border-accent">
-                <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-accent">Grátis e na hora</span>
-                <span className="font-serif text-[20px] font-semibold leading-snug">Quanto vale o seu imóvel hoje?</span>
-                <span className="text-[13px] leading-snug text-[var(--text-muted)]">Avaliação pelo método comparativo da NBR 14653, com os anúncios da sua região.</span>
-                <span className="mt-1 inline-flex h-10 w-fit items-center rounded-full bg-accent px-4 text-sm font-bold text-white">Avaliar meu imóvel →</span>
-              </Link>
+              <ChamadasProprietario />
               <Regioes lista={regioes} />
               <Banner banners={banners} posicao="lateral" />
             </aside>
@@ -115,11 +111,7 @@ export default async function NewsCapa({ searchParams }: { searchParams: { q?: s
           </section>
         )}
 
-        {destaques.length > 0 && (
-          <section className="rounded-3xl bg-[var(--pill-bg)] p-5 md:p-8 [&>section]:mt-0">
-            <RelatedListings grade title="Imóveis em destaque" subtitle="Escolhidos pela equipe. Muda a cada visita." items={destaques} />
-          </section>
-        )}
+        <ImoveisDaRegiao inicial={destaques} />
 
         {(porTopico.length > 0 || demais.length > 0) && (
           <section className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -152,6 +144,7 @@ export default async function NewsCapa({ searchParams }: { searchParams: { q?: s
             </div>
             <aside className="flex flex-col gap-6">
               {/* com poucas notícias, o banner alto deixava buraco: só usa o alto quando a coluna é comprida */}
+              <ChamadasProprietario so="vender" />
               <Banner banners={banners} posicao={demais.length + porTopico.length * 4 >= 8 ? 'lateral-grande' : 'lateral'} className="lg:sticky lg:top-24" />
             </aside>
           </section>

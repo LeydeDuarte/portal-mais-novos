@@ -22,6 +22,7 @@ export type DadosPainel = {
   cliquesAnuncie: number;
   cliquesAvaliar: number;
   cliquesSol: number;
+  cliquesVender: number;
   leiturasNews: number;
   favoritos: number;
   compartilhamentos: number;
@@ -123,6 +124,7 @@ export async function dadosDoPainel(periodo: Periodo = 'mes', de?: string, ate?:
               count(*) filter (where tipo = 'anuncie') anuncie,
               count(*) filter (where tipo = 'avaliar') avaliar,
               count(*) filter (where tipo = 'sol') sol,
+              count(*) filter (where tipo = 'vender') vender,
               count(*) filter (where tipo = 'favorito') favoritos,
               count(*) filter (where tipo = 'compartilhar') compartilhar,
               count(*) filter (where tipo = 'visita' and pagina ~ '^/news/[^/]+/[^/]+$' and pagina !~ '^/news/(regiao|previa)/') news
@@ -187,6 +189,7 @@ export async function dadosDoPainel(periodo: Periodo = 'mes', de?: string, ate?:
     cliquesAnuncie: n(t.anuncie),
     cliquesAvaliar: n(t.avaliar),
     cliquesSol: n(t.sol),
+    cliquesVender: n(t.vender),
     leiturasNews: n(t.news),
     favoritos: n(t.favoritos),
     compartilhamentos: n(t.compartilhar),

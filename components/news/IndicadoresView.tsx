@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import ChamadasProprietario from '@/components/news/ChamadasProprietario';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import JsonLd from '@/components/JsonLd';
@@ -197,6 +198,9 @@ export default async function IndicadoresView({ serieId, periodoId, porSerie }: 
               <span className="font-sans text-lg font-bold tabular-nums">{pct(i.valor)}</span>
             </Link>
           ))}
+          <div className="mt-3">
+            <ChamadasProprietario />
+          </div>
           <Banner banners={banners} posicao="lateral" className="mt-3" />
           {lidas.length > 0 && (
             <div className="mt-3">

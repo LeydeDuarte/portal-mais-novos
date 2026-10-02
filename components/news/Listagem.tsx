@@ -1,5 +1,8 @@
 // Listagem de notícias (tópico ou região): título, lista e lateral
 import Link from 'next/link';
+import ChamadasProprietario from '@/components/news/ChamadasProprietario';
+import ImoveisDaRegiao from '@/components/news/ImoveisDaRegiao';
+import { imoveisEmDestaque } from '@/lib/news/imoveis';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import JsonLd from '@/components/JsonLd';
@@ -17,7 +20,8 @@ export default async function Listagem({
   regiaoAtual,
   caminho,
   pagina,
-  temMais
+  temMais,
+  cidadeImoveis
 }: {
   titulo: string;
   descricao: string;
@@ -27,8 +31,10 @@ export default async function Listagem({
   caminho: string;
   pagina: number;
   temMais: boolean;
+  /** página de região: imóveis dessa cidade (sem isso, os da região de quem está vendo) */
+  cidadeImoveis?: { cidade: string | null; uf: string };
 }) {
-  const [lidas, regioes, banners] = await Promise.all([maisLidas(30, 5), regioesComNoticias(), bannersAtivos()]);
+  const [lidas, regioes, banners, destaques] = await Promise.all([maisLidas(30, 5), regioesComNoticias(), bannersAtivos(), imoveisEmDestaque(4).catch(() => [])]);
   const [primeira, ...resto] = itens;
   return (
     <div className="flex min-h-screen flex-col">
@@ -78,12 +84,17 @@ export default async function Listagem({
           )}
         </div>
         <aside className="flex flex-col gap-6">
+          <ChamadasProprietario />
           <BannerFundadora className="hidden lg:flex" />
           <MaisLidas itens={lidas} />
           <Regioes lista={regioes} atual={regiaoAtual} />
           <Banner banners={banners} posicao="lateral" />
         </aside>
       </main>
+      {/* imóveis à venda pela região e pelo perfil de quem está vendo */}
+      <div className="mx-auto w-full max-w-6xl px-5 pb-14 md:px-8">
+        <ImoveisDaRegiao inicial={destaques} cidade={cidadeImoveis?.cidade} uf={cidadeImoveis?.uf} />
+      </div>
       <Footer />
     </div>
   );

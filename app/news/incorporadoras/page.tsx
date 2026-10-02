@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import ImoveisDaRegiao from '@/components/news/ImoveisDaRegiao';
+import { imoveisEmDestaque } from '@/lib/news/imoveis';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { TopoNews } from '@/components/news/Pecas';
@@ -23,6 +25,7 @@ export const metadata: Metadata = {
 
 export default async function RankingIncorporadoras() {
   const reg = regiaoDoVisitante();
+  const destaques = await imoveisEmDestaque(4).catch(() => []);
   const [cliente, staff, pais, doEstado] = await Promise.all([
     getCliente().catch(() => null),
     staffAtual().catch(() => null),
@@ -92,6 +95,9 @@ export default async function RankingIncorporadoras() {
           </div>
         )}
       </main>
+      <div className="mx-auto w-full max-w-6xl px-5 pb-14 md:px-8">
+        <ImoveisDaRegiao inicial={destaques} />
+      </div>
       <Footer />
     </div>
   );

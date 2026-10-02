@@ -43,6 +43,7 @@ export default async function RegiaoPage({ params, searchParams }: Props) {
       regiaoAtual={r.cidade ? `${r.uf}/${r.cidade}` : r.uf}
       caminho={urlRegiao(r.uf, r.cidade)}
       pagina={pagina}
+      cidadeImoveis={{ cidade: r.cidade ?? null, uf: r.uf }}
     />
   );
 }

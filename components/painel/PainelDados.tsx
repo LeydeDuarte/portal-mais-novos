@@ -175,6 +175,7 @@ export default function PainelDados() {
             <Cartao rotulo="Canal do WhatsApp" valor={d.cliquesCanal} detalhe="cliques em Seguir no WhatsApp" />
             <Cartao rotulo="Avalie seu imóvel" valor={d.cliquesAvaliar} detalhe="cliques nas páginas de anúncio e condomínio" />
             <Cartao rotulo="Posição do sol" valor={d.cliquesSol} detalhe="cliques em Entrar para ver, nos condomínios" />
+            <Cartao rotulo="Venda seu imóvel" valor={d.cliquesVender} detalhe="cliques na chamada das páginas do News" />
             <Cartao rotulo="Leituras no News" valor={d.leiturasNews} detalhe="páginas de notícia abertas" />
             <Cartao rotulo="Favoritados" valor={d.favoritos} detalhe="imóveis e condomínios salvos no coração" />
             <Cartao rotulo="Compartilhamentos" valor={d.compartilhamentos} detalhe="WhatsApp, link copiado ou menu do celular" />

@@ -1,5 +1,6 @@
 // Página de uma notícia (usada pela página pública e pela prévia da equipe)
 import Link from 'next/link';
+import ChamadasProprietario from '@/components/news/ChamadasProprietario';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import JsonLd from '@/components/JsonLd';
@@ -269,6 +270,7 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
               </div>
             )}
           </div>
+          <ChamadasProprietario />
         </aside>
       </main>
 
