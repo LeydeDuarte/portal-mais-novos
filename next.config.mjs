@@ -43,6 +43,14 @@ const nextConfig = {
     // sharp (miniaturas das fotos) roda só no servidor
     serverComponentsExternalPackages: ['sharp']
   },
+  // endereços do site antigo que ainda aparecem no Google
+  async redirects() {
+    return [
+      { source: '/buscar-imoveis', destination: '/', permanent: true },
+      { source: '/buscar-imoveis/:resto*', destination: '/', permanent: true },
+      { source: '/empreendimentos', destination: '/lancamentos', permanent: true }
+    ];
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },

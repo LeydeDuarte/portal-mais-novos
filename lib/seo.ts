@@ -1,3 +1,4 @@
+import { ehFutura } from './classification';
 import { tituloAnuncio, tituloCondominio } from './titulos';
 import type { Metadata } from 'next';
 import type { PropertyDetail, Development } from './property-details';
@@ -235,6 +236,8 @@ export function buildAgentJsonLd() {
   };
 }
 
+const aPartirDe = (d: Development) => d.units.some((u) => (u.priceValue ?? 0) > 0 && (u.areaValue ?? 0) > 0);
+
 export function buildDevelopmentMetadata(development: Development): Metadata {
   const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
   const onde = [development.bairro, development.cidade].filter(Boolean).join(', ') || development.location;
@@ -243,10 +246,38 @@ export function buildDevelopmentMetadata(development: Development): Metadata {
   const nomeSeo = nomeCondominioSeo(development.name);
   const quartos = [...(development.quartosOpcoes ?? []), ...development.units.map((u) => num(u.beds)).filter((n): n is number => !!n)];
   const title = tituloCondominio({ ...development, quartos });
-  const fase = badge.label && development.tipo !== 'horizontal' ? ` ${badge.label}.` : '';
-  const abertura = `Imóveis à venda no ${nomeSeo}, ${tipoTxt.toLowerCase()} no ${onde}.${fase}`;
-  const texto = descricaoTextoPuro(development.description);
-  const desc = texto ? `${abertura} ${texto}` : `${abertura} Veja unidades, fotos, lazer, plantas e valores na Mais Novos Imóveis.`;
+  // Descrição com fatos que fazem a pessoa clicar (quantos à venda, a partir de quanto,
+  // entrega) + o que só o portal mostra. Sem números inventados: só o que está cadastrado.
+  void nomeSeo;
+  void tipoTxt;
+  const valorCurto = (v: number) =>
+    v >= 1_000_000 ? `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} mi` : `R$ ${Math.round(v / 1000)} mil`;
+  const aVenda = development.units.filter(
+    (u) => !u.isTipologia && u.finalidade !== 'aluguel' && !u.vendidoEm && u.visibilidade !== 'privado' && u.priceValue
+  );
+  const tabela = development.units.filter((u) => u.isTipologia && u.priceValue);
+  const precos = (aVenda.length ? aVenda : tabela).map((u) => u.priceValue!).filter((v) => v > 0);
+  const aPartir = precos.length ? Math.min(...precos) : null;
+  const anoEntrega = /^\d{4}/.test(development.deliveryDate ?? '') ? Number(development.deliveryDate!.slice(0, 4)) : null;
+  const futuro = !!anoEntrega && ehFutura(badge.bucket);
+  const temPlanta = development.units.some((u) => (u.plantas ?? []).length > 0);
+  const temFoto = (development.photos ?? []).length > 0;
+  const oQueTem = [temFoto && 'fotos', temPlanta && 'plantas', 'lazer', aPartirDe(development) && 'preço do m²', 'posição do sol'].filter(Boolean) as string[];
+  const partes = [
+    `${development.name}, ${onde}.`,
+    aVenda.length
+      ? `${aVenda.length} ${aVenda.length === 1 ? 'imóvel' : 'imóveis'} à venda${aPartir ? ` a partir de ${valorCurto(aPartir)}` : ''}.`
+      : aPartir
+        ? `Unidades a partir de ${valorCurto(aPartir)}.`
+        : null,
+    anoEntrega && development.tipo !== 'horizontal' ? (futuro ? `Entrega em ${anoEntrega}.` : `Entregue em ${anoEntrega}.`) : null,
+    `${oQueTem.slice(0, -1).join(', ').replace(/^./, (c) => c.toUpperCase())} e ${oQueTem[oQueTem.length - 1]}.`
+  ].filter(Boolean) as string[];
+  let desc = partes.join(' ');
+  if (desc.length < 120) {
+    const texto = descricaoTextoPuro(development.description);
+    if (texto) desc = `${desc} ${texto}`;
+  }
   const description = desc.length > 158 ? `${desc.slice(0, 155).replace(/\s+\S*$/, '')}…` : desc;
   const url = `${SITE_URL}${urlCondominio(development)}`;
   const imagem = development.photos?.[0];

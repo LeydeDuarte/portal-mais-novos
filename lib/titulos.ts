@@ -60,7 +60,11 @@ const quartosTxt = (qs: number[]) => {
   return f ? `${f} ${f === '1' ? 'Quarto' : 'Quartos'}` : '';
 };
 /** Encurta nomes de bairro comuns quando o espaço aperta ("Setor Marista" → "Marista") */
-const bairroCurto = (b: string) => b.replace(/^(Setor|St\.?|Jardim|Jd\.?|Vila|Parque|Residencial)\s+/i, '');
+const bairroCurto = (b: string) => {
+  const c = b.replace(/^(Setor|St\.?|Jardim|Jd\.?|Vila|Parque|Residencial)\s+/i, '');
+  // "Jardim Goiás" não vira "Goiás" (confunde com o estado); nomes muito curtos ficam inteiros
+  return /^goi[aá]s$/i.test(c) || c.length < 5 ? b : c;
+};
 
 const fase = (entrega?: string | null): StatusBucket | null => (temEntrega(entrega) ? getStatusBucket(entrega) : null);
 
@@ -83,32 +87,35 @@ export function tituloCondominio(d: {
   const q = COMERCIAIS.includes(principal ?? '') ? '' : quartosTxt(d.quartos ?? []);
   const f = fase(d.deliveryDate);
 
+  // As buscas que trazem gente ao portal são pelo NOME do condomínio: o nome vem primeiro
+  // (aparece inteiro e em negrito no Google, mesmo no celular, que corta o fim do título).
   if (f && ehFutura(f)) {
     return completar(caber([
-      q && `Lançamento no ${bairro}: ${tipoPl} de ${q} | ${nome}`,
-      q && `Lançamento no ${bairroCurto(bairro)}: ${tipoPl} de ${q} | ${nome}`,
-      `Lançamento no ${bairro}: ${tipoPl} | ${nome}`,
-      `Lançamento no ${bairroCurto(bairro)}: ${tipoPl} | ${nome}`,
-      `Lançamento no ${bairroCurto(bairro)} | ${nome}`,
-      `${nome}: Lançamento no ${bairroCurto(bairro)}`
+      q && `${nome}: Lançamento no ${bairro}, ${tipoPl} de ${q}`,
+      q && `${nome}: Lançamento no ${bairro}, ${q}`,
+      q && `${nome}: Lançamento no ${bairroCurto(bairro)}, ${q}`,
+      `${nome}: Lançamento no ${bairro}`,
+      `${nome}: Lançamento no ${bairroCurto(bairro)}`,
+      `${nome}: Lançamento`
     ]));
   }
   if (f === 'novo') {
     return completar(caber([
-      q && `${tipoPl} de ${q} Prontos no ${bairro} | ${nome}`,
-      `${tipoPl} Prontos para Morar no ${bairro} | ${nome}`,
-      `${tipoPl} Prontos para Morar no ${bairroCurto(bairro)} | ${nome}`,
-      `Pronto para Morar no ${bairroCurto(bairro)} | ${nome}`,
-      `${nome}: Pronto para Morar no ${bairroCurto(bairro)}`
+      q && `${nome}: ${tipoPl} de ${q} Prontos no ${bairro}`,
+      q && `${nome}: ${tipoPl} de ${q} no ${bairroCurto(bairro)}`,
+      `${nome}: Pronto para Morar no ${bairro}`,
+      `${nome}: Pronto para Morar no ${bairroCurto(bairro)}`,
+      `${nome}, ${bairroCurto(bairro)}`
     ]));
   }
   return completar(caber([
-    q && `${tipoPl} de ${q} no ${bairro} | ${nome}`,
-    q && `${tipoPl} de ${q} no ${bairroCurto(bairro)} | ${nome}`,
-    `${tipoPl} à Venda no ${bairro} | ${nome}`,
-    `${tipoPl} à Venda no ${bairroCurto(bairro)} | ${nome}`,
-    `Imóveis à Venda no ${nome}, ${bairroCurto(bairro)}`,
-    `Imóveis à Venda no ${nome}`
+    q && `${nome}: ${tipoPl} de ${q} no ${bairro}`,
+    q && `${nome}: ${tipoPl} de ${q} no ${bairroCurto(bairro)}`,
+    `${nome}: ${tipoPl} à Venda no ${bairro}`,
+    `${nome}: ${tipoPl} à Venda no ${bairroCurto(bairro)}`,
+    `${nome}, ${bairroCurto(bairro)}: Fotos e Plantas`,
+    `${nome}, ${bairroCurto(bairro)}`,
+    nome
   ]));
 }
 
