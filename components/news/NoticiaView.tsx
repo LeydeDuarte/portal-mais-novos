@@ -1,5 +1,6 @@
 // Página de uma notícia (usada pela página pública e pela prévia da equipe)
 import Link from 'next/link';
+import { relSaida } from '@/lib/news/links';
 import ChamadasProprietario from '@/components/news/ChamadasProprietario';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -181,7 +182,7 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
                 {n.fontes.map((f, i) => (
                   <li key={i}>
                     {f.url ? (
-                      <a href={f.url} target="_blank" rel="noopener" className="underline">
+                      <a href={f.url} target="_blank" rel={relSaida(f.url)} className="underline">
                         {f.nome}
                       </a>
                     ) : (

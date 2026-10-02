@@ -1,6 +1,7 @@
 // Texto da notícia: parágrafos, subtítulos, citações, listas, imagens e os blocos
 // especiais ([[imoveis]], [[dados]], [[video]], [[banner]], [[leia]]).
 import Link from 'next/link';
+import { relSaida } from '@/lib/news/links';
 import type { ReactNode } from 'react';
 import { blocosDoTexto, urlNoticia, videoEmbed, type Bloco } from '@/lib/news/base';
 import { condominiosParaLink, noticiaPorSlug } from '@/lib/news/dados';
@@ -36,7 +37,7 @@ export function Inline({ texto }: { texto: string }) {
             <Inline texto={t} />
           </Link>
         ) : (
-          <a key={k++} href={u} target="_blank" rel="noopener" className="font-semibold text-accent underline underline-offset-2">
+          <a key={k++} href={u} target="_blank" rel={relSaida(u)} className="font-semibold text-accent underline underline-offset-2">
             <Inline texto={t} />
           </a>
         )
