@@ -24,6 +24,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/news/indicadores`, lastModified: agora, changeFrequency: 'daily', priority: 0.7 },
     { url: `${SITE_URL}/news/incorporadoras`, lastModified: agora, changeFrequency: 'weekly', priority: 0.6 },
     { url: `${SITE_URL}/avaliar`, lastModified: agora, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${SITE_URL}/mapa`, lastModified: agora, changeFrequency: 'daily', priority: 0.8 },
     ...TOPICOS.map((t) => ({ url: `${SITE_URL}/news/${t.id}`, lastModified: agora, changeFrequency: 'daily' as const, priority: 0.7 }))
   ];
 

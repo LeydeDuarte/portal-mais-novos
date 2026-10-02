@@ -7,6 +7,7 @@ import PainelFiltros from './PainelFiltros';
 import MasonryFeed, { type FeedInicial } from './MasonryFeed';
 import Footer from './Footer';
 import SearchBox from './SearchBox';
+import Link from 'next/link';
 import { DEFAULT_FILTERS, addTermos, localKey, splitTermos, type FilterState, type LocalFiltro } from '@/lib/filters';
 
 type Props = {
@@ -52,6 +53,24 @@ export default function Home({ initialModo = 'todos', initialQuery = '', inicial
     });
   }, [initialQuery]);
 
+  // a mesma busca vale no mapa (/mapa) e de volta no feed
+  useEffect(() => {
+    try {
+      const salvo = JSON.parse(sessionStorage.getItem('mn_filtros_feed') || 'null') as FilterState | null;
+      if (salvo && !initialQuery) setFilters((prev) => ({ ...prev, ...salvo, modo: initialModo === 'lancamentos' ? 'lancamentos' : salvo.modo ?? prev.modo }));
+    } catch {
+      /* sem memória */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('mn_filtros_feed', JSON.stringify(filters));
+    } catch {
+      /* ignora */
+    }
+  }, [filters]);
+
   const toggleLocal = (l: LocalFiltro) =>
     setFilters((prev) => {
       const k = localKey(l);
@@ -78,6 +97,17 @@ export default function Home({ initialModo = 'todos', initialQuery = '', inicial
         </div>
       </div>
       <Footer />
+      {/* atalho para o mapa, com a mesma busca */}
+      <Link
+        href="/mapa"
+        className="fixed bottom-6 left-1/2 z-[60] flex h-11 -translate-x-1/2 items-center gap-2 rounded-full bg-[#14161A] px-5 text-[13.5px] font-semibold text-white shadow-lg hover:brightness-110"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" />
+          <path d="M9 4v14M15 6v14" />
+        </svg>
+        Ver no mapa
+      </Link>
     </div>
   );
 }

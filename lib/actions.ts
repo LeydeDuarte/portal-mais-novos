@@ -2493,3 +2493,135 @@ export async function salvarPosicaoMapa(tipo: 'imovel' | 'condominio', id: strin
     await query(`update developments set lat = $2, lng = $3, geo_fonte = 'manual', geo_precisao = 'MANUAL', geo_erro = null where id = $1`, [id, la, lo]);
   else await query(`update properties set lat = $2, lng = $3, geo_fonte = 'manual', localizacao_aproximada = false where id = $1`, [id, la, lo]);
 }
+
+// ---------------- Mapa público ----------------
+// Mesmos filtros do feed, só a área visível do mapa (nunca o catálogo inteiro de uma
+// vez) e com limite por visitante, contra cópia em massa. Regras de privacidade
+// aplicadas AQUI, no servidor (o navegador nunca recebe o ponto exato protegido):
+//  - anúncio ligado a condomínio: usa a posição do condomínio (portaria); casas de
+//    condomínio horizontal nunca têm a posição própria enviada;
+//  - anúncio de rua (sem condomínio) e privado: posição aproximada (deslocada de
+//    150 a 300 m, sempre igual para o mesmo anúncio) e desenhada como círculo;
+//  - privado: sem preço, sem foto e sem título; só "Privado · N qtos";
+//  - nada de proprietário, corretor responsável ou dados internos.
+function aproximar(lat: number, lng: number, id: string): [number, number] {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619) >>> 0;
+  const ang = ((h % 3600) / 3600) * 2 * Math.PI;
+  const dist = 150 + ((h >>> 12) % 150);
+  return [lat + (dist * Math.cos(ang)) / 111320, lng + (dist * Math.sin(ang)) / (111320 * Math.cos((lat * Math.PI) / 180))];
+}
+
+export type AreaMapa = { oeste: number; sul: number; leste: number; norte: number };
+
+export async function getPontosMapaPublico(filters: FilterState, area: AreaMapa): Promise<ResultadoMapa & { bloqueado?: boolean }> {
+  const ip = ipDoVisitante();
+  if (!(await dentroDoLimite(`mapa:${ip}`, 300, 10))) return { pontos: [], semPosicao: 0, bloqueado: true };
+  await registrarUso(`mapa:${ip}`);
+  const n = (v: unknown, min: number, max: number) => Math.min(max, Math.max(min, Number(v) || 0));
+  const a = { o: n(area?.oeste, -180, 180), s: n(area?.sul, -90, 90), l: n(area?.leste, -180, 180), nn: n(area?.norte, -90, 90) };
+  if (a.o >= a.l || a.s >= a.nn) return { pontos: [], semPosicao: 0 };
+
+  const [pub, priv] = await Promise.all([feedInterno(0, filters, false, false, { mapa: true }), feedInterno(0, filters, true, false, { mapa: true })]);
+  const privIds = new Set((priv.mapa ?? []).filter((r) => r.kind === 'imovel').map((r) => r.id));
+  const todos = [...(pub.mapa ?? []), ...(priv.mapa ?? [])];
+  const propIds = Array.from(new Set(todos.filter((r) => r.kind === 'imovel').map((r) => r.id)));
+  const devIds = Array.from(new Set(todos.filter((r) => r.kind === 'empreendimento').map((r) => r.id)));
+  const caixa = [a.s, a.nn, a.o, a.l];
+
+  type LinhaI = {
+    id: string; slug: string | null; titulo: string | null; tipo_unidade: string | null; finalidade: string | null; price_value: string | number | null;
+    quartos: number | null; vagas: number | null; area: string | number | null; lat: number | null; lng: number | null; d_lat: number | null; d_lng: number | null;
+    bairro: string | null; cidade: string | null; uf: string | null; condominio: string | null; d_nome: string | null; delivery_date: string | Date | null;
+    capa: string | null; empreendimento_id: string | null; vendido_em: string | Date | null;
+  };
+  type LinhaC = {
+    id: string; slug: string | null; name: string; tipo: string | null; lat: number; lng: number; delivery_date: string | Date | null; bairro: string | null;
+    cidade: string | null; uf: string | null; capa: string | null; min_price: string | number | null; anuncios: number | string;
+    empresas: { nome: string; slug: string | null }[] | null;
+  };
+  const [imoveis, condos] = await Promise.all([
+    propIds.length
+      ? query<LinhaI>(
+          `select p.id, p.slug, p.titulo, p.tipo_unidade, p.finalidade, p.price_value, p.quartos, p.vagas, p.area, p.lat, p.lng, d.lat as d_lat, d.lng as d_lng,
+                  p.bairro, p.cidade, p.uf, p.condominio, d.name as d_nome, p.delivery_date, coalesce(p.capa_mini, p.photos->>0) as capa, p.empreendimento_id, p.vendido_em
+             from properties p left join developments d on d.id = p.empreendimento_id
+            where p.id = any($1::text[])
+              and coalesce(d.lat, p.lat) between $2 and $3 and coalesce(d.lng, p.lng) between $4 and $5
+            limit 2000`,
+          [propIds, ...caixa]
+        )
+      : Promise.resolve([] as LinhaI[]),
+    devIds.length
+      ? query<LinhaC>(
+          `select d.id, d.slug, d.name, d.tipo, d.lat, d.lng, d.delivery_date, d.bairro, d.cidade, d.uf, coalesce(d.capa_mini, d.photos->>0) as capa,
+                  (select min(x.price_value) from properties x where x.empreendimento_id = d.id and x.visibilidade = 'publico' and x.vendido_em is null and x.price_value > 0) as min_price,
+                  (select count(*) from properties x where x.empreendimento_id = d.id and not x.is_tipologia and x.visibilidade = 'publico' and x.vendido_em is null) as anuncios,
+                  (select json_agg(json_build_object('nome', coalesce(nullif(e.nome_perfil, ''), nullif(e.nome_fantasia, ''), e.razao_social), 'slug', e.slug) order by de.ordem)
+                     from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = d.id) as empresas
+             from developments d
+            where d.id = any($1::text[]) and d.lat between $2 and $3 and d.lng between $4 and $5
+            limit 2500`,
+          [devIds, ...caixa]
+        )
+      : Promise.resolve([] as LinhaC[])
+  ]);
+  const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v) || null);
+  const mes = (v: string | Date | null) => (v ? (v instanceof Date ? v.toISOString() : String(v)).slice(0, 7) : null);
+  const dia = (v: string | Date | null) => (v ? (v instanceof Date ? v.toISOString() : String(v)).slice(0, 10) : null);
+
+  const pontos: PontoMapa[] = [];
+  for (const r of imoveis) {
+    const privado = privIds.has(r.id);
+    const noCondominio = r.d_lat != null && r.d_lng != null;
+    let lat = Number(noCondominio ? r.d_lat : r.lat);
+    let lng = Number(noCondominio ? r.d_lng : r.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const aproximada = privado || !noCondominio;
+    if (aproximada) [lat, lng] = aproximar(lat, lng, r.id);
+    pontos.push({
+      tipo: 'imovel',
+      id: r.id,
+      lat,
+      lng,
+      nome: privado ? 'Anúncio privado' : r.d_nome || r.condominio || r.titulo || 'Imóvel',
+      tipoUnidade: r.tipo_unidade,
+      preco: privado ? null : num(r.price_value),
+      quartos: r.quartos,
+      vagas: r.vagas,
+      area: num(r.area),
+      entrega: mes(r.delivery_date),
+      bairro: r.bairro,
+      cidade: r.cidade,
+      capa: privado ? null : r.capa,
+      url: urlImovel({ id: r.id, slug: r.slug, uf: r.uf, cidade: r.cidade, bairro: r.bairro, finalidade: r.finalidade }),
+      condominioId: privado ? null : r.empreendimento_id,
+      privado,
+      aproximada,
+      herdaPosicao: false,
+      podeMover: false,
+      vendidoEm: privado ? null : dia(r.vendido_em)
+    });
+  }
+  for (const r of condos)
+    pontos.push({
+      tipo: 'condominio',
+      id: r.id,
+      lat: Number(r.lat),
+      lng: Number(r.lng),
+      nome: r.name,
+      horizontal: r.tipo === 'horizontal',
+      preco: num(r.min_price),
+      anuncios: Number(r.anuncios) || 0,
+      privados: 0,
+      entrega: mes(r.delivery_date),
+      bairro: r.bairro,
+      cidade: r.cidade,
+      capa: r.capa,
+      url: urlCondominio({ id: r.id, slug: r.slug, uf: r.uf, cidade: r.cidade, bairro: r.bairro }),
+      precisao: null,
+      podeMover: false,
+      empresas: Array.isArray(r.empresas) ? r.empresas.filter((e) => e?.nome) : []
+    });
+  return { pontos, semPosicao: 0 };
+}

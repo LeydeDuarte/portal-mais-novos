@@ -15,6 +15,7 @@ import type { Cliente } from '@/lib/cliente-auth';
 // - Nas outras páginas: leva para o feed já com a busca (?q=).
 const NAV = [
   { label: 'Lançamentos', href: '/lancamentos' },
+  { label: 'Mapa', href: '/mapa' },
   { label: 'Financiamento', href: '/financiamento' },
   { label: 'Venda seu imóvel', href: '/vender' },
   { label: 'News', href: '/news' },

@@ -111,7 +111,13 @@ function prepararDados(pontos: PontoMapa[]) {
         cor: vendido ? COR_VENDIDO : i.privado ? '#20242C' : '#257CFF',
         txt: vendido || i.privado ? '#FFFFFF' : '#14161A',
         l1: vendido ? 'VENDIDO' : '',
-        l2: i.preco ? precoCurto(i.preco) : vendido ? i.nome.slice(0, 20) : 'Consulte',
+        l2: i.preco
+          ? precoCurto(i.preco)
+          : i.privado
+            ? `Privado${i.quartos ? ` · ${i.quartos} qto${i.quartos > 1 ? 's' : ''}` : ''}`
+            : vendido
+              ? i.nome.slice(0, 20)
+              : 'Consulte',
         prio: vendido ? 3 : 0,
         // vendido não entra na faixa de preço dos agrupamentos
         pmin: vendido ? 1e13 : i.preco ?? 1e13,
@@ -262,15 +268,32 @@ function geoSol(lat: number, lng: number, diaSel: DiaSol, minutos: number) {
 
 export type Foco = { lat: number; lng: number; texto: string; ts: number };
 
+export type AreaVisivel = { oeste: number; sul: number; leste: number; norte: number; zoom: number };
+
 export default function MapaImoveis({
   pontos,
   foco,
-  onMover
+  onMover,
+  onSelecionar,
+  onArea,
+  enquadrar = true,
+  centroInicial
 }: {
   pontos: PontoMapa[];
   foco?: Foco | null;
   onMover?: (tipo: 'imovel' | 'condominio', id: string, lat: number, lng: number) => Promise<void>;
+  /** mapa público: o clique abre a gaveta da página em vez do balão da equipe */
+  onSelecionar?: (sel: { tipo: 'imovel' | 'condominio'; id: string }) => void;
+  /** avisa a área visível (o mapa público busca só o que está na tela) */
+  onArea?: (a: AreaVisivel) => void;
+  /** enquadrar sozinho quando o conjunto de pontos muda (painel: sim; público: não) */
+  enquadrar?: boolean;
+  centroInicial?: { lat: number; lng: number; zoom: number };
 }) {
+  const selRef = useRef(onSelecionar);
+  selRef.current = onSelecionar;
+  const areaRef = useRef(onArea);
+  areaRef.current = onArea;
   const caixa = useRef<HTMLDivElement | null>(null);
   const mapa = useRef<MLMap | null>(null);
   const lib = useRef<typeof import('maplibre-gl') | null>(null);
@@ -305,8 +328,8 @@ export default function MapaImoveis({
       const m = new maplibregl.Map({
         container: caixa.current,
         style: ESTILO,
-        center: CENTRO_GOIANIA,
-        zoom: 11.2,
+        center: centroInicial ? [centroInicial.lng, centroInicial.lat] : CENTRO_GOIANIA,
+        zoom: centroInicial?.zoom ?? 11.2,
         attributionControl: { compact: true },
         dragRotate: false,
         pitchWithRotate: false
@@ -455,7 +478,17 @@ export default function MapaImoveis({
           paint: { 'text-color': ['get', 'txt'] }
         } as never);
 
-        const clicar = (e: MapLayerMouseEvent) => abrirPopup(e);
+        const clicar = (e: MapLayerMouseEvent) => {
+          const k = String(e.features?.[0]?.properties?.k ?? '');
+          if (selRef.current && k) return selRef.current({ tipo: k.startsWith('c:') ? 'condominio' : 'imovel', id: k.slice(2) });
+          abrirPopup(e);
+        };
+        const avisarArea = () => {
+          const b = m.getBounds();
+          areaRef.current?.({ oeste: b.getWest(), sul: b.getSouth(), leste: b.getEast(), norte: b.getNorth(), zoom: m.getZoom() });
+        };
+        m.on('moveend', avisarArea);
+        avisarArea();
         m.on('click', 'ativos', clicar);
         m.on('click', 'ativos-ponto', clicar);
         m.on('click', 'apagados', clicar);
@@ -491,7 +524,7 @@ export default function MapaImoveis({
     (m.getSource('aprox') as GeoJSONSource).setData({ type: 'FeatureCollection', features: dados.aprox });
     // enquadra só quando o CONJUNTO muda (não depois de corrigir a posição de um ponto)
     const assinatura = `${pontos.length}:${pontos.slice(0, 30).map((p) => p.id).join(',')}`;
-    if (assinatura === enquadrou.current || !pontos.length) return;
+    if (!enquadrar || assinatura === enquadrou.current || !pontos.length) return;
     enquadrou.current = assinatura;
     const base = dados.ativos.length >= 3 ? dados.ativos : [...dados.ativos, ...dados.apagados];
     if (!base.length) return;
@@ -512,7 +545,7 @@ export default function MapaImoveis({
       ],
       { padding: 60, maxZoom: 15, duration: 600 }
     );
-  }, [dados, pronto, pontos]);
+  }, [dados, pronto, pontos, enquadrar]);
 
   // busca de endereço: voa até lá e marca o lugar (ou leva o marcador de correção)
   useEffect(() => {
