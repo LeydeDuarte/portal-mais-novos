@@ -166,13 +166,20 @@ export function CardRegiao({
   subtitulo,
   mapsQuery,
   aproximado,
-  numeros
+  numeros,
+  lat,
+  lng,
+  linkMapa
 }: {
   titulo: string;
   subtitulo: string;
   mapsQuery: string;
   aproximado?: boolean;
   numeros: { valor: string | null; rotulo: string }[];
+  /** posição (do condomínio, ou arredondada no anúncio de rua): mapa real + link para o mapa do portal */
+  lat?: number;
+  lng?: number;
+  linkMapa?: string;
 }) {
   const lista = numeros.filter((n) => n.valor);
   return (
@@ -184,7 +191,7 @@ export function CardRegiao({
         </svg>
         Localização
       </div>
-      <LocationCard embutido title={titulo} subtitle={subtitulo} mapsQuery={mapsQuery} approximate={aproximado} />
+      <LocationCard embutido title={titulo} subtitle={subtitulo} mapsQuery={mapsQuery} approximate={aproximado} lat={lat} lng={lng} linkMapa={linkMapa} />
       {lista.length > 0 && (
         <div className={`grid gap-2 p-4 text-center ${lista.length >= 3 ? 'grid-cols-3' : lista.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {lista.map((n) => (

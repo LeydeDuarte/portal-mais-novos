@@ -110,7 +110,7 @@ function prepararDados(pontos: PontoMapa[]) {
         pill: vendido ? `pill-${COR_VENDIDO}` : i.privado ? 'pill-#20242C' : 'pill-branca',
         cor: vendido ? COR_VENDIDO : i.privado ? '#20242C' : '#257CFF',
         txt: vendido || i.privado ? '#FFFFFF' : '#14161A',
-        l1: vendido ? 'VENDIDO' : '',
+        l1: vendido ? 'VENDIDO' : i.privado ? 'PRIVADO' : '',
         l2: i.preco
           ? precoCurto(i.preco)
           : i.privado

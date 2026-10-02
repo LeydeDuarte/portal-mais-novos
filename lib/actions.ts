@@ -2502,7 +2502,7 @@ export async function salvarPosicaoMapa(tipo: 'imovel' | 'condominio', id: strin
 //    condomínio horizontal nunca têm a posição própria enviada;
 //  - anúncio de rua (sem condomínio) e privado: posição aproximada (deslocada de
 //    150 a 300 m, sempre igual para o mesmo anúncio) e desenhada como círculo;
-//  - privado: sem preço, sem foto e sem título; só "Privado · N qtos";
+//  - privado: com o valor, mas sem foto, sem título e sem endereço;
 //  - nada de proprietário, corretor responsável ou dados internos.
 function aproximar(lat: number, lng: number, id: string): [number, number] {
   let h = 2166136261;
@@ -2586,7 +2586,7 @@ export async function getPontosMapaPublico(filters: FilterState, area: AreaMapa)
       lng,
       nome: privado ? 'Anúncio privado' : r.d_nome || r.condominio || r.titulo || 'Imóvel',
       tipoUnidade: r.tipo_unidade,
-      preco: privado ? null : num(r.price_value),
+      preco: num(r.price_value), // privado mostra o valor (decisão da Leyde); foto, título e endereço não
       quartos: r.quartos,
       vagas: r.vagas,
       area: num(r.area),

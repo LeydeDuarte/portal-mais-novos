@@ -1,35 +1,46 @@
 'use client';
 
-// Mapa real (ruas e nomes) atrás do desenho do sol, para o visitante entender a
-// posição do prédio. MapLibre + OpenFreeMap (gratuito). Parado (sem arrastar), e só
-// carrega quando a seção aparece na tela, para não pesar a abertura da página.
+// Mapa real (ruas e nomes) usado como fundo: atrás do desenho do sol e no cartão de
+// Localização. MapLibre + OpenFreeMap (gratuito). Parado (sem arrastar). Só carrega
+// quando aparece na tela e depois que a página terminou de abrir, para não pesar.
+// Atenção: o MapLibre põe "position: relative" no elemento do mapa; por isso o mapa
+// fica num div INTERNO (h-full), e o externo é que ocupa o espaço (absolute).
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef, useState } from 'react';
 
 const ESTILO = 'https://tiles.openfreemap.org/styles/positron';
 
 export default function MapaFundoSol({ lat, lng, zoom }: { lat: number; lng: number; zoom: number }) {
+  const externo = useRef<HTMLDivElement | null>(null);
   const caixa = useRef<HTMLDivElement | null>(null);
-  const [visivel, setVisivel] = useState(false);
+  const [liberado, setLiberado] = useState(false);
 
   useEffect(() => {
-    const el = caixa.current;
+    const el = externo.current;
     if (!el) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const depoisDeCarregar = (fn: () => void) => {
+      if (document.readyState === 'complete') timer = setTimeout(fn, 600);
+      else window.addEventListener('load', () => (timer = setTimeout(fn, 600)), { once: true });
+    };
     const obs = new IntersectionObserver(
       (e) => {
         if (e.some((x) => x.isIntersecting)) {
-          setVisivel(true);
           obs.disconnect();
+          depoisDeCarregar(() => setLiberado(true));
         }
       },
       { rootMargin: '200px' }
     );
     obs.observe(el);
-    return () => obs.disconnect();
+    return () => {
+      obs.disconnect();
+      if (timer) clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
-    if (!visivel || !caixa.current) return;
+    if (!liberado || !caixa.current) return;
     let mapa: { remove: () => void } | null = null;
     let cancelado = false;
     (async () => {
@@ -49,7 +60,11 @@ export default function MapaFundoSol({ lat, lng, zoom }: { lat: number; lng: num
       cancelado = true;
       mapa?.remove();
     };
-  }, [visivel, lat, lng, zoom]);
+  }, [liberado, lat, lng, zoom]);
 
-  return <div ref={caixa} className="absolute inset-0 bg-[#EEF0EB]" aria-hidden />;
+  return (
+    <div ref={externo} className="absolute inset-0 bg-[#EEF0EB]" aria-hidden>
+      <div ref={caixa} className="h-full w-full" />
+    </div>
+  );
 }

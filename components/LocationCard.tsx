@@ -1,26 +1,45 @@
+import MapaFundoSol from './MapaFundoSol';
+
 type Props = {
   title: string; // ex: "Residencial Jardins do Cerrado" ou "Setor Bueno"
   subtitle: string; // ex: "Jardim Goiás, Goiânia — GO"
   mapsQuery: string; // o que abre no Google Maps ao clicar
   approximate?: boolean; // imóvel de rua: só a região, nunca o endereço exato
   embutido?: boolean; // dentro de outro cartão (perfil): sem o título e sem margem
+  /** com posição: mapa de verdade ao fundo e o clique abre o MAPA DO PORTAL nesse ponto */
+  lat?: number;
+  lng?: number;
+  linkMapa?: string;
 };
 
 // Seção "Localização" no final da página do imóvel/empreendimento.
 // O fundo é uma textura de mapa desenhada aqui mesmo (sem custo de API);
 // o mapa de verdade só abre quando a pessoa clica.
-export default function LocationCard({ title, subtitle, mapsQuery, approximate, embutido = false }: Props) {
-  const href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
+export default function LocationCard({ title, subtitle, mapsQuery, approximate, embutido = false, lat, lng, linkMapa }: Props) {
+  const temMapa = lat != null && lng != null;
+  const href = temMapa && linkMapa ? linkMapa : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`;
   return (
     <section className={embutido ? '' : 'mt-10'} aria-label="Localização">
       {!embutido && <h2 className="mb-3 text-lg font-bold">Localização</h2>}
       <a
         href={href}
-        target="_blank"
-        rel="noreferrer"
-        className={`group relative flex h-[170px] items-center justify-center overflow-hidden bg-[#f1f3f5] px-5 ${embutido ? '' : 'rounded-2xl'}`}
+        {...(temMapa && linkMapa ? {} : { target: '_blank', rel: 'noreferrer' })}
+        className={`group relative flex justify-center overflow-hidden bg-[#f1f3f5] px-5 ${temMapa ? 'h-[210px] items-end pb-3' : 'h-[170px] items-center'} ${embutido ? '' : 'rounded-2xl'}`}
       >
-        <svg className="absolute inset-0 h-full w-full opacity-70" viewBox="0 0 600 170" preserveAspectRatio="xMidYMid slice" aria-hidden>
+        {temMapa ? (
+          <>
+            <MapaFundoSol lat={lat!} lng={lng!} zoom={approximate ? 14 : 16} />
+            {!approximate && (
+              <span aria-hidden className="absolute left-1/2 top-1/2 z-[1] -translate-x-1/2 -translate-y-full">
+                <svg width="30" height="38" viewBox="0 0 24 30">
+                  <path d="M12 1a9 9 0 0 0-9 9c0 6.6 9 18 9 18s9-11.4 9-18a9 9 0 0 0-9-9Z" fill="#1A5FD0" stroke="#fff" strokeWidth="2" />
+                  <circle cx="12" cy="10" r="3.3" fill="#fff" />
+                </svg>
+              </span>
+            )}
+          </>
+        ) : null}
+        <svg className={`absolute inset-0 h-full w-full opacity-70 ${temMapa ? 'hidden' : ''}`} viewBox="0 0 600 170" preserveAspectRatio="xMidYMid slice" aria-hidden>
           <rect width="600" height="170" fill="#f1f3f5" />
           <path d="M430 10 C500 0 560 40 560 90 C560 140 500 160 450 150 C400 140 380 90 395 50 C402 30 412 15 430 10Z" fill="#e3ebe0" />
           <g stroke="#fff" strokeLinecap="round" fill="none">
@@ -39,10 +58,12 @@ export default function LocationCard({ title, subtitle, mapsQuery, approximate, 
         {approximate && (
           <span
             aria-hidden
-            className="absolute left-1/2 top-1/2 h-[150px] w-[150px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-accent/70 bg-accent/10"
+            className="absolute left-1/2 top-1/2 z-[1] h-[150px] w-[150px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-accent/70 bg-accent/10"
           />
         )}
-        <span className="relative flex w-full max-w-[360px] items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-[0_2px_10px_rgba(20,22,26,0.10)] transition-shadow group-hover:shadow-[0_4px_16px_rgba(20,22,26,0.16)]">
+        <span
+          className={`relative z-[2] flex w-full max-w-[360px] items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-[0_2px_10px_rgba(20,22,26,0.10)] transition-shadow group-hover:shadow-[0_4px_16px_rgba(20,22,26,0.16)] ${temMapa ? 'py-3' : ''}`}
+        >
           <svg width="22" height="22" viewBox="0 0 24 24" className="shrink-0 text-accent" fill="currentColor" aria-hidden>
             <path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" />
           </svg>

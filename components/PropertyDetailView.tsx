@@ -250,10 +250,13 @@ export default async function PropertyDetailView({
           <aside className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 lg:sticky lg:top-24">
               <CardRegiao
+                lat={posSol?.lat}
+                lng={posSol?.lng}
+                linkMapa={posSol ? `/mapa?lat=${posSol.lat}&lng=${posSol.lng}&z=${posSol.aproximado ? 15 : 16}&sel=i:${encodeURIComponent(property.id)}` : undefined}
                 titulo={nomeCondominio || property.bairro || property.location.split(',')[0]}
                 subtitulo={property.location}
                 mapsQuery={nomeCondominio ? `${nomeCondominio}, ${regiao}` : regiao}
-                aproximado={!nomeCondominio}
+                aproximado={posSol ? posSol.aproximado : !nomeCondominio}
                 numeros={[
                   { valor: entrega ? entrega.replace(/^Entrega(ue em)? /, '') : null, rotulo: entrega?.startsWith('Entrega ') ? 'Entrega prevista' : 'Entregue em' },
                   { valor: mercado?.m2Anunciado ? brl(mercado.m2Anunciado) : null, rotulo: `m² médio no ${property.bairro ?? 'bairro'}` },

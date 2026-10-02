@@ -305,6 +305,9 @@ export default async function DevelopmentDetailView({ development }: { developme
           <aside className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 lg:sticky lg:top-24">
               <CardRegiao
+                lat={development.lat}
+                lng={development.lng}
+                linkMapa={development.lat != null && development.lng != null ? `/mapa?lat=${development.lat}&lng=${development.lng}&z=16&sel=c:${encodeURIComponent(development.id)}` : undefined}
                 titulo={development.name}
                 subtitulo={development.location}
                 mapsQuery={`${development.name}, ${development.location.replace(/\s*—\s*/g, ', ')}`}

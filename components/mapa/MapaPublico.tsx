@@ -73,6 +73,20 @@ export default function MapaPublico() {
   const { staff } = useStaffSession();
   const liberado = session.loggedIn || !!staff;
 
+  // vindo do cartão "Localização" de uma página: /mapa?lat=..&lng=..&z=16&sel=c:ID
+  const [centro, setCentro] = useState<{ lat: number; lng: number; zoom: number } | null>(null);
+  const pendente = useRef<string | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const lat = Number(q.get('lat'));
+    const lng = Number(q.get('lng'));
+    const z = Number(q.get('z'));
+    const ok = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat !== 0 || lng !== 0);
+    setCentro(ok ? { lat, lng, zoom: Number.isFinite(z) && z >= 3 && z <= 19 ? z : 16 } : { lat: -16.6869, lng: -49.2648, zoom: 12.5 });
+    const sel = q.get('sel');
+    if (sel && /^[ci]:[\w-]{1,80}$/.test(sel)) pendente.current = sel;
+  }, []);
+
   // filtros compartilhados com o feed (mesma busca nos dois modos)
   useEffect(() => {
     try {
@@ -162,6 +176,31 @@ export default function MapaPublico() {
     [grupos, abrir]
   );
 
+  // abre o ponto pedido no endereço assim que ele chega (anúncio dentro de condomínio abre o condomínio)
+  useEffect(() => {
+    const p = pendente.current;
+    if (!p || !pontos.length) return;
+    const id = p.slice(2);
+    if (p.startsWith('c:')) {
+      const c = grupos.condos.get(id);
+      if (c) {
+        pendente.current = null;
+        abrir({ tipo: 'condominio', c });
+      }
+      return;
+    }
+    const solto = grupos.soltos.find((x) => x.id === id);
+    if (solto) {
+      pendente.current = null;
+      return abrir({ tipo: 'imovel', i: solto });
+    }
+    const dono = Array.from(grupos.condos.values()).find((c) => c.imoveis.some((x) => x.id === id));
+    if (dono) {
+      pendente.current = null;
+      abrir({ tipo: 'condominio', c: dono });
+    }
+  }, [pontos, grupos, abrir]);
+
   const toggleLocal = (l: LocalFiltro) =>
     setFilters((prev) => {
       const k = localKey(l);
@@ -209,7 +248,7 @@ export default function MapaPublico() {
                   : i!.vendidoEm
                     ? 'Vendido'
                     : i!.privado
-                      ? 'Anúncio privado'
+                      ? `Privado${i!.preco ? ` · ${precoCurto(i!.preco)}` : ''}`
                       : precoCurto(i!.preco) || 'Consulte';
                 const capa = c ? c.capa : i!.capa;
                 return (
@@ -238,7 +277,7 @@ export default function MapaPublico() {
         </section>
 
         <div className="relative min-w-0 flex-1">
-          <MapaImoveis pontos={pontos} onSelecionar={selecionar} onArea={setArea} enquadrar={false} centroInicial={{ lat: -16.6869, lng: -49.2648, zoom: 12.5 }} />
+          {centro && <MapaImoveis pontos={pontos} onSelecionar={selecionar} onArea={setArea} enquadrar={false} centroInicial={centro} />}
 
           {bloqueado && (
             <div className="absolute inset-x-3 top-3 z-20 mx-auto max-w-md rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900 shadow">
