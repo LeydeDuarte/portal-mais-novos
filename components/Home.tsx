@@ -100,7 +100,7 @@ export default function Home({ initialModo = 'todos', initialQuery = '', inicial
       {/* atalho para o mapa, com a mesma busca */}
       <Link
         href="/mapa"
-        className="fixed bottom-6 left-1/2 z-[60] flex h-11 -translate-x-1/2 items-center gap-2 rounded-full bg-[#14161A] px-5 text-[13.5px] font-semibold text-white shadow-lg hover:brightness-110"
+        className="fixed bottom-6 left-1/2 z-[60] flex h-11 -translate-x-1/2 items-center gap-2 rounded-full bg-accent px-5 text-[13.5px] font-bold text-white shadow-[0_6px_18px_rgba(37,124,255,0.4)] hover:brightness-110"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" />

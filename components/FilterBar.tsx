@@ -151,7 +151,7 @@ export default function FilterBar({ filters, onChange }: Props) {
               onClick={() => set('modo', m)}
               className={`rounded-full px-3.5 py-1.5 text-[13px] font-bold whitespace-nowrap ${filters.modo === m ? 'bg-accent text-white' : 'text-[var(--text-muted)]'}`}
             >
-              {m === 'todos' ? 'Todos' : 'Lançamentos e empreendimentos'}
+              {m === 'todos' ? 'Todos' : 'Lançamentos e condomínios'}
             </button>
           ))}
         </div>

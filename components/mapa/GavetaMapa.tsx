@@ -2,7 +2,7 @@
 
 // Gaveta do mapa público (direita no computador, de baixo no celular).
 // Abas: Unidades (ou Detalhes, no anúncio) · ☀ Sol · Avise-me. Botão verde sempre fixo.
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import InterestForm from '@/components/InterestForm';
 import PosicaoSol from '@/components/PosicaoSol';
@@ -20,14 +20,34 @@ const det = (i: { quartos: number | null; vagas: number | null; area: number | n
     .filter(Boolean)
     .join(' · ');
 
-export default function GavetaMapa({ sel, onFechar }: { sel: Selecionado; onFechar: () => void }) {
+export type SolNoMapa = { lat: number; lng: number; dia: 'hoje' | 'inverno' | 'verao'; minutos: number } | null;
+
+export default function GavetaMapa({ sel, onFechar, onSol }: { sel: Selecionado; onFechar: () => void; onSol?: (v: SolNoMapa) => void }) {
   const condo = sel.tipo === 'condominio' ? sel.c : null;
   const imovel = sel.tipo === 'imovel' ? sel.i : null;
   const fase = condo && temEntrega(condo.entrega) ? getStatusBucket(condo.entrega) : null;
   const semNada = !!condo && !condo.imoveis.length && !condo.preco && !(fase && ['breve_lancamento', 'lancamento', 'obras'].includes(fase));
-  const [aba, setAba] = useState<'principal' | 'sol' | 'aviso'>(semNada ? 'aviso' : 'principal');
-  useEffect(() => setAba(semNada ? 'aviso' : 'principal'), [sel, semNada]);
+  // lançamento, obras ou pronto há até 36 meses, sem unidade listada: "em cadastramento"
+  const mesesDesdeEntrega = condo?.entrega
+    ? (() => {
+        const [y, m] = condo.entrega.split('-').map(Number);
+        const agora = new Date();
+        return (agora.getFullYear() - y) * 12 + (agora.getMonth() + 1 - m);
+      })()
+    : null;
+  const emCadastramento =
+    !!condo && !condo.imoveis.length && !!fase && (['breve_lancamento', 'lancamento', 'obras'].includes(fase) || (mesesDesdeEntrega != null && mesesDesdeEntrega <= 36));
+  const abaInicial = semNada && !emCadastramento ? 'aviso' : 'principal';
+  const [aba, setAba] = useState<'principal' | 'sol' | 'aviso'>(abaInicial);
+  useEffect(() => setAba(abaInicial), [sel, abaInicial]);
 
+  const pLat = condo ? condo.lat : imovel!.lat;
+  const pLng = condo ? condo.lng : imovel!.lng;
+  // aba Sol aberta (e liberada): o mapa grande desenha o caminho do sol em volta do prédio
+  const mudarSol = useCallback(
+    (v: { dia: 'hoje' | 'inverno' | 'verao'; minutos: number } | null) => onSol?.(v ? { lat: pLat, lng: pLng, ...v } : null),
+    [onSol, pLat, pLng]
+  );
   const nome = condo ? condo.nome : imovel!.nome;
   const capa = condo ? condo.capa : imovel!.capa;
   const url = condo ? condo.url : imovel!.url;
@@ -58,7 +78,7 @@ export default function GavetaMapa({ sel, onFechar }: { sel: Selecionado; onFech
       aria-label={nome}
       className="fixed inset-x-0 bottom-0 z-40 flex max-h-[85dvh] flex-col overflow-hidden rounded-t-3xl bg-[var(--bg)] shadow-[0_-10px_30px_rgba(0,0,0,0.18)] md:absolute md:inset-x-auto md:bottom-3 md:right-3 md:top-3 md:max-h-none md:w-[420px] md:rounded-3xl md:shadow-2xl"
     >
-      <div className="relative h-36 shrink-0 bg-[#DDE1E6] md:h-44">
+      <div className={`relative shrink-0 bg-[#DDE1E6] transition-[height] ${aba === 'principal' ? 'h-28 md:h-36' : 'h-20 md:h-24'}`}>
         {capa && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={capa} alt={`${nome}, ${[bairro, cidade].filter(Boolean).join(', ')}`} className="h-full w-full object-cover" />
@@ -118,15 +138,23 @@ export default function GavetaMapa({ sel, onFechar }: { sel: Selecionado; onFech
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4 [&>section]:mt-3">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 pb-4">
         {aba === 'principal' && condo && (
           <div className="mt-3 flex flex-col gap-2">
             {condo.horizontal && condo.imoveis.length > 0 && (
               <p className="rounded-xl bg-[var(--pill-bg)] px-3 py-2 text-[12.5px]">Por segurança dos proprietários, a localização de cada casa é informada na visita.</p>
             )}
             {condo.imoveis.length === 0 ? (
-              <p className="text-[13.5px] text-[var(--text-muted)]">
-                {semNada ? 'Nenhuma unidade anunciada agora.' : 'Unidades direto com a construtora: fale com a gente para receber a tabela e a disponibilidade.'}
+              <p className="rounded-xl bg-[var(--pill-bg)] px-3 py-2.5 text-[13.5px]">
+                {emCadastramento ? (
+                  <>
+                    <b>Condomínio em cadastramento.</b> Fale com o consultor.
+                  </>
+                ) : semNada ? (
+                  'Nenhuma unidade anunciada agora.'
+                ) : (
+                  'Unidades direto com a construtora: fale com o consultor para ver preços e disponibilidade.'
+                )}
               </p>
             ) : (
               condo.imoveis.map((i) => (
@@ -161,6 +189,8 @@ export default function GavetaMapa({ sel, onFechar }: { sel: Selecionado; onFech
             nome={nome}
             whats={whats}
             aproximado={!!imovel?.aproximada}
+            compacto
+            onMudar={mudarSol}
           />
         )}
         {aba === 'aviso' && (
@@ -179,7 +209,7 @@ export default function GavetaMapa({ sel, onFechar }: { sel: Selecionado; onFech
 
       <div className="flex shrink-0 gap-2 border-t border-[var(--border)] px-5 pb-[calc(12px+env(safe-area-inset-bottom,0px))] pt-3">
         <div className="flex-1 [&>*]:w-full">
-          <BotaoWhatsapp ctx={whats} variante="bloco" rotulo={imovel?.vendidoEm ? 'Falar com o corretor' : condo && !condo.imoveis.length ? 'Quero a tabela e as plantas' : 'Fale comigo'} />
+          <BotaoWhatsapp ctx={whats} variante="bloco" rotulo={imovel?.vendidoEm ? 'Falar com o corretor' : condo && !condo.imoveis.length ? 'Ver preços e disponibilidade com consultor' : 'Fale comigo'} />
         </div>
         {!imovel?.privado && (
           <a href={url} className="flex h-[46px] shrink-0 items-center rounded-full border border-[var(--border)] px-4 text-[13.5px] font-semibold hover:bg-[var(--pill-bg)]">

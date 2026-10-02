@@ -47,7 +47,7 @@ export default function MapaFundoSol({ lat, lng, zoom }: { lat: number; lng: num
       const mod = await import('maplibre-gl');
       const L = ((mod as unknown as { default?: typeof mod }).default ?? mod) as typeof mod;
       if (cancelado || !caixa.current) return;
-      mapa = new L.Map({
+      const m = new L.Map({
         container: caixa.current,
         style: ESTILO,
         center: [lng, lat],
@@ -55,6 +55,9 @@ export default function MapaFundoSol({ lat, lng, zoom }: { lat: number; lng: num
         interactive: false,
         attributionControl: { compact: true }
       });
+      // crédito do mapa só no "i" (fechado), para não cobrir o desenho
+      m.on('load', () => m.getContainer().querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'));
+      mapa = m;
     })();
     return () => {
       cancelado = true;

@@ -4,7 +4,7 @@
 // (é o principal motivo para entrar). O cálculo é astronômico, feito no navegador
 // (SunCalc), sem custo. Desenho tipo "cúpula do céu" vista de cima: a borda é o
 // horizonte, o centro é o sol a pino; quanto mais alto o sol, mais perto do centro.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as SunCalc from 'suncalc';
 import LoginModal from '@/components/LoginModal';
 import BotaoWhatsapp, { type WhatsappContexto } from '@/components/BotaoWhatsapp';
@@ -52,7 +52,9 @@ export default function PosicaoSol({
   lng,
   nome,
   whats,
-  aproximado = false
+  aproximado = false,
+  compacto = false,
+  onMudar
 }: {
   lat: number;
   lng: number;
@@ -60,6 +62,10 @@ export default function PosicaoSol({
   whats: WhatsappContexto;
   /** posição arredondada (anúncio de rua): mostra a região, sem marcar o ponto */
   aproximado?: boolean;
+  /** dentro da gaveta do mapa: uma coluna, letras menores, sem título nem botão próprio */
+  compacto?: boolean;
+  /** avisa dia e horário escolhidos (o mapa público desenha o sol em volta do prédio) */
+  onMudar?: (v: { dia: 'hoje' | 'inverno' | 'verao'; minutos: number } | null) => void;
 }) {
   const { session, signIn } = useSession();
   // equipe logada no painel vê direto, sem precisar do login do Google
@@ -72,6 +78,13 @@ export default function PosicaoSol({
     const m = a.getUTCHours() * 60 + a.getUTCMinutes();
     return m >= 6 * 60 && m <= 18 * 60 ? m - (m % 10) : 14 * 60 + 30;
   });
+
+  // só quem pode ver (logado ou equipe) liga o desenho no mapa grande
+  useEffect(() => {
+    if (!onMudar) return;
+    onMudar(loggedIn ? { dia, minutos: min } : null);
+  }, [onMudar, loggedIn, dia, min]);
+  useEffect(() => () => onMudar?.(null), [onMudar]);
 
   const calc = useMemo(() => {
     const dd = dataDoDia(dia);
@@ -113,8 +126,8 @@ export default function PosicaoSol({
   // sem login: prévia desfocada + convite
   if (!loggedIn)
     return (
-      <section className="mt-8 rounded-[20px] border border-[var(--border)] p-5">
-        {titulo}
+      <section className={compacto ? 'mt-3' : 'mt-8 rounded-[20px] border border-[var(--border)] p-5'}>
+        {!compacto && titulo}
         <div className="relative mt-4 overflow-hidden rounded-2xl bg-[#FFFBEB]">
           <svg viewBox="0 0 260 260" className="mx-auto block h-[220px] w-[220px] blur-[3px]" aria-hidden>
             <circle cx={C} cy={C} r={R} fill="none" stroke="#D6B66E" strokeWidth="1.5" strokeDasharray="5 5" />
@@ -150,11 +163,11 @@ export default function PosicaoSol({
     );
 
   return (
-    <section className="mt-8 rounded-[20px] border border-[var(--border)] p-5">
-      {titulo}
-      <div className="mt-4 grid gap-5 sm:grid-cols-[300px_minmax(0,1fr)] sm:items-center">
+    <section className={compacto ? 'mt-3 text-[13px]' : 'mt-8 rounded-[20px] border border-[var(--border)] p-5'}>
+      {!compacto && titulo}
+      <div className={compacto ? 'flex flex-col gap-3' : 'mt-4 grid gap-5 sm:grid-cols-[300px_minmax(0,1fr)] sm:items-center'}>
         <figure className="m-0">
-          <div className="relative mx-auto aspect-square w-full max-w-[300px] overflow-hidden rounded-2xl border border-[var(--border)]">
+          <div className={`relative mx-auto aspect-square w-full overflow-hidden rounded-2xl border border-[var(--border)] ${compacto ? 'max-w-[230px]' : 'max-w-[300px]'}`}>
             {/* mapa de verdade atrás do desenho: ruas e nomes, para a pessoa se localizar */}
             <MapaFundoSol lat={lat} lng={lng} zoom={aproximado ? 14 : 16.6} />
             <svg viewBox="0 0 260 260" className="absolute inset-0 h-full w-full" role="img" aria-label={`Caminho do sol sobre o ${nome}`}>
@@ -194,28 +207,28 @@ export default function PosicaoSol({
             {(
               [
                 ['hoje', 'Hoje'],
-                ['inverno', 'Inverno (21/jun)'],
-                ['verao', 'Verão (21/dez)']
+                ['inverno', compacto ? 'Inverno' : 'Inverno (21/jun)'],
+                ['verao', compacto ? 'Verão' : 'Verão (21/dez)']
               ] as [Dia, string][]
             ).map(([v, t]) => (
               <button
                 key={v}
                 type="button"
                 onClick={() => setDia(v)}
-                className={`h-9 rounded-full px-3.5 text-[13px] font-semibold ${dia === v ? 'bg-accent text-white' : 'border border-[var(--border)]'}`}
+                className={`${compacto ? 'h-8 px-3 text-[12px]' : 'h-9 px-3.5 text-[13px]'} rounded-full font-semibold ${dia === v ? 'bg-accent text-white' : 'border border-[var(--border)]'}`}
               >
                 {t}
               </button>
             ))}
           </div>
           <label className="flex items-center gap-3">
-            <span className="w-12 text-[15px] font-bold tabular-nums">
+            <span className={`w-12 font-bold tabular-nums ${compacto ? 'text-[14px]' : 'text-[15px]'}`}>
               {String(Math.floor(min / 60)).padStart(2, '0')}:{String(min % 60).padStart(2, '0')}
             </span>
             <input type="range" min={5 * 60} max={19 * 60 + 30} step={10} value={min} onChange={(e) => setMin(Number(e.target.value))} className="flex-1 accent-[#F59E0B]" aria-label="Horário" />
           </label>
-          <p className="text-[13.5px]">{calc.texto.agora}</p>
-          <ul className="flex flex-col gap-1 text-[13px] text-[var(--text-muted)]">
+          <p className={compacto ? 'text-[12.5px]' : 'text-[13.5px]'}>{calc.texto.agora}</p>
+          <ul className={`flex flex-col gap-1 text-[var(--text-muted)] ${compacto ? 'text-[12px]' : 'text-[13px]'}`}>
             <li>
               Nasce às <b className="text-[var(--text)]">{calc.texto.nascer}</b> e se põe às <b className="text-[var(--text)]">{calc.texto.por}</b>.
             </li>
@@ -235,7 +248,7 @@ export default function PosicaoSol({
           </p>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className={`mt-3 grid grid-cols-2 gap-2 ${compacto ? '[&>div]:p-2 [&>div]:text-[11.5px]' : 'sm:grid-cols-4'}`}>
         {[
           ['Face norte', 'sol na maior parte do ano'],
           ['Face leste', 'sol da manhã'],
@@ -249,7 +262,7 @@ export default function PosicaoSol({
           </div>
         ))}
       </div>
-      <div className="mt-4">
+      <div className={compacto ? 'hidden' : 'mt-4'}>
         <BotaoWhatsapp ctx={whats} variante="bloco" rotulo="Qual unidade pega o sol que eu prefiro?" />
       </div>
     </section>

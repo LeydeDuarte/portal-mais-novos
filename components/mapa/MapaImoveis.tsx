@@ -201,7 +201,7 @@ const detalhes = (i: { quartos: number | null; area: number | null; vagas: numbe
 // centro é o sol a pino. Quanto mais alto o sol, mais perto do centro fica o ponto.
 const RAIO_SOL = 160; // metros
 const FUSO_GOIANIA = 3; // UTC-3, sem horário de verão
-type DiaSol = 'hoje' | 'inverno' | 'verao';
+export type DiaSol = 'hoje' | 'inverno' | 'verao';
 function destino(lat: number, lng: number, azimute: number, metros: number): [number, number] {
   const r = (azimute * Math.PI) / 180;
   return [lng + (metros * Math.sin(r)) / (111320 * Math.cos((lat * Math.PI) / 180)), lat + (metros * Math.cos(r)) / 111320];
@@ -277,7 +277,8 @@ export default function MapaImoveis({
   onSelecionar,
   onArea,
   enquadrar = true,
-  centroInicial
+  centroInicial,
+  solFixo
 }: {
   pontos: PontoMapa[];
   foco?: Foco | null;
@@ -289,6 +290,8 @@ export default function MapaImoveis({
   /** enquadrar sozinho quando o conjunto de pontos muda (painel: sim; público: não) */
   enquadrar?: boolean;
   centroInicial?: { lat: number; lng: number; zoom: number };
+  /** mapa público: o sol desenhado em volta do prédio, comandado pela aba Sol da gaveta */
+  solFixo?: { lat: number; lng: number; dia: DiaSol; minutos: number } | null;
 }) {
   const selRef = useRef(onSelecionar);
   selRef.current = onSelecionar;
@@ -335,6 +338,8 @@ export default function MapaImoveis({
         pitchWithRotate: false
       });
       m.touchZoomRotate.disableRotation();
+      // crédito do mapa (OpenFreeMap / OpenStreetMap) só no "i": abre ao passar o mouse ou tocar
+      m.on('load', () => m.getContainer().querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'));
       m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
       m.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true } }), 'top-right');
       m.on('error', (e) => {
@@ -562,7 +567,24 @@ export default function MapaImoveis({
   }, [foco]);
 
   // desenha (ou apaga) a posição do sol
-  const resumoSol = useMemo(() => (sol ? geoSol(sol.lat, sol.lng, diaSol, minSol) : null), [sol, diaSol, minSol]);
+  const resumoSol = useMemo(
+    () => (solFixo ? geoSol(solFixo.lat, solFixo.lng, solFixo.dia, solFixo.minutos) : sol ? geoSol(sol.lat, sol.lng, diaSol, minSol) : null),
+    [sol, diaSol, minSol, solFixo]
+  );
+  // sol comandado de fora: aproxima o prédio uma vez, deixando livre o espaço da gaveta
+  const solFixoChave = solFixo ? `${solFixo.lat},${solFixo.lng}` : '';
+  useEffect(() => {
+    const m = mapa.current;
+    if (!m || !pronto || !solFixo) return;
+    const largo = window.innerWidth >= 768;
+    m.easeTo({
+      center: [solFixo.lng, solFixo.lat],
+      zoom: Math.max(m.getZoom(), 16.6),
+      padding: largo ? { top: 40, bottom: 40, left: 40, right: 470 } : { top: 60, bottom: Math.round(window.innerHeight * 0.55), left: 20, right: 20 },
+      duration: 700
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [solFixoChave, pronto]);
   useEffect(() => {
     const m = mapa.current;
     if (!m || !pronto) return;

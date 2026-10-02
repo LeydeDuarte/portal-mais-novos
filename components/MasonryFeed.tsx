@@ -267,7 +267,7 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
     <>
       <div className="flex items-center gap-3 px-4 pb-1 pt-5 md:px-8 md:pt-6">
         <div className="min-w-0 flex-1 text-[15px] font-bold">
-          {filters.modo === 'lancamentos' ? 'Lançamentos e empreendimentos' : 'Imóveis para você'}
+          {filters.modo === 'lancamentos' ? 'Lançamentos e condomínios' : 'Imóveis para você'}
           {totalAVenda != null && (totalAVenda > 0 || filtrando) ? (
             <span className="ml-2 inline-flex translate-y-[-1px] items-center rounded-full bg-accent/10 px-2.5 py-0.5 align-middle text-xs font-bold text-accent">
               <span className="font-sans tabular-nums">{totalAVenda.toLocaleString('pt-BR')}</span>&nbsp;

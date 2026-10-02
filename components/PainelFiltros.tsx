@@ -7,18 +7,30 @@ import { countActiveFilters, type FilterState } from '@/lib/filters';
 // Lateral esquerda recolhível com os filtros. Recolhida, fica só uma aba "Filtros"
 // na borda. A escolha (aberta/recolhida) fica gravada no navegador.
 // No celular vira uma gaveta que abre pela aba.
-export default function PainelFiltros({ filters, onChange }: { filters: FilterState; onChange: (f: FilterState) => void }) {
-  const [aberto, setAberto] = useState(true);
+// iniciarRecolhido: no mapa a lateral sempre começa recolhida (mais espaço para o mapa,
+// principalmente em tela pequena), sem mudar a preferência gravada para o feed.
+export default function PainelFiltros({
+  filters,
+  onChange,
+  iniciarRecolhido = false
+}: {
+  filters: FilterState;
+  onChange: (f: FilterState) => void;
+  iniciarRecolhido?: boolean;
+}) {
+  const [aberto, setAberto] = useState(!iniciarRecolhido);
   const [gaveta, setGaveta] = useState(false);
   useEffect(() => {
+    if (iniciarRecolhido) return;
     try {
       if (localStorage.getItem('mn_filtros') === 'fechado') setAberto(false);
     } catch {
       /* sem armazenamento */
     }
-  }, []);
+  }, [iniciarRecolhido]);
   const alternar = (v: boolean) => {
     setAberto(v);
+    if (iniciarRecolhido) return;
     try {
       localStorage.setItem('mn_filtros', v ? 'aberto' : 'fechado');
     } catch {

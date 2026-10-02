@@ -191,3 +191,8 @@ img {
 /* Nada pode deixar a página mais larga que a tela (no celular isso aparecia como
    faixas brancas dos lados). "clip" não atrapalha os elementos fixos/grudados. */
 html, body { overflow-x: clip; max-width: 100%; }
+
+/* crédito dos mapas (OpenFreeMap / OpenStreetMap): discreto, só o "i" até a pessoa abrir */
+.maplibregl-ctrl-attrib { font-size: 10px; line-height: 1.3; }
+.maplibregl-ctrl-attrib.maplibregl-compact { min-height: 20px; }
+.maplibregl-ctrl-attrib.maplibregl-compact-show { max-width: min(260px, 70vw); }

@@ -15,7 +15,7 @@ import FilterBar from '@/components/FilterBar';
 import PainelFiltros from '@/components/PainelFiltros';
 import SearchBox from '@/components/SearchBox';
 import LoginModal from '@/components/LoginModal';
-import GavetaMapa, { type CondoComImoveis, type Selecionado } from '@/components/mapa/GavetaMapa';
+import GavetaMapa, { type CondoComImoveis, type Selecionado, type SolNoMapa } from '@/components/mapa/GavetaMapa';
 import type { AreaVisivel } from '@/components/mapa/MapaImoveis';
 import { DEFAULT_FILTERS, addTermos, localKey, splitTermos, type FilterState, type LocalFiltro } from '@/lib/filters';
 import { getPontosMapaPublico } from '@/lib/actions';
@@ -68,6 +68,7 @@ export default function MapaPublico() {
   const [sel, setSel] = useState<Selecionado | null>(null);
   const [pedindoLogin, setPedindoLogin] = useState<Selecionado | null>(null);
   const [legenda, setLegenda] = useState(false);
+  const [solMapa, setSolMapa] = useState<SolNoMapa>(null);
   const pedido = useRef(0);
   const { session, signIn } = useSession();
   const { staff } = useStaffSession();
@@ -221,7 +222,7 @@ export default function MapaPublico() {
       />
       <FilterBar filters={filters} onChange={setFilters} />
       <div className="flex min-h-0 flex-1 [&_aside.sticky]:h-full">
-        <PainelFiltros filters={filters} onChange={setFilters} />
+        <PainelFiltros filters={filters} onChange={setFilters} iniciarRecolhido />
 
         {/* lista da área (computador) */}
         <section aria-label="Nesta área do mapa" className="hidden w-[340px] shrink-0 flex-col border-r border-[var(--border)] lg:flex">
@@ -277,7 +278,7 @@ export default function MapaPublico() {
         </section>
 
         <div className="relative min-w-0 flex-1">
-          {centro && <MapaImoveis pontos={pontos} onSelecionar={selecionar} onArea={setArea} enquadrar={false} centroInicial={centro} />}
+          {centro && <MapaImoveis pontos={pontos} onSelecionar={selecionar} onArea={setArea} enquadrar={false} centroInicial={centro} solFixo={sel ? solMapa : null} />}
 
           {bloqueado && (
             <div className="absolute inset-x-3 top-3 z-20 mx-auto max-w-md rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900 shadow">
@@ -310,14 +311,27 @@ export default function MapaPublico() {
             )}
           </div>
 
+          {/* volta para o feed: branco com borda, para não se confundir com as bolinhas pretas do mapa */}
           <Link
-            href="/"
-            className="absolute bottom-6 left-1/2 z-10 flex h-11 -translate-x-1/2 items-center rounded-full bg-[#14161A] px-5 text-[13.5px] font-semibold text-white shadow-lg lg:hidden"
+            href={filters.modo === 'lancamentos' ? '/lancamentos' : '/'}
+            className="absolute bottom-6 left-1/2 z-10 flex h-11 -translate-x-1/2 items-center gap-2 rounded-full border-2 border-[#14161A] bg-white px-5 text-[13.5px] font-bold text-[#14161A] shadow-[0_6px_18px_rgba(0,0,0,0.25)] lg:bottom-auto lg:left-auto lg:right-14 lg:top-3 lg:translate-x-0"
           >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+              <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+            </svg>
             Ver em lista
           </Link>
 
-          {sel && <GavetaMapa sel={sel} onFechar={() => setSel(null)} />}
+          {sel && (
+            <GavetaMapa
+              sel={sel}
+              onSol={setSolMapa}
+              onFechar={() => {
+                setSel(null);
+                setSolMapa(null);
+              }}
+            />
+          )}
         </div>
       </div>
 
