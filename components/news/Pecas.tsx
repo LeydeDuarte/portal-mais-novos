@@ -26,7 +26,7 @@ export function Marca({ tamanho = 'g' }: { tamanho?: 'g' | 'p' }) {
 export async function TopoNews({ ativo, q, regiaoAtual }: { ativo?: string; q?: string; regiaoAtual?: string }) {
   const [regioes, bairros, ind] = await Promise.all([regioesComNoticias(), mercadoPorBairro('GO', 8), lerIndicadores(2)]);
   const radar = [
-    ...ind.filter((i) => i.valor != null && (i.id === 'selic' || i.id === 'incc-di' || i.id === 'ipca')).map((i) => ({ k: i.nome, v: i.id === 'selic' ? `${pct(i.valor)} a.a.` : `${pct(i.valor)} no mês`, href: `/news/indicadores?serie=${i.id}` })),
+    ...ind.filter((i) => i.valor != null && (i.id === 'selic' || i.id === 'incc-di' || i.id === 'ipca')).map((i) => ({ k: i.nome, v: i.id === 'selic' ? `${pct(i.valor)} a.a.` : `${pct(i.valor)} no mês`, href: `/news/indicadores/${i.id}` })),
     ...bairros.map((b) => ({ k: b.nome, v: `R$ ${b.m2.toLocaleString('pt-BR')}/m²`, href: '/news/mercado' }))
   ];
   return (
@@ -290,7 +290,7 @@ export function FaixaIndicadores({ lista }: { lista: Indicador[] }) {
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         {com.map((i) => (
-          <Link key={i.id} href={`/news/indicadores?serie=${i.id}`} className="flex flex-col gap-1 rounded-2xl border border-[var(--border)] p-4 hover:border-accent">
+          <Link key={i.id} href={`/news/indicadores/${i.id}`} className="flex flex-col gap-1 rounded-2xl border border-[var(--border)] p-4 hover:border-accent">
             <span className="text-xs font-bold tracking-wide text-[var(--text-muted)]">{i.nome.toUpperCase()}</span>
             <span className="font-sans text-[24px] font-bold tabular-nums">{i.id === 'selic' ? `${pct(i.valor)} a.a.` : pct(i.valor)}</span>
             <span className="text-xs text-[var(--text-muted)]">

@@ -1,3 +1,4 @@
+import { SERIES } from '@/lib/indicadores';
 import type { MetadataRoute } from 'next';
 import { SITE_URL, urlRegiao } from '@/lib/seo';
 import { listarRegioes, urlsParaSitemap } from '@/lib/landing';
@@ -22,6 +23,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/financiamento`, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE_URL}/news`, lastModified: agora, changeFrequency: 'hourly', priority: 0.9 },
     { url: `${SITE_URL}/news/indicadores`, lastModified: agora, changeFrequency: 'daily', priority: 0.7 },
+    // uma página por indicador (Selic, IPCA, INCC-DI, INCC-M, IGP-M)
+    ...SERIES.map((s) => ({ url: `${SITE_URL}/news/indicadores/${s.id}`, lastModified: agora, changeFrequency: 'daily' as const, priority: 0.7 })),
     { url: `${SITE_URL}/news/incorporadoras`, lastModified: agora, changeFrequency: 'weekly', priority: 0.6 },
     { url: `${SITE_URL}/avaliar`, lastModified: agora, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${SITE_URL}/mapa`, lastModified: agora, changeFrequency: 'daily', priority: 0.8 },

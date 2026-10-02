@@ -1,3 +1,4 @@
+import { SERIES } from '@/lib/indicadores';
 import { EMPRESA, SITE_NAME, SITE_URL, urlRegiao } from '@/lib/seo';
 import { CATEGORIAS, listarRegioes } from '@/lib/landing';
 import { noticiasPublicadas } from '@/lib/news/dados';
@@ -32,13 +33,15 @@ export async function GET() {
     '',
     '## Principais páginas',
     `- [Feed de imóveis à venda](${SITE_URL}/): todos os anúncios públicos, com busca por bairro, condomínio, tipo e preço (${SITE_URL}/?q=termo)`,
-    `- [Lançamentos e empreendimentos](${SITE_URL}/lancamentos)`,
+    `- [Lançamentos e condomínios](${SITE_URL}/lancamentos)`,
+    `- [Mapa de imóveis e lançamentos](${SITE_URL}/mapa): mapa interativo com preço em cada ponto, fase da obra (breve lançamento, lançamento, obras, pronto novo), construtora, anúncios de cada condomínio e a posição do sol de cada prédio por estação e horário; abre por bairro em ${SITE_URL}/mapa?bairro=Setor%20Bueno&cidade=Goi%C3%A2nia&uf=GO`,
     `- [Imóveis por região](${SITE_URL}/imoveis-a-venda): cidades e bairros com imóveis à venda`,
     `- [Venda seu imóvel](${SITE_URL}/vender): proprietário cadastra o imóvel para a Mais Novos vender`,
     `- [Quem somos](${SITE_URL}/quem-somos)`,
     `- [Financiamento](${SITE_URL}/financiamento)`,
     `- [Mais Novos News](${SITE_URL}/news): notícias do mercado imobiliário de Goiânia e região, com preço do m² por bairro calculado com os anúncios do portal`,
     `- [Indicadores: Selic, IPCA, INCC-DI, INCC-M e IGP-M](${SITE_URL}/news/indicadores): valores atualizados com dados do Banco Central, com gráfico histórico e calculadora de correção de valores (parcela na planta, aluguel, valor de compra) pelo índice escolhido`,
+    ...SERIES.map((s) => `- [${s.nome} hoje](${SITE_URL}/news/indicadores/${s.id}): ${s.uso}; valor do mês, acumulado em 12 meses, gráfico de até 10 anos${s.tipo === 'mensal' ? ' e calculadora de correção' : ''}`),
     `- [Avaliação de imóvel grátis](${SITE_URL}/avaliar): ferramenta que estima quanto vale um imóvel pelo método comparativo da ABNT NBR 14653-2, com anúncios parecidos da mesma região, homogeneização por área, quartos, vagas e idade, e intervalo de confiança de 80%`,
     `- [Ranking das incorporadoras](${SITE_URL}/news/incorporadoras): incorporadoras que mais estão construindo no Brasil e por estado, com empreendimentos em breve lançamento, lançamento e obras`,
     `- [Mais Valor Capital](https://maisvalorcapital.com.br): marca de crédito da Mais Novos Imóveis para financiamento imobiliário, home equity (crédito com garantia de imóvel), financiamento de construção e portabilidade; correspondente bancário certificado pela ANEPS`,

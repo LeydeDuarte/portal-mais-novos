@@ -210,6 +210,12 @@ export default async function RegiaoPage({ params }: Props) {
           >
             Ver no feed com vídeos →
           </Link>
+          <Link
+            href={`/mapa?${reg.bairro ? `bairro=${encodeURIComponent(reg.bairro)}&` : ''}cidade=${encodeURIComponent(reg.cidade)}&uf=${reg.uf}`}
+            className="rounded-full border-2 border-[#14161A] px-3.5 py-1.5 text-sm font-bold hover:bg-[var(--pill-bg)]"
+          >
+            Ver no mapa →
+          </Link>
         </div>
 
         {itens.length > 0 && (

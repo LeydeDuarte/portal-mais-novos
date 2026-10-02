@@ -84,6 +84,14 @@ export default function MapaPublico() {
     const z = Number(q.get('z'));
     const ok = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && (lat !== 0 || lng !== 0);
     setCentro(ok ? { lat, lng, zoom: Number.isFinite(z) && z >= 3 && z <= 19 ? z : 16 } : { lat: -16.6869, lng: -49.2648, zoom: 12.5 });
+    // vindo de uma página de região: /mapa?bairro=Setor%20Bueno&cidade=Goiânia&uf=GO
+    const bairro = q.get('bairro')?.slice(0, 120);
+    const cidade = q.get('cidade')?.slice(0, 80);
+    if (cidade) {
+      const uf = (q.get('uf') || 'GO').slice(0, 2).toUpperCase();
+      const local: LocalFiltro = bairro ? { tipo: 'bairro', nome: bairro, cidade, uf } : { tipo: 'cidade', nome: cidade, cidade, uf };
+      setFilters((f) => ({ ...f, locais: [local] }));
+    }
     const sel = q.get('sel');
     if (sel && /^[ci]:[\w-]{1,80}$/.test(sel)) pendente.current = sel;
   }, []);
@@ -93,7 +101,13 @@ export default function MapaPublico() {
     try {
       const salvo = JSON.parse(sessionStorage.getItem(CHAVE_FILTROS) || 'null') as FilterState | null;
       const locais = JSON.parse(localStorage.getItem('mn_locais') || '[]') as LocalFiltro[];
-      setFilters({ ...DEFAULT_FILTERS, ...(salvo ?? {}), locais: salvo?.locais ?? (Array.isArray(locais) ? locais.slice(0, 20) : []) });
+      // se veio de uma página de região (?cidade=...), o local do endereço vale mais que o guardado
+      const doEndereco = new URLSearchParams(window.location.search).get('cidade');
+      setFilters((prev) => ({
+        ...DEFAULT_FILTERS,
+        ...(salvo ?? {}),
+        locais: doEndereco ? prev.locais : salvo?.locais ?? (Array.isArray(locais) ? locais.slice(0, 20) : [])
+      }));
     } catch {
       /* sem memória */
     }
@@ -132,7 +146,8 @@ export default function MapaPublico() {
   // busca por nome (condomínio escolhido na busca ou palavra digitada): o mapa vai até o
   // resultado e, se for um condomínio só, já abre a gaveta dele
   const condoBuscado = filters.locais.filter((l) => l.tipo === 'condominio');
-  const chaveBusca = condoBuscado.length || filters.termos.length ? JSON.stringify([condoBuscado.map((l) => l.id ?? l.nome), filters.termos]) : '';
+  // bairro, cidade ou condomínio escolhido, ou palavra digitada: o mapa enquadra o resultado
+  const chaveBusca = filters.locais.length || filters.termos.length ? JSON.stringify([filters.locais.map((l) => localKey(l)), filters.termos]) : '';
   useEffect(() => {
     if (condoBuscado.length === 1 && condoBuscado[0].id) pendente.current = `c:${condoBuscado[0].id}`;
     // eslint-disable-next-line react-hooks/exhaustive-deps

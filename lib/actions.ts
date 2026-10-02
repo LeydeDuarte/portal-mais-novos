@@ -2534,7 +2534,7 @@ export async function getPontosMapaPublico(filters: FilterState, area: AreaMapa)
   const devIds = Array.from(new Set(todos.filter((r) => r.kind === 'empreendimento').map((r) => r.id)));
   // buscando um nome (condomínio escolhido ou palavra digitada): traz o resultado de qualquer
   // lugar, não só da área visível, para o mapa poder ir até ele
-  const porNome = (filters?.termos ?? []).length > 0 || (filters?.locais ?? []).some((l) => l?.tipo === 'condominio');
+  const porNome = (filters?.termos ?? []).length > 0 || (filters?.locais ?? []).length > 0;
   const caixa = porNome ? [-90, 90, -180, 180] : [a.s, a.nn, a.o, a.l];
 
   type LinhaI = {

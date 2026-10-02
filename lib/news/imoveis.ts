@@ -67,6 +67,11 @@ export async function imoveisParaNoticia(ctx: ContextoImoveis, limite = 4) {
     await etapa([tipo, COM_FOTO, ...c].join(' and '), ctx.cidade ? [ctx.cidade] : [], 'random()', true);
     await etapa([tipo, 'p.destaque'].join(' and '), [], 'random()', true); // outras cidades
   }
+  // 3b. só a cidade (ex.: cidade de quem está vendo): destaques da cidade, depois os com foto
+  if (ctx.cidade && !ctx.bairro && !ctx.foco) {
+    await etapa('lower(p.cidade) = lower($1) and p.destaque', [ctx.cidade], 'random()', true);
+    await etapa(`lower(p.cidade) = lower($1) and ${COM_FOTO}`, [ctx.cidade], 'random()', true);
+  }
   // 4. geral
   await etapa('p.destaque', [], 'random()', true);
   await etapa(COM_FOTO, [], 'p.created_at desc');
