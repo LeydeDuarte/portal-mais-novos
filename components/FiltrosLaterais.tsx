@@ -98,12 +98,16 @@ function Localizacao({ filters, onChange, aoEscolher }: { filters: FilterState; 
     ? (indice ?? [])
         // qualquer parte do nome serve: "bueno", "setor", "set bue" acham "Setor Bueno"
         .filter((l) => {
-          if (l.tipo === 'condominio' || (uf && l.uf !== uf)) return false;
+          if (uf && l.uf !== uf) return false;
           const alvo = semAcento(`${l.nome} ${l.cidade} ${l.uf}`);
           return t.split(/\s+/).every((p) => alvo.includes(p));
         })
-        .sort((a, b) => (a.tipo === b.tipo ? b.total - a.total : a.tipo === 'cidade' ? -1 : 1))
-        .slice(0, 8)
+        // cidades, depois bairros, depois condomínios (pelo nome)
+        .sort((a, b) => {
+          const ordem = { cidade: 0, bairro: 1, condominio: 2 } as Record<string, number>;
+          return a.tipo === b.tipo ? b.total - a.total : (ordem[a.tipo] ?? 3) - (ordem[b.tipo] ?? 3);
+        })
+        .slice(0, 10)
     : [];
   const escolher = (l: LocalSugestao) => {
     const novo: LocalFiltro = { tipo: l.tipo, nome: l.nome, cidade: l.cidade, uf: l.uf, id: l.id };
@@ -130,13 +134,16 @@ function Localizacao({ filters, onChange, aoEscolher }: { filters: FilterState; 
           onChange={(e) => (carregar(), setQ(e.target.value))}
           // Enter / "Buscar" no teclado do celular escolhe a 1ª sugestão
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && sugestoes[0]) {
-              e.preventDefault();
-              escolher(sugestoes[0]);
-            }
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            if (sugestoes[0]) return escolher(sugestoes[0]);
+            // sem sugestão: vira uma palavra de busca (acha pelo nome em anúncios e condomínios)
+            const termo = q.trim();
+            if (termo.length >= 2 && !filters.termos.includes(termo)) onChange({ ...filters, termos: [...filters.termos, termo].slice(0, 5) });
+            setQ('');
           }}
           enterKeyHint="search"
-          placeholder="Digite parte do nome: bueno, marista, goiânia…"
+          placeholder="Bairro, cidade ou condomínio: bueno, viva sudoeste…"
         />
         {sugestoes.length > 0 && (
           <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg)] p-1 shadow-xl">
@@ -144,6 +151,7 @@ function Localizacao({ filters, onChange, aoEscolher }: { filters: FilterState; 
               <button key={`${l.tipo}-${l.nome}-${l.cidade}-${l.uf}`} type="button" onClick={() => escolher(l)} className="block w-full rounded-lg px-3 py-2 text-left text-[13px] hover:bg-[var(--pill-bg)]">
                 <span className="font-semibold">{l.tipo === 'cidade' ? `${l.nome} - ${l.uf}` : l.nome}</span>
                 {l.tipo === 'bairro' && <span className="text-[var(--text-muted)]"> · {l.cidade} - {l.uf}</span>}
+                {l.tipo === 'condominio' && <span className="text-[var(--text-muted)]"> · condomínio · {l.cidade}</span>}
                 <span className="ml-1 text-[11px] text-[var(--text-faint)]">{l.total}</span>
               </button>
             ))}

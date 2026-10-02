@@ -254,7 +254,11 @@ async function feedInterno(
   if (filters.vagas.length) propConds.push(bate('p.vagas', filters.vagas));
   if (filters.banheiros.length) propConds.push(bate('p.banheiros', filters.banheiros));
   if (filters.aceitaTemporada === 'sim') propConds.push('p.aceita_temporada = true');
-  if (filters.modo === 'lancamentos') propConds.push('p.empreendimento_id is null and p.delivery_date > now()');
+  // Lançamentos: no feed, só avulsos de entrega futura (os do condomínio já aparecem no card dele).
+  // No mapa, os anúncios ligados a condomínio entram (ficam dentro do ponto do condomínio,
+  // que assim mostra "N anúncios"); só os avulsos de rua já entregues saem.
+  if (filters.modo === 'lancamentos')
+    propConds.push(opts.mapa ? '(p.empreendimento_id is not null or p.delivery_date > now())' : 'p.empreendimento_id is null and p.delivery_date > now()');
 
   // ---- Condições dos empreendimentos (alias d, resumo das unidades em u) ----
   if (filters.finalidade === 'aluguel') devConds.push('false');
@@ -2528,7 +2532,10 @@ export async function getPontosMapaPublico(filters: FilterState, area: AreaMapa)
   const todos = [...(pub.mapa ?? []), ...(priv.mapa ?? [])];
   const propIds = Array.from(new Set(todos.filter((r) => r.kind === 'imovel').map((r) => r.id)));
   const devIds = Array.from(new Set(todos.filter((r) => r.kind === 'empreendimento').map((r) => r.id)));
-  const caixa = [a.s, a.nn, a.o, a.l];
+  // buscando um nome (condomínio escolhido ou palavra digitada): traz o resultado de qualquer
+  // lugar, não só da área visível, para o mapa poder ir até ele
+  const porNome = (filters?.termos ?? []).length > 0 || (filters?.locais ?? []).some((l) => l?.tipo === 'condominio');
+  const caixa = porNome ? [-90, 90, -180, 180] : [a.s, a.nn, a.o, a.l];
 
   type LinhaI = {
     id: string; slug: string | null; titulo: string | null; tipo_unidade: string | null; finalidade: string | null; price_value: string | number | null;

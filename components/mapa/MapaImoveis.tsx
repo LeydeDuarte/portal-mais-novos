@@ -278,7 +278,8 @@ export default function MapaImoveis({
   onArea,
   enquadrar = true,
   centroInicial,
-  solFixo
+  solFixo,
+  ajustarChave
 }: {
   pontos: PontoMapa[];
   foco?: Foco | null;
@@ -292,6 +293,8 @@ export default function MapaImoveis({
   centroInicial?: { lat: number; lng: number; zoom: number };
   /** mapa público: o sol desenhado em volta do prédio, comandado pela aba Sol da gaveta */
   solFixo?: { lat: number; lng: number; dia: DiaSol; minutos: number } | null;
+  /** mapa público: quando esta chave muda (nova busca por nome), enquadra os resultados uma vez */
+  ajustarChave?: string;
 }) {
   const selRef = useRef(onSelecionar);
   selRef.current = onSelecionar;
@@ -315,6 +318,7 @@ export default function MapaImoveis({
     return m >= 6 * 60 && m <= 18 * 60 ? m - (m % 10) : 12 * 60;
   });
   const enquadrou = useRef('');
+  const ajustou = useRef('');
   const dados = useMemo(() => prepararDados(pontos), [pontos]);
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
@@ -529,7 +533,10 @@ export default function MapaImoveis({
     (m.getSource('aprox') as GeoJSONSource).setData({ type: 'FeatureCollection', features: dados.aprox });
     // enquadra só quando o CONJUNTO muda (não depois de corrigir a posição de um ponto)
     const assinatura = `${pontos.length}:${pontos.slice(0, 30).map((p) => p.id).join(',')}`;
-    if (!enquadrar || assinatura === enquadrou.current || !pontos.length) return;
+    const forcar = !!ajustarChave && ajustarChave !== ajustou.current;
+    if (forcar && pontos.length) ajustou.current = ajustarChave!;
+    if (!forcar && (!enquadrar || assinatura === enquadrou.current)) return;
+    if (!pontos.length) return;
     enquadrou.current = assinatura;
     const base = dados.ativos.length >= 3 ? dados.ativos : [...dados.ativos, ...dados.apagados];
     if (!base.length) return;
@@ -550,7 +557,7 @@ export default function MapaImoveis({
       ],
       { padding: 60, maxZoom: 15, duration: 600 }
     );
-  }, [dados, pronto, pontos, enquadrar]);
+  }, [dados, pronto, pontos, enquadrar, ajustarChave]);
 
   // busca de endereço: voa até lá e marca o lugar (ou leva o marcador de correção)
   useEffect(() => {

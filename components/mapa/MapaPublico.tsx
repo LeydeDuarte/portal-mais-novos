@@ -129,6 +129,15 @@ export default function MapaPublico() {
 
   const grupos = useMemo(() => agrupar(pontos), [pontos]);
 
+  // busca por nome (condomínio escolhido na busca ou palavra digitada): o mapa vai até o
+  // resultado e, se for um condomínio só, já abre a gaveta dele
+  const condoBuscado = filters.locais.filter((l) => l.tipo === 'condominio');
+  const chaveBusca = condoBuscado.length || filters.termos.length ? JSON.stringify([condoBuscado.map((l) => l.id ?? l.nome), filters.termos]) : '';
+  useEffect(() => {
+    if (condoBuscado.length === 1 && condoBuscado[0].id) pendente.current = `c:${condoBuscado[0].id}`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveBusca]);
+
   // lista "Nesta área do mapa": só o que está na tela, com anúncio e lançamentos primeiro
   const lista = useMemo(() => {
     if (!area) return [] as Selecionado[];
@@ -138,12 +147,12 @@ export default function MapaPublico() {
       if (!dentro(c.lat, c.lng)) continue;
       const fase = temEntrega(c.entrega) ? getStatusBucket(c.entrega) : null;
       const acesa = (fase && ACESAS.includes(fase)) || c.imoveis.length > 0;
-      if (!acesa) continue;
+      if (!acesa && !chaveBusca) continue; // buscando pelo nome, o condomínio aparece mesmo sem anúncio
       itens.push({ s: { tipo: 'condominio', c }, peso: c.imoveis.length ? 0 : fase === 'lancamento' || fase === 'breve_lancamento' ? 1 : 2 });
     }
     for (const i of grupos.soltos) if (dentro(i.lat, i.lng)) itens.push({ s: { tipo: 'imovel', i }, peso: i.vendidoEm ? 4 : i.privado ? 3 : 0 });
     return itens.sort((a, b) => a.peso - b.peso).map((x) => x.s);
-  }, [grupos, area]);
+  }, [grupos, area, chaveBusca]);
 
   const abrir = useCallback(
     (s: Selecionado) => {
@@ -278,7 +287,7 @@ export default function MapaPublico() {
         </section>
 
         <div className="relative min-w-0 flex-1">
-          {centro && <MapaImoveis pontos={pontos} onSelecionar={selecionar} onArea={setArea} enquadrar={false} centroInicial={centro} solFixo={sel ? solMapa : null} />}
+          {centro && <MapaImoveis pontos={pontos} onSelecionar={selecionar} onArea={setArea} enquadrar={false} centroInicial={centro} solFixo={sel ? solMapa : null} ajustarChave={chaveBusca} />}
 
           {bloqueado && (
             <div className="absolute inset-x-3 top-3 z-20 mx-auto max-w-md rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900 shadow">

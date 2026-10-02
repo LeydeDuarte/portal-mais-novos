@@ -260,7 +260,7 @@ export default function GavetaMapa({ sel, onFechar, onSol }: { sel: Selecionado;
 
       <div className="flex shrink-0 gap-2 border-t border-[var(--border)] px-5 pb-[calc(12px+env(safe-area-inset-bottom,0px))] pt-3">
         <div className="flex-1 [&>*]:w-full">
-          <BotaoWhatsapp ctx={whats} variante="bloco" rotulo={imovel?.vendidoEm ? 'Falar com o corretor' : condo && !condo.imoveis.length ? 'Ver preços e disponibilidade com consultor' : 'Fale comigo'} />
+          <BotaoWhatsapp ctx={whats} variante="bloco" rotulo={imovel?.vendidoEm ? 'Falar com o corretor' : condo && !condo.imoveis.length ? 'Preços e disponibilidade c/ consultor' : 'Fale comigo'} />
         </div>
         {!imovel?.privado && (
           <a href={url} target="_blank" rel="noopener" className="flex h-[46px] shrink-0 items-center rounded-full border border-[var(--border)] px-4 text-[13.5px] font-semibold hover:bg-[var(--pill-bg)]">
