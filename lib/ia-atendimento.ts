@@ -11,6 +11,7 @@ import { enviarTextoWhatsapp } from './whatsapp';
 import { urlImovel, urlCondominio } from './urls';
 import { SITE_URL } from './seo';
 import { normTel } from './crm';
+import { registrarUsoIA } from './custos';
 
 type Msg = { direcao: string; autor: string; texto: string | null; criado_em: string };
 type Bloco = { type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> } | { type: 'tool_result'; tool_use_id: string; content: string };
@@ -75,7 +76,7 @@ const FERRAMENTAS = [
   }
 ];
 
-function instrucoes(cfg: ConfigIA, contexto: string): string {
+function instrucoes(cfg: ConfigIA): string {
   return `Você é ${cfg.nomeAssistente}, a assistente virtual da Mais Novos Imóveis (Goiânia), da corretora Leyde Duarte (CRECI-GO C17586), atendendo pelo WhatsApp.
 
 Como responder:
@@ -97,9 +98,7 @@ Corretores: se a pessoa disser que é corretor, pedir parceria, comissão, exclu
 Passe para a equipe (passar_para_atendente) quando: pedir visita, proposta, negociação de valor, análise de crédito, falar com uma pessoa, reclamação, assunto jurídico ou algo fora do contexto. Ao passar, avise a pessoa que a Leyde ou a equipe vai continuar o atendimento por aqui em breve.
 
 Guarde o que a pessoa informar (quartos, valor, bairros, banco, FGTS) com guardar_preferencias.
-${cfg.instrucoesExtras ? `\nInstruções da Leyde:\n${cfg.instrucoesExtras}\n` : ''}
-Contexto (dados do portal):
-${contexto}`;
+${cfg.instrucoesExtras ? `\nInstruções da Leyde:\n${cfg.instrucoesExtras}\n` : ''}`;
 }
 
 /** imóvel e condomínio de interesse do contato (pelo que entrou no CRM) */
@@ -260,16 +259,28 @@ export async function responderComIA(contatoId: string): Promise<void> {
   if (!mensagens.length || mensagens[mensagens.length - 1].role !== 'user') return;
 
   const ctx = await contextoDoContato(contatoId);
-  const system = instrucoes(cfg, ctx.texto);
+  // as instruções (e as ferramentas, que vêm antes) ficam em cache por alguns minutos:
+  // nas respostas seguintes essa parte custa cerca de 10% do preço normal
+  const system = [
+    { type: 'text', text: instrucoes(cfg), cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: `Contexto (dados do portal):\n${ctx.texto}` }
+  ];
+  const modelo = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
   let resposta = '';
   for (let volta = 0; volta < 5; volta++) {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5', max_tokens: 900, system, tools: FERRAMENTAS, messages: mensagens }),
+      body: JSON.stringify({ model: modelo, max_tokens: 900, system, tools: FERRAMENTAS, messages: mensagens }),
       signal: AbortSignal.timeout(40000)
     });
-    const j = (await r.json().catch(() => ({}))) as { content?: Bloco[]; stop_reason?: string; error?: { message?: string } };
+    const j = (await r.json().catch(() => ({}))) as {
+      content?: Bloco[];
+      stop_reason?: string;
+      error?: { message?: string };
+      usage?: { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
+    };
+    await registrarUsoIA(modelo, j.usage, contatoId);
     if (!r.ok || !j.content) {
       await query(`insert into crm_atividades (contato_id, tipo, texto) values ($1, 'sistema', $2)`, [contatoId, `A IA não conseguiu responder: ${j.error?.message ?? r.status}`]);
       return;

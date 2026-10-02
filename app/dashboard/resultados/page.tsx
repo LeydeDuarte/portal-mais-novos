@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import PainelNav from '@/components/PainelNav';
 import PainelDados from '@/components/painel/PainelDados';
 import OnlineAgora from '@/components/painel/OnlineAgora';
+import ResumoCustos from '@/components/painel/ResumoCustos';
 import { useStaffSession } from '@/lib/use-staff-session';
 
 // Painel → Resultados: dados do portal inteiro. Só o administrador principal vê.
@@ -21,6 +22,7 @@ export default function ResultadosPage() {
       <PainelNav />
       <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-8 md:px-6">
         <OnlineAgora />
+        <ResumoCustos />
         <div className="mt-8">
           <PainelDados />
         </div>
