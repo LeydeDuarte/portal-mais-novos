@@ -139,7 +139,7 @@ export default function GavetaMapa({ sel, onFechar, onSol }: { sel: Selecionado;
                 <span key={e.nome}>
                   {k > 0 && ' · '}
                   {e.slug ? (
-                    <a href={`/empresa/${e.slug}`} className="font-semibold text-accent hover:underline">
+                    <a href={`/empresa/${e.slug}`} target="_blank" rel="noopener" className="font-semibold text-accent hover:underline">
                       {e.nome}
                     </a>
                   ) : (
@@ -193,7 +193,7 @@ export default function GavetaMapa({ sel, onFechar, onSol }: { sel: Selecionado;
             ) : (
               condo.imoveis.map((i) => (
                 <div key={i.id} className="flex items-center gap-2 rounded-2xl border border-[var(--border)] p-2">
-                  <a href={i.url} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl hover:bg-[var(--pill-bg)]">
+                  <a href={i.url} target="_blank" rel="noopener" className="flex min-w-0 flex-1 items-center gap-3 rounded-xl hover:bg-[var(--pill-bg)]">
                     <span className="h-14 w-16 shrink-0 overflow-hidden rounded-xl bg-[#DDE1E6]">
                       {i.capa && (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -252,7 +252,7 @@ export default function GavetaMapa({ sel, onFechar, onSol }: { sel: Selecionado;
           <BotaoWhatsapp ctx={whats} variante="bloco" rotulo={imovel?.vendidoEm ? 'Falar com o corretor' : condo && !condo.imoveis.length ? 'Ver preços e disponibilidade com consultor' : 'Fale comigo'} />
         </div>
         {!imovel?.privado && (
-          <a href={url} className="flex h-[46px] shrink-0 items-center rounded-full border border-[var(--border)] px-4 text-[13.5px] font-semibold hover:bg-[var(--pill-bg)]">
+          <a href={url} target="_blank" rel="noopener" className="flex h-[46px] shrink-0 items-center rounded-full border border-[var(--border)] px-4 text-[13.5px] font-semibold hover:bg-[var(--pill-bg)]">
             Ver página
           </a>
         )}

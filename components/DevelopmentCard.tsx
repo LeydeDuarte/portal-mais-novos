@@ -98,7 +98,7 @@ export default function DevelopmentCard({
   if (!cover) {
     return (
       <div className="surgir mb-5 inline-block w-full break-inside-avoid md:mb-7">
-        <Link href={urlCondominio(development)} className="block rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4 transition-colors hover:bg-[var(--pill-bg)] md:border-[#E7EAEE] md:bg-[#F6F7F9] md:hover:bg-[#EEF1F4]">
+        <Link href={urlCondominio(development)} target="_blank" rel="noopener" className="block rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4 transition-colors hover:bg-[var(--pill-bg)] md:border-[#E7EAEE] md:bg-[#F6F7F9] md:hover:bg-[#EEF1F4]">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
               {badge.text}
@@ -127,7 +127,7 @@ export default function DevelopmentCard({
 
   return (
     <div className="surgir mb-5 inline-block w-full break-inside-avoid md:mb-7">
-      <Link href={urlCondominio(development)} className="block">
+      <Link href={urlCondominio(development)} target="_blank" rel="noopener" className="block">
         <div
           className="feed-midia group relative flex items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)]"
           style={{ height: development.height }}

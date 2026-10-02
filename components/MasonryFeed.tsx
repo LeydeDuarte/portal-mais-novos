@@ -350,6 +350,8 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
               <Link
                 key={c.id}
                 href={urlCondominio(c)}
+                target="_blank"
+                rel="noopener"
                 className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3.5 py-1.5 text-sm font-semibold hover:border-accent hover:text-accent"
               >
                 {c.nome}

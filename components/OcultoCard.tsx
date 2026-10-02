@@ -11,6 +11,8 @@ export default function OcultoCard({ a }: { a: AnuncioOculto }) {
   return (
     <Link
       href={`/imovel/${a.id}`}
+      target="_blank"
+      rel="noopener"
       className="group flex flex-col gap-2 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--pill-bg)]/60 p-4 transition-colors hover:border-accent hover:bg-[var(--bg)]"
     >
       <div className="flex h-28 flex-col items-center justify-center gap-1.5 rounded-xl bg-[#1d2026] text-white">

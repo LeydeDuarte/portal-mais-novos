@@ -96,7 +96,7 @@ export default function PropertyCard({ property, isFavorite, loggedIn, onFavorit
 
   return (
     <div className="surgir mb-5 inline-block w-full break-inside-avoid md:mb-7">
-      <Link href={urlImovel(property)} className="block">
+      <Link href={urlImovel(property)} target="_blank" rel="noopener" className="block">
         <div
           ref={setRefs}
           className={`feed-midia group relative flex items-center justify-center overflow-hidden rounded-2xl bg-[var(--card-img-bg)] ${
