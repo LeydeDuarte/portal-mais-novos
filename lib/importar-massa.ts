@@ -8,6 +8,7 @@ import { enviarParaR2 } from './r2';
 import { prepararFoto } from './fotos-fila';
 import { miniaturaDe } from './miniaturas';
 import { registrarUsoIA } from './custos';
+import { ehUsadoOuAntigo, limparUmCondominio } from './limpeza-usados';
 
 export type Classificacao = {
   tipo: 'foto' | 'planta' | 'descartar';
@@ -100,6 +101,11 @@ export async function importarArquivo(devId: string, hash: string, arquivo: stri
     await reg('descartada', null, null);
     return { situacao: 'descartada', detalhe: c.legenda };
   }
+  // usado ou antigo: só a fachada e as plantas (o resto nem é guardado)
+  if (c.tipo === 'foto' && c.categoria !== 'fachada' && (await ehUsadoOuAntigo(devId))) {
+    await reg('descartada', null, null);
+    return { situacao: 'descartada', detalhe: 'usado: só fachada e plantas' };
+  }
   const ehPlanta = c.tipo === 'planta';
   const pronta = await prepararFoto(buf, tipoMime, ehPlanta);
   const nomeArq = ehPlanta ? `${dev[0].name} planta${c.metragem ? ` ${Math.round(c.metragem)} m2` : ''}` : `${dev[0].name} ${c.categoria}`;
@@ -140,6 +146,12 @@ export async function finalizarPasta(devId: string, maxFotos = 40): Promise<{ fo
   // capa: a foto que já era capa continua, a menos que não houvesse nenhuma
   const fotos = (existentes.length ? [...existentes, ...ordenadas] : ordenadas).slice(0, maxFotos);
   await query(`update developments set photos = $2::jsonb where id = $1`, [devId, JSON.stringify(fotos)]);
+  // usado ou antigo: fica só a melhor fachada
+  if (await ehUsadoOuAntigo(devId)) {
+    await limparUmCondominio(devId).catch(() => 0);
+    const f = await query<{ photos: string[] | null }>('select photos from developments where id = $1', [devId]);
+    return { fotos: f[0]?.photos?.length ?? 0, capa: f[0]?.photos?.[0] ?? null };
+  }
   await miniaturaDe('developments', devId).catch(() => {});
   return { fotos: fotos.length, capa: fotos[0] ?? null };
 }

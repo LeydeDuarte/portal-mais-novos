@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { r2PublicBase } from './r2-url';
 
 // Envio de arquivos para o Cloudflare R2 (servidor). Usado pelo upload do
@@ -42,4 +42,13 @@ export async function enviarParaR2(body: Buffer, contentType: string, folder: st
     new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: body, ContentType: contentType, CacheControl: 'public, max-age=31536000, immutable' })
   );
   return `${r2PublicBase()}/${key}`;
+}
+
+/** Apaga um arquivo do R2 pelo endereço público (só arquivos do nosso armazenamento) */
+export async function apagarDoR2(url: string): Promise<boolean> {
+  const base = r2PublicBase();
+  if (!base || !url.startsWith(`${base}/`)) return false;
+  const key = decodeURIComponent(url.slice(base.length + 1));
+  await getClient().send(new DeleteObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key }));
+  return true;
 }
