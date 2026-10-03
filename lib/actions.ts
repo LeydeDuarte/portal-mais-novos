@@ -673,6 +673,8 @@ const requireStaff = exigirEquipe;
 // Admin mexe em tudo; corretor só no que ele mesmo cadastrou
 async function assertCanEdit(table: 'properties' | 'developments', id: string, staff: StaffSessionPayload) {
   if (veTudo(staff.role)) return;
+  // corretor não edita condomínios (nem o que cadastrou): só liga o próprio anúncio a um condomínio
+  if (table === 'developments') throw new Error('Só o analista ou o administrador editam condomínios.');
   const rows = await query<{ corretor_email: string | null }>(`select corretor_email from ${table} where id = $1`, [id]);
   if (!rows[0] || rows[0].corretor_email !== staff.email) throw new Error('Você só pode editar o que cadastrou.');
 }
@@ -1310,6 +1312,7 @@ export async function createDevelopment(
   input: CreateDevelopmentInput
 ): Promise<{ ok: true } | { ok: false; faltando: string[]; duplicado?: CondoDuplicado }> {
   const staff = await requireStaff();
+  if (!veTudo(staff.role)) throw new Error('Só o analista ou o administrador cadastram condomínios. Peça a eles para cadastrar e depois ligue o seu anúncio.');
   // Não deixa cadastrar de novo um condomínio que já existe (mesmo nome + mesmo CEP ou bairro)
   const existentes = await query<{ id: string; name: string; cep: string | null; bairro: string | null; cidade: string | null }>(
     'select id, name, cep, bairro, cidade from developments'
@@ -1723,8 +1726,10 @@ export type MercadoBairro = {
   excluidos: number;
   m2Anuncios: number | null; // média do m² pedido (venda) — todos os anúncios
   m2Vendidos: number | null; // média do m² dos vendidos (valor de venda, se informado)
+  m2Portais: number | null; // média do m² pedido nos portais (buscas das avaliações, últimos 90 dias)
+  nPortais: number;
 };
-export type MercadoMes = { mes: string; m2Anuncios: number | null; nAnuncios: number; m2Vendidos: number | null; nVendidos: number };
+export type MercadoMes = { mes: string; m2Anuncios: number | null; nAnuncios: number; m2Vendidos: number | null; nVendidos: number; m2Portais: number | null; nPortais: number };
 
 const BASE_MERCADO = `
   select p.bairro, p.cidade, p.tipo_unidade, p.price_value as preco, p.area, p.created_at as data_anuncio, null::timestamptz as data_fim,
@@ -1735,7 +1740,7 @@ const BASE_MERCADO = `
     from imoveis_historico h where h.finalidade = 'venda'`;
 
 export async function getMercado(tipos?: string[]): Promise<MercadoBairro[]> {
-  await requireStaff();
+  { const eu = await requireStaff(); if (!veTudo(eu.role)) throw new Error('Ferramenta só do analista e do administrador.'); }
   const filtroTipo = tipos?.length ? 'and tipo_unidade = any($1::text[])' : '';
   const rows = await query<{ bairro: string; cidade: string; ativos: string; privados: string; vendidos: string; excluidos: string; m2a: string | null; m2v: string | null }>(
     `with base as (${BASE_MERCADO})
@@ -1753,24 +1758,43 @@ export async function getMercado(tipos?: string[]): Promise<MercadoBairro[]> {
     tipos?.length ? [tipos] : []
   );
   const n = (v: string | null) => (v != null ? Math.round(Number(v)) : null);
-  return rows.map((r) => ({
-    bairro: r.bairro,
-    cidade: r.cidade,
-    ativos: Number(r.ativos),
-    privados: Number(r.privados),
-    vendidos: Number(r.vendidos),
-    excluidos: Number(r.excluidos),
-    m2Anuncios: n(r.m2a),
-    m2Vendidos: n(r.m2v)
-  }));
+  const portais = await query<{ b: string; c: string; bairro: string; cidade: string; m2: string; n: string }>(
+    `select ${norm('bairro')} b, ${norm("coalesce(cidade, '')")} c, mode() within group (order by bairro) bairro, mode() within group (order by cidade) cidade,
+            avg(preco / area) m2, count(*) n
+       from mercado_observacoes where mes >= date_trunc('month', now() - interval '90 days') and preco > 0 and area > 0 and bairro is not null ${tipos?.length ? 'and tipo = any($1::text[])' : ''}
+      group by 1, 2`,
+    tipos?.length ? [tipos] : []
+  ).catch(() => []);
+  const chave = (b: string, c: string) => `${b}|${c}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const mapaPortais = new Map(portais.map((p) => [chave(p.bairro, p.cidade ?? ''), p]));
+  const lista: MercadoBairro[] = rows.map((r) => {
+    const p = mapaPortais.get(chave(r.bairro, r.cidade ?? ''));
+    if (p) mapaPortais.delete(chave(r.bairro, r.cidade ?? ''));
+    return {
+      bairro: r.bairro,
+      cidade: r.cidade,
+      ativos: Number(r.ativos),
+      privados: Number(r.privados),
+      vendidos: Number(r.vendidos),
+      excluidos: Number(r.excluidos),
+      m2Anuncios: n(r.m2a),
+      m2Vendidos: n(r.m2v),
+      m2Portais: p ? n(p.m2) : null,
+      nPortais: p ? Number(p.n) : 0
+    };
+  });
+  // bairros que só têm dados de portais (ainda sem anúncio nosso)
+  for (const p of Array.from(mapaPortais.values()))
+    lista.push({ bairro: p.bairro, cidade: p.cidade, ativos: 0, privados: 0, vendidos: 0, excluidos: 0, m2Anuncios: null, m2Vendidos: null, m2Portais: n(p.m2), nPortais: Number(p.n) });
+  return lista;
 }
 
 export async function getMercadoMensal(bairro: string, cidade: string, tipos?: string[]): Promise<MercadoMes[]> {
-  await requireStaff();
+  { const eu = await requireStaff(); if (!veTudo(eu.role)) throw new Error('Ferramenta só do analista e do administrador.'); }
   const params: unknown[] = [bairro, cidade];
   const filtroTipo = tipos?.length ? `and tipo_unidade = any($3::text[])` : '';
   if (tipos?.length) params.push(tipos);
-  const rows = await query<{ mes: string; m2a: string | null; na: string; m2v: string | null; nv: string }>(
+  const rows = await query<{ mes: string; m2a: string | null; na: string; m2v: string | null; nv: string; m2p: string | null; np: string }>(
     `with base as (${BASE_MERCADO}),
      sel as (select * from base where ${norm("coalesce(bairro, '')")} = ${norm('$1::text')} and ${norm("coalesce(cidade, '')")} = ${norm('$2::text')} ${filtroTipo}),
      anuncios as (
@@ -1781,8 +1805,15 @@ export async function getMercadoMensal(bairro: string, cidade: string, tipos?: s
        select to_char(date_trunc('month', data_fim), 'YYYY-MM') as mes, avg(preco / area) as m2, count(*) as n
          from sel where estado = 'vendido' and preco > 0 and area > 0 group by 1
      )
-     select coalesce(a.mes, v.mes) as mes, a.m2 as m2a, coalesce(a.n, 0) as na, v.m2 as m2v, coalesce(v.n, 0) as nv
-       from anuncios a full join vendas v on v.mes = a.mes
+     ,portais as (
+       select to_char(mes, 'YYYY-MM') as mes, avg(preco / area) as m2, count(*) as n
+         from mercado_observacoes
+        where ${norm("coalesce(bairro, '')")} = ${norm('$1::text')} and ${norm("coalesce(cidade, '')")} = ${norm('$2::text')} and preco > 0 and area > 0
+              ${tipos?.length ? 'and tipo = any($3::text[])' : ''}
+        group by 1
+     )
+     select coalesce(a.mes, v.mes, p.mes) as mes, a.m2 as m2a, coalesce(a.n, 0) as na, v.m2 as m2v, coalesce(v.n, 0) as nv, p.m2 as m2p, coalesce(p.n, 0) as np
+       from anuncios a full join vendas v on v.mes = a.mes full join portais p on p.mes = coalesce(a.mes, v.mes)
       order by 1`,
     params
   );
@@ -1791,14 +1822,53 @@ export async function getMercadoMensal(bairro: string, cidade: string, tipos?: s
     m2Anuncios: r.m2a != null ? Math.round(Number(r.m2a)) : null,
     nAnuncios: Number(r.na),
     m2Vendidos: r.m2v != null ? Math.round(Number(r.m2v)) : null,
-    nVendidos: Number(r.nv)
+    nVendidos: Number(r.nv),
+    m2Portais: r.m2p != null ? Math.round(Number(r.m2p)) : null,
+    nPortais: Number(r.np)
   }));
+}
+
+export type OscilacaoBairro = { bairro: string; cidade: string; m2De: number | null; nDe: number; m2Ate: number | null; nAte: number; variacaoPct: number | null };
+
+/** Oscilação do m² por bairro entre dois meses (AAAA-MM): média dos anúncios do portal
+ *  (pelo mês do anúncio) e dos portais (observações do mês), juntas. */
+export async function getOscilacao(de: string, ate: string, tipos?: string[]): Promise<OscilacaoBairro[]> {
+  { const eu = await requireStaff(); if (!veTudo(eu.role)) throw new Error('Ferramenta só do analista e do administrador.'); }
+  if (!/^\d{4}-\d{2}$/.test(de) || !/^\d{4}-\d{2}$/.test(ate)) return [];
+  const params: unknown[] = [`${de}-01`, `${ate}-01`];
+  if (tipos?.length) params.push(tipos);
+  const ft = tipos?.length ? 'and tipo = any($3::text[])' : '';
+  const rows = await query<{ bairro: string; cidade: string; m2de: string | null; nde: string; m2ate: string | null; nate: string }>(
+    `with obs as (
+       select bairro, cidade, tipo_unidade tipo, date_trunc('month', created_at)::date mes, price_value / area m2
+         from properties where is_tipologia = false and finalidade = 'venda' and price_value > 0 and area > 0 and bairro is not null
+       union all
+       select bairro, cidade, tipo_unidade, date_trunc('month', anunciado_em)::date, coalesce(valor_venda, price_value) / area
+         from imoveis_historico where finalidade = 'venda' and coalesce(valor_venda, price_value) > 0 and area > 0 and bairro is not null and anunciado_em is not null
+       union all
+       select bairro, cidade, tipo, mes, preco / area from mercado_observacoes where preco > 0 and area > 0 and bairro is not null
+     ),
+     sel as (select * from obs where mes in ($1::date, $2::date) ${ft})
+     select mode() within group (order by bairro) bairro, mode() within group (order by cidade) cidade,
+            avg(m2) filter (where mes = $1::date) m2de, count(*) filter (where mes = $1::date) nde,
+            avg(m2) filter (where mes = $2::date) m2ate, count(*) filter (where mes = $2::date) nate
+       from sel group by ${norm('bairro')}, ${norm("coalesce(cidade, '')")}`,
+    params
+  ).catch(() => []);
+  const n = (v: string | null) => (v != null ? Math.round(Number(v)) : null);
+  return rows
+    .map((r) => {
+      const a = n(r.m2de);
+      const b = n(r.m2ate);
+      return { bairro: r.bairro, cidade: r.cidade, m2De: a, nDe: Number(r.nde), m2Ate: b, nAte: Number(r.nate), variacaoPct: a && b ? Math.round(((b - a) / a) * 1000) / 10 : null };
+    })
+    .sort((x, y) => (y.variacaoPct ?? -999) - (x.variacaoPct ?? -999));
 }
 
 export type HistoricoLinha = { propertyId: string; motivo: string; titulo: string | null; tipoUnidade: string; preco: number | null; valorVenda: number | null; area: number | null; bairro: string | null; cidade: string | null; condominio: string | null; encerradoEm: string };
 
 export async function listHistorico(): Promise<HistoricoLinha[]> {
-  await requireStaff();
+  { const eu = await requireStaff(); if (!veTudo(eu.role)) throw new Error('Ferramenta só do analista e do administrador.'); }
   const rows = await query<{ property_id: string; motivo: string; titulo: string | null; tipo_unidade: string; price_value: string | null; valor_venda: string | null; area: string | null; bairro: string | null; cidade: string | null; condominio: string | null; encerrado_em: Date }>(
     'select * from imoveis_historico order by encerrado_em desc limit 300'
   );
@@ -2495,7 +2565,7 @@ export async function getPontosMapa(filters: FilterState): Promise<ResultadoMapa
       capa: r.capa,
       url: urlCondominio({ id: r.id, slug: r.slug, uf: r.uf, cidade: r.cidade, bairro: r.bairro }),
       precisao: r.geo_precisao,
-      podeMover: podeMover(r.corretor_email),
+      podeMover: veTudo(staff.role), // condomínio no mapa: só analista e administrador mexem
       empresas: Array.isArray(r.empresas) ? r.empresas.filter((e) => e?.nome) : []
     });
   }

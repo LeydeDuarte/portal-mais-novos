@@ -127,9 +127,6 @@ export async function excluirCondominio(id: string): Promise<{ ok: boolean; erro
 /** Três pontinhos → marcar/desmarcar "aceita temporada" no condomínio */
 export async function marcarTemporadaCondominio(id: string, aceita: boolean): Promise<void> {
   const eu = await exigirEquipe();
-  if (!veTudo(eu.role)) {
-    const r = await query<{ corretor_email: string | null }>('select corretor_email from developments where id = $1', [id]);
-    if (r[0]?.corretor_email?.toLowerCase() !== eu.email.toLowerCase()) throw new Error('Só quem cadastrou, o analista ou o administrador.');
-  }
+  if (!veTudo(eu.role)) throw new Error('Só o analista ou o administrador marcam a temporada do condomínio.');
   await query('update developments set aceita_temporada = $2 where id = $1', [id, aceita]);
 }

@@ -1,0 +1,137 @@
+'use client';
+
+// Leitura de tabelas de vendas NO NAVEGADOR (grátis, sem IA): PDF pelas regras do
+// "Importar PDFs", planilha (xlsx/csv) pelo cabeçalho, ZIP aberto na hora.
+// Descobre o mês de referência e o empreendimento (pelo nome no arquivo, na pasta ou no texto).
+import { lerPdf } from './pdf-import/extract';
+import { lerTabela, parseMesAno, semAcento, type UnidadeTabela } from './pdf-import/parse';
+
+export type ArquivoTabela = { caminho: string; nome: string; dados: Blob };
+export type TabelaLida = {
+  caminho: string;
+  unidades: UnidadeTabela[];
+  mes: string | null; // AAAA-MM
+  texto: string; // começo do arquivo (para achar o nome do empreendimento)
+  hash: string;
+  erro?: string;
+};
+
+const EXT = /\.(pdf|xlsx|xls|csv)$/i;
+
+/** Abre ZIPs e devolve só os arquivos de tabela (pdf, xlsx, csv), com o caminho da pasta. */
+export async function expandirArquivos(lista: File[]): Promise<ArquivoTabela[]> {
+  const out: ArquivoTabela[] = [];
+  for (const f of lista) {
+    const caminho = (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name;
+    if (/\.zip$/i.test(f.name)) {
+      const { unzipSync } = await import('fflate');
+      const conteudo = unzipSync(new Uint8Array(await f.arrayBuffer()), { filter: (a) => EXT.test(a.name) && !/__MACOSX|\/\./.test(a.name) });
+      for (const [nome, bytes] of Object.entries(conteudo)) out.push({ caminho: `${caminho.replace(/\.zip$/i, '')}/${nome}`, nome: nome.split('/').pop() ?? nome, dados: new Blob([bytes]) });
+    } else if (EXT.test(f.name)) out.push({ caminho, nome: f.name, dados: f });
+  }
+  return out;
+}
+
+async function hashDe(b: Blob): Promise<string> {
+  const d = await crypto.subtle.digest('SHA-256', await b.arrayBuffer());
+  return Array.from(new Uint8Array(d))
+    .slice(0, 16)
+    .map((x) => x.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+const norm = (s: string) => semAcento(String(s ?? '').toLowerCase()).trim();
+
+/** Número em formato brasileiro ou não: "1.150.000,00", "98,5", "120", "890000", "R$ 1.2 mi" não. */
+function numeroBR(v: unknown): number | undefined {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+  let t = String(v ?? '').replace(/[^\d.,-]/g, '');
+  if (!t) return undefined;
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.'); // vírgula decimal: pontos são milhar
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, ''); // só pontos de milhar
+  const n = Number(t);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Planilha: acha a linha de cabeçalho (unidade / área / valor) e lê as linhas abaixo. */
+function lerLinhasPlanilha(linhas: unknown[][]): UnidadeTabela[] {
+  const achar = (cab: string[], re: RegExp) => cab.findIndex((c) => re.test(c));
+  for (let h = 0; h < Math.min(linhas.length, 40); h++) {
+    const cab = (linhas[h] ?? []).map((c) => norm(String(c ?? '')));
+    const iU = achar(cab, /^(unid|apto|apart|apt|casa|lote|n[ºo°.]?\s*(da\s*)?unid)/);
+    const iA = achar(cab, /(area|metragem|m2|m²|privativ)/);
+    const iV = achar(cab, /(valor|preco|total|a vista)/);
+    if (iU < 0 || iA < 0 || iV < 0) continue;
+    const iVg = achar(cab, /(vaga|garag)/);
+    const iS = achar(cab, /(situac|status|disponib)/);
+    const out: UnidadeTabela[] = [];
+    for (const l of linhas.slice(h + 1)) {
+      const un = String(l?.[iU] ?? '').trim();
+      const area = numeroBR(String(l?.[iA] ?? '').replace(/m.?2|m²/gi, ''));
+      const valor = numeroBR(l?.[iV]);
+      if (!un || !area || area < 15 || area > 5000) continue;
+      const st = norm(String(iS >= 0 ? l?.[iS] ?? '' : ''));
+      out.push({
+        unidade: un,
+        area,
+        valor: valor && valor >= 30000 ? valor : undefined,
+        vagas: iVg >= 0 ? Number(String(l?.[iVg] ?? '').replace(/\D/g, '')) || undefined : undefined,
+        situacao: /vend/.test(st) ? 'vendida' : /reserv/.test(st) ? 'reservada' : 'disponivel'
+      });
+    }
+    if (out.length) return out;
+  }
+  return [];
+}
+
+export async function lerArquivoTabela(a: ArquivoTabela): Promise<TabelaLida> {
+  const hash = await hashDe(a.dados);
+  const base = { caminho: a.caminho, hash };
+  try {
+    if (/\.pdf$/i.test(a.nome)) {
+      const doc = await lerPdf(await a.dados.arrayBuffer(), a.nome);
+      const texto = doc.paginas.slice(0, 2).flat().join('\n').slice(0, 4000);
+      const unidades = lerTabela(doc);
+      const mes = parseMesAno(a.nome) ?? parseMesAno(texto) ?? null;
+      return { ...base, unidades, mes, texto, erro: unidades.length ? undefined : 'Não reconheci as linhas de unidade deste PDF.' };
+    }
+    let linhas: unknown[][];
+    if (/\.csv$/i.test(a.nome)) {
+      const t = await a.dados.text();
+      const sep = (t.split('\n')[0].match(/;/g) ?? []).length >= (t.split('\n')[0].match(/,/g) ?? []).length ? ';' : ',';
+      linhas = t.split(/\r?\n/).map((l) => l.split(sep).map((c) => c.replace(/^"|"$/g, '').trim()));
+    } else {
+      const { default: lerPlanilha } = await import('read-excel-file');
+      linhas = (await lerPlanilha(a.dados)) as unknown[][];
+    }
+    const texto = linhas
+      .slice(0, 12)
+      .map((l) => l.join(' '))
+      .join('\n');
+    const unidades = lerLinhasPlanilha(linhas);
+    const mes = parseMesAno(a.nome) ?? parseMesAno(texto) ?? null;
+    return { ...base, unidades, mes, texto, erro: unidades.length ? undefined : 'Não achei as colunas de unidade, área e valor.' };
+  } catch (e) {
+    return { ...base, unidades: [], mes: null, texto: '', erro: e instanceof Error ? e.message : 'Não foi possível ler.' };
+  }
+}
+
+/** Empreendimento pelo nome: procura os nomes cadastrados no caminho (pasta + arquivo) e no texto.
+ *  Só liga sozinho quando um nome bate sem empate (o mais longo). */
+export function acharEmpreendimento(t: TabelaLida, nomes: { id: string; nome: string }[]): { id: string; nome: string } | null {
+  const alvo = ` ${norm(`${t.caminho} ${t.texto}`).replace(/[^a-z0-9]+/g, ' ')} `;
+  const limpar = (n: string) => norm(n).replace(/^(edificio|residencial|condominio)\s+/, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  let melhor: { id: string; nome: string; tam: number } | null = null;
+  let empate = false;
+  for (const n of nomes) {
+    const c = limpar(n.nome);
+    if (c.length < 5) continue;
+    if (alvo.includes(` ${c} `)) {
+      if (!melhor || c.length > melhor.tam) {
+        melhor = { ...n, tam: c.length };
+        empate = false;
+      } else if (c.length === melhor.tam && n.id !== melhor.id) empate = true;
+    }
+  }
+  return melhor && !empate ? { id: melhor.id, nome: melhor.nome } : null;
+}

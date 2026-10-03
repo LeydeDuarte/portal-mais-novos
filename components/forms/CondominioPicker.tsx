@@ -2,6 +2,8 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { createDevelopment, type CondominioResumo } from '@/lib/actions';
+import { useStaffSession } from '@/lib/use-staff-session';
+import { veTudo } from '@/lib/papeis';
 import CepField, { ENDERECO_VAZIO, formatLocation, type Endereco } from '@/components/CepField';
 import AmenitiesCheckboxes from '@/components/AmenitiesCheckboxes';
 
@@ -42,6 +44,8 @@ function guardarRecente(id: string) {
 // (nome, endereço, tipo e lazer) — ele nasce como RASCUNHO, sem aparecer no
 // site, até alguém finalizar e publicar em Painel → Condomínios.
 export default function CondominioPicker({ condominios, selectedId, onSelect: onSelectRaw, onCreated, cidade = '', bairro = '', textoInicial = '' }: Props) {
+  const { staff } = useStaffSession();
+  const podeCadastrar = veTudo(staff?.role);
   const onSelect = (c: CondominioResumo | null) => {
     if (c) guardarRecente(c.id);
     onSelectRaw(c);
@@ -218,13 +222,18 @@ export default function CondominioPicker({ condominios, selectedId, onSelect: on
               {matches.length === 0 && (
                 <p className="px-3 py-2 text-sm text-[var(--text-muted)]">{semTexto ? 'Digite o nome do condomínio.' : 'Nenhum condomínio com esse nome ainda.'}</p>
               )}
-              <button
-                type="button"
-                onClick={startCreate}
-                className="mt-1 w-full rounded-lg border-t border-[var(--border)] px-3 py-2.5 text-left text-sm font-bold text-accent hover:bg-[var(--pill-bg)]"
-              >
-                + Cadastrar {text.trim() ? `“${text.trim()}”` : 'um condomínio novo'}
-              </button>
+              {podeCadastrar ? (
+                <button
+                  type="button"
+                  onClick={startCreate}
+                  className="mt-1 w-full rounded-lg border-t border-[var(--border)] px-3 py-2.5 text-left text-sm font-bold text-accent hover:bg-[var(--pill-bg)]"
+                >
+                  + Cadastrar {text.trim() ? `“${text.trim()}”` : 'um condomínio novo'}
+                </button>
+              ) : (
+                // corretor não cadastra condomínio: pede ao analista ou ao administrador
+                <p className="mt-1 border-t border-[var(--border)] px-3 py-2.5 text-[12.5px] text-[var(--text-muted)]">Não achou? Peça ao analista ou ao administrador para cadastrar o condomínio e depois ligue o seu anúncio.</p>
+              )}
             </div>
           )}
         </div>

@@ -17,7 +17,7 @@ export async function lerPrecosIA(): Promise<PrecosIA> {
 /** grava o consumo de uma chamada à IA (usage devolvido pela API) */
 export async function registrarUsoIA(
   modelo: string,
-  usage: { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number } | undefined,
+  usage: { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number; server_tool_use?: { web_search_requests?: number } } | undefined,
   contatoId: string | null
 ): Promise<void> {
   if (!usage) return;
@@ -29,9 +29,12 @@ export async function registrarUsoIA(
   const cl = usage.cache_read_input_tokens ?? 0;
   // cache: escrita custa 1,25x a entrada; leitura, 0,1x
   const custo = (e * p.entrada + ce * p.entrada * 1.25 + cl * p.entrada * 0.1 + s * p.saida) / 1_000_000;
+  // pesquisa na internet (ferramenta da IA): US$ 10 por mil pesquisas
+  const pesquisas = usage.server_tool_use?.web_search_requests ?? 0;
+  const custoTotal = custo + pesquisas * 0.01;
   await query(
     `insert into custos_uso (fornecedor, modelo, entrada, saida, cache_escrita, cache_leitura, custo_usd, contato_id) values ('anthropic', $1, $2, $3, $4, $5, $6, $7)`,
-    [modelo, e, s, ce, cl, custo, contatoId]
+    [modelo, e, s, ce, cl, custoTotal, contatoId]
   ).catch(() => {});
 }
 

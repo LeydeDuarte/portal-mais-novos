@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
-import { getMercado, getMercadoMensal, listHistorico, type MercadoBairro, type MercadoMes, type HistoricoLinha } from '@/lib/actions';
+import { getMercado, getMercadoMensal, getOscilacao, listHistorico, type MercadoBairro, type MercadoMes, type HistoricoLinha, type OscilacaoBairro } from '@/lib/actions';
+import { panoramaLancamentos, type PanoramaLancamentos } from '@/lib/actions-tabelas';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 
 const COR_ANUNCIOS = '#257CFF';
 const COR_VENDIDOS = '#E8590C';
+const COR_PORTAIS = '#6A3CFF';
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 const mesLabel = (m: string) => {
   const [a, mm] = m.split('-');
@@ -22,7 +24,7 @@ function GraficoM2({ dados }: { dados: MercadoMes[] }) {
   const W = 720;
   const H = 260;
   const m = { t: 16, r: 16, b: 32, l: 72 };
-  const valores = dados.flatMap((d) => [d.m2Anuncios, d.m2Vendidos]).filter((v): v is number => v != null);
+  const valores = dados.flatMap((d) => [d.m2Anuncios, d.m2Vendidos, d.m2Portais]).filter((v): v is number => v != null);
   if (!valores.length) return <p className="text-sm text-[var(--text-muted)]">Sem dados de preço e metragem para este bairro ainda.</p>;
   const min = Math.min(...valores) * 0.9;
   const max = Math.max(...valores) * 1.05;
@@ -33,6 +35,10 @@ function GraficoM2({ dados }: { dados: MercadoMes[] }) {
     .map((d, i) => (d.m2Anuncios != null ? `${x(i)},${y(d.m2Anuncios)}` : null))
     .filter(Boolean)
     .join(' ');
+  const linhaPortais = dados
+    .map((d, i) => (d.m2Portais != null ? `${x(i)},${y(d.m2Portais)}` : null))
+    .filter(Boolean)
+    .join(' ');
   const passo = Math.max(1, Math.ceil(dados.length / 8));
   const h = hover != null ? dados[hover] : null;
 
@@ -41,6 +47,7 @@ function GraficoM2({ dados }: { dados: MercadoMes[] }) {
       <div className="mb-2 flex flex-wrap gap-4 text-xs text-[var(--text-muted)]">
         <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded" style={{ background: COR_ANUNCIOS }} /> Média do m² anunciado</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: COR_VENDIDOS }} /> Média do m² vendido</span>
+        <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded" style={{ background: COR_PORTAIS }} /> Média do m² nos portais</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Evolução do preço médio do metro quadrado por mês" onMouseLeave={() => setHover(null)}>
         {ticks.map((t) => (
@@ -60,6 +67,10 @@ function GraficoM2({ dados }: { dados: MercadoMes[] }) {
         )}
         {hover != null && <line x1={x(hover)} x2={x(hover)} y1={m.t} y2={H - m.b} stroke="var(--text-faint)" strokeDasharray="3 3" />}
         <polyline points={linha} fill="none" stroke={COR_ANUNCIOS} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        <polyline points={linhaPortais} fill="none" stroke={COR_PORTAIS} strokeWidth={2} strokeDasharray="5 4" strokeLinejoin="round" strokeLinecap="round" />
+        {dados.map((d, i) =>
+          d.m2Portais != null ? <circle key={`p${i}`} cx={x(i)} cy={y(d.m2Portais)} r={hover === i ? 5 : 3.5} fill={COR_PORTAIS} stroke="var(--bg)" strokeWidth={2} /> : null
+        )}
         {dados.map((d, i) =>
           d.m2Anuncios != null ? <circle key={`a${i}`} cx={x(i)} cy={y(d.m2Anuncios)} r={hover === i ? 5 : 3.5} fill={COR_ANUNCIOS} stroke="var(--bg)" strokeWidth={2} /> : null
         )}
@@ -83,6 +94,7 @@ function GraficoM2({ dados }: { dados: MercadoMes[] }) {
           <div className="font-bold">{mesLabel(h.mes)}</div>
           <div>Anunciado: {h.m2Anuncios != null ? `${brl(h.m2Anuncios)}/m² (${h.nAnuncios})` : '-'}</div>
           <div>Vendido: {h.m2Vendidos != null ? `${brl(h.m2Vendidos)}/m² (${h.nVendidos})` : '-'}</div>
+          <div>Portais: {h.m2Portais != null ? `${brl(h.m2Portais)}/m² (${h.nPortais})` : '-'}</div>
         </div>
       )}
     </div>
@@ -97,7 +109,21 @@ export default function MercadoPage() {
   const [sel, setSel] = useState<MercadoBairro | null>(null);
   const [mensal, setMensal] = useState<MercadoMes[] | null>(null);
   const [historico, setHistorico] = useState<HistoricoLinha[]>([]);
-  const [aba, setAba] = useState<'bairros' | 'historico'>('bairros');
+  const [aba, setAba] = useState<'bairros' | 'oscilacao' | 'lancamentos' | 'historico'>('bairros');
+  const [lanc, setLanc] = useState<PanoramaLancamentos | null>(null);
+  // oscilação: compara o m² de cada bairro entre dois meses
+  const meses = useMemo(() => {
+    const l: string[] = [];
+    const d = new Date();
+    for (let i = 0; i < 60; i++) {
+      const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+      l.push(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`);
+    }
+    return l;
+  }, []);
+  const [de, setDe] = useState(() => meses[Math.min(12, meses.length - 1)]);
+  const [ate, setAte] = useState(() => meses[0]);
+  const [osc, setOsc] = useState<OscilacaoBairro[] | null>(null);
 
   useEffect(() => {
     if (loaded && !staff) router.replace('/dashboard/login');
@@ -167,9 +193,9 @@ export default function MercadoPage() {
               </optgroup>
             ))}
           </select>
-          {(['bairros', 'historico'] as const).map((a) => (
+          {(['bairros', 'oscilacao', 'lancamentos', 'historico'] as const).map((a) => (
             <button key={a} type="button" onClick={() => setAba(a)} className={`rounded-full px-4 py-2 text-sm font-bold ${aba === a ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}>
-              {a === 'bairros' ? 'Por bairro' : `Histórico (${historico.length})`}
+              {a === 'bairros' ? 'Por bairro' : a === 'oscilacao' ? 'Oscilação' : a === 'lancamentos' ? 'Lançamentos e obras' : `Histórico (${historico.length})`}
             </button>
           ))}
         </div>
@@ -196,12 +222,13 @@ export default function MercadoPage() {
                     <th className="px-3 py-2 text-right">Excluídos</th>
                     <th className="px-3 py-2 text-right">m² anunciado</th>
                     <th className="px-3 py-2 text-right">m² vendido</th>
+                    <th className="px-3 py-2 text-right">m² portais (90 dias)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {bairros === null && (
                     <tr>
-                      <td colSpan={7} className="px-3 py-4 text-[var(--text-muted)]">Carregando…</td>
+                      <td colSpan={8} className="px-3 py-4 text-[var(--text-muted)]">Carregando…</td>
                     </tr>
                   )}
                   {bairros?.map((b) => (
@@ -219,12 +246,226 @@ export default function MercadoPage() {
                       <td className="px-3 py-2 text-right">{b.excluidos}</td>
                       <td className="px-3 py-2 text-right">{b.m2Anuncios ? brl(b.m2Anuncios) : '-'}</td>
                       <td className="px-3 py-2 text-right">{b.m2Vendidos ? brl(b.m2Vendidos) : '-'}</td>
+                      <td className="px-3 py-2 text-right">
+                        {b.m2Portais ? (
+                          <>
+                            {brl(b.m2Portais)} <span className="text-xs text-[var(--text-muted)]">({b.nPortais})</span>
+                          </>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </>
+        )}
+
+        {aba === 'oscilacao' && (
+          <section className="mt-5">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
+                De
+                <select value={de} onChange={(e) => setDe(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-sm">
+                  {meses.map((m) => (
+                    <option key={m} value={m}>
+                      {mesLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
+                Até
+                <select value={ate} onChange={(e) => setAte(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-sm">
+                  {meses.map((m) => (
+                    <option key={m} value={m}>
+                      {mesLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setOsc(null);
+                  getOscilacao(de, ate, tipos).then(setOsc).catch(() => setOsc([]));
+                }}
+                className="h-10 rounded-full bg-ink px-5 text-sm font-bold text-white"
+              >
+                Comparar
+              </button>
+              <p className="basis-full text-xs text-[var(--text-muted)]">
+                Média do m² pedido em cada mês, juntando os anúncios do portal e os anúncios dos portais encontrados nas avaliações. O histórico cresce a cada avaliação e nunca é apagado.
+              </p>
+            </div>
+            {osc && (
+              <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--border)]">
+                <table className="w-full text-sm">
+                  <thead className="bg-[var(--pill-bg)] text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                    <tr>
+                      <th className="px-3 py-2">Bairro</th>
+                      <th className="px-3 py-2 text-right">m² em {mesLabel(de)}</th>
+                      <th className="px-3 py-2 text-right">m² em {mesLabel(ate)}</th>
+                      <th className="px-3 py-2 text-right">Variação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {osc.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-3 py-4 text-[var(--text-muted)]">Sem dados nesses meses.</td>
+                      </tr>
+                    )}
+                    {osc.map((o) => (
+                      <tr key={`${o.bairro}-${o.cidade}`} className="border-t border-[var(--border)] tabular-nums">
+                        <td className="px-3 py-2 font-semibold">
+                          {o.bairro} <span className="font-normal text-[var(--text-muted)]">· {o.cidade}</span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {o.m2De ? brl(o.m2De) : '-'} <span className="text-xs text-[var(--text-muted)]">({o.nDe})</span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {o.m2Ate ? brl(o.m2Ate) : '-'} <span className="text-xs text-[var(--text-muted)]">({o.nAte})</span>
+                        </td>
+                        <td className={`px-3 py-2 text-right font-bold ${o.variacaoPct == null ? 'text-[var(--text-muted)]' : o.variacaoPct > 0 ? 'text-[#15803D]' : o.variacaoPct < 0 ? 'text-[#C2410C]' : ''}`}>
+                          {o.variacaoPct == null ? '-' : `${o.variacaoPct > 0 ? '+' : ''}${o.variacaoPct.toLocaleString('pt-BR')}%`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        {aba === 'lancamentos' && (
+          <section className="mt-5">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
+                De
+                <select value={de} onChange={(e) => setDe(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-sm">
+                  {meses.map((m) => (
+                    <option key={m} value={m}>
+                      {mesLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
+                Até
+                <select value={ate} onChange={(e) => setAte(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-sm">
+                  {meses.map((m) => (
+                    <option key={m} value={m}>
+                      {mesLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setLanc(null);
+                  panoramaLancamentos(de, ate).then(setLanc).catch(() => setLanc({ mensal: [], bairros: [], incorporadoras: [], reajustes: [] }));
+                }}
+                className="h-10 rounded-full bg-ink px-5 text-sm font-bold text-white"
+              >
+                Ver período
+              </button>
+              <p className="basis-full text-xs text-[var(--text-muted)]">
+                Pelas tabelas de vendas das incorporadoras (Painel → Tabelas de preços), pelo mês de referência de cada tabela. Média do m² das unidades disponíveis.
+              </p>
+            </div>
+            {lanc && (
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl border border-[var(--border)] p-4 lg:col-span-2">
+                  <h3 className="text-sm font-bold">m² médio das tabelas, mês a mês</h3>
+                  {lanc.mensal.length === 0 ? (
+                    <p className="mt-2 text-sm text-[var(--text-muted)]">Nenhuma tabela nesse período.</p>
+                  ) : (
+                    <div className="mt-3 flex h-40 items-end gap-2 overflow-x-auto">
+                      {(() => {
+                        const max = Math.max(...lanc.mensal.map((x) => x.m2 ?? 0), 1);
+                        return lanc.mensal.map((x) => (
+                          <div key={x.mes} className="flex h-full min-w-[46px] flex-1 flex-col items-center justify-end gap-1" title={`${mesLabel(x.mes)}: ${x.m2 ? brl(x.m2) : '-'} (${x.tabelas} tabelas)`}>
+                            <span className="text-[10.5px] font-bold tabular-nums">{x.m2 ? `${Math.round(x.m2 / 100) / 10}k` : '-'}</span>
+                            <div className="w-full max-w-[40px] rounded-t bg-accent" style={{ height: `${Math.max(2, ((x.m2 ?? 0) / max) * 100)}%` }} />
+                            <span className="whitespace-nowrap text-[10.5px] text-[var(--text-muted)]">{mesLabel(x.mes)}</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </div>
+                {(
+                  [
+                    ['Por bairro (tabela mais recente de cada empreendimento)', lanc.bairros, 'Empreend.'],
+                    ['Por incorporadora', lanc.incorporadoras, 'Empreend.']
+                  ] as const
+                ).map(([titulo, lista, col]) => (
+                  <div key={titulo} className="overflow-hidden rounded-2xl border border-[var(--border)]">
+                    <h3 className="border-b border-[var(--border)] px-4 py-2.5 text-sm font-bold">{titulo}</h3>
+                    {lista.length === 0 ? (
+                      <p className="p-4 text-sm text-[var(--text-muted)]">Sem dados no período.</p>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead className="text-left text-xs text-[var(--text-muted)]">
+                          <tr>
+                            <th className="px-4 py-1.5">Nome</th>
+                            <th className="px-2 py-1.5 text-right">{col}</th>
+                            <th className="px-4 py-1.5 text-right">m² médio</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {lista.map((x) => (
+                            <tr key={`${x.nome}-${x.sub ?? ''}`} className="border-t border-[var(--border)] tabular-nums">
+                              <td className="px-4 py-1.5 font-semibold">{x.nome}</td>
+                              <td className="px-2 py-1.5 text-right">{x.n}</td>
+                              <td className="px-4 py-1.5 text-right">{x.m2 ? brl(x.m2) : '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                ))}
+                <div className="overflow-x-auto rounded-2xl border border-[var(--border)] lg:col-span-2">
+                  <h3 className="border-b border-[var(--border)] px-4 py-2.5 text-sm font-bold">Reajuste por empreendimento (primeira x última tabela do período)</h3>
+                  {lanc.reajustes.length === 0 ? (
+                    <p className="p-4 text-sm text-[var(--text-muted)]">É preciso ter pelo menos duas tabelas do mesmo empreendimento no período.</p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead className="text-left text-xs text-[var(--text-muted)]">
+                        <tr>
+                          <th className="px-4 py-1.5">Empreendimento</th>
+                          <th className="px-2 py-1.5 text-right">Tabelas</th>
+                          <th className="px-2 py-1.5 text-right">m² no início</th>
+                          <th className="px-2 py-1.5 text-right">m² no fim</th>
+                          <th className="px-4 py-1.5 text-right">Reajuste</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lanc.reajustes.map((x) => (
+                          <tr key={`${x.nome}-${x.sub ?? ''}`} className="border-t border-[var(--border)] tabular-nums">
+                            <td className="px-4 py-1.5 font-semibold">
+                              {x.nome} {x.sub && <span className="font-normal text-[var(--text-muted)]">· {x.sub}</span>}
+                            </td>
+                            <td className="px-2 py-1.5 text-right">{x.n}</td>
+                            <td className="px-2 py-1.5 text-right">{x.m2Inicio ? brl(x.m2Inicio) : '-'}</td>
+                            <td className="px-2 py-1.5 text-right">{x.m2Fim ? brl(x.m2Fim) : '-'}</td>
+                            <td className={`px-4 py-1.5 text-right font-bold ${x.variacaoPct == null ? '' : x.variacaoPct > 0 ? 'text-[#15803D]' : x.variacaoPct < 0 ? 'text-[#C2410C]' : ''}`}>
+                              {x.variacaoPct == null ? '-' : `${x.variacaoPct > 0 ? '+' : ''}${x.variacaoPct.toLocaleString('pt-BR')}%`}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
         )}
 
         {aba === 'historico' && (

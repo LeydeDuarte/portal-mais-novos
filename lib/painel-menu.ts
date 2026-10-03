@@ -22,8 +22,10 @@ export const GRUPOS: Grupo[] = [
       { href: '/dashboard/imoveis', label: 'Imóveis', descricao: 'Anúncios, links privados e vendidos.', icone: 'casa', acesso: 'todos' },
       { href: '/dashboard/condominios', label: 'Condomínios', descricao: 'Empreendimentos, tipologias e rascunhos.', icone: 'predio', acesso: 'todos' },
       { href: '/dashboard/mapa', label: 'Mapa', descricao: 'Anúncios e condomínios no mapa.', icone: 'mapa', acesso: 'todos' },
-      { href: '/dashboard/cadastro-ia', label: 'Cadastro IA', descricao: 'Cole o texto do anúncio e revise antes de publicar.', icone: 'faisca', acesso: 'todos' },
-      { href: '/dashboard/importar-pdf', label: 'Importar PDFs', descricao: 'Ficha técnica, tabela de vendas e plantas.', icone: 'pdf', acesso: 'todos' },
+      { href: '/dashboard/cadastro-ia', label: 'Cadastro IA', descricao: 'Cole o texto do anúncio e revise antes de publicar.', icone: 'faisca', acesso: 'gestor' },
+      { href: '/dashboard/tabelas', label: 'Tabelas de preços', descricao: 'Tabelas de vendas em massa, com histórico de preços.', icone: 'pdf', acesso: 'gestor' },
+      { href: '/dashboard/avaliacoes', label: 'Avaliação de imóveis', descricao: 'Relatório de avaliação com amostras da base e dos portais.', icone: 'grafico', acesso: 'gestor' },
+      { href: '/dashboard/importar-pdf', label: 'Importar PDFs', descricao: 'Ficha técnica, tabela de vendas e plantas.', icone: 'pdf', acesso: 'gestor' },
       { href: '/dashboard/importar-imagens', label: 'Importar imagens', descricao: 'Pastas de fotos e plantas por empreendimento.', icone: 'imagens', acesso: 'gestor' }
     ]
   },
@@ -42,9 +44,9 @@ export const GRUPOS: Grupo[] = [
   {
     titulo: 'Mercado e conteúdo',
     itens: [
-      { href: '/dashboard/mercado', label: 'Mercado', descricao: 'Preço do m² por bairro, vendidos e excluídos.', icone: 'grafico', acesso: 'todos' },
-      { href: '/dashboard/monitoramento', label: 'Monitoramento', descricao: 'Anúncios da cidade que ainda não temos.', icone: 'radar', acesso: 'todos' },
-      { href: '/dashboard/empresas', label: 'Construtoras', descricao: 'Construtoras, incorporadoras e seus empreendimentos.', icone: 'guindaste', acesso: 'todos' },
+      { href: '/dashboard/mercado', label: 'Mercado', descricao: 'Preço do m² por bairro, vendidos e excluídos.', icone: 'grafico', acesso: 'gestor' },
+      { href: '/dashboard/monitoramento', label: 'Monitoramento', descricao: 'Anúncios da cidade que ainda não temos.', icone: 'radar', acesso: 'gestor' },
+      { href: '/dashboard/empresas', label: 'Construtoras', descricao: 'Construtoras, incorporadoras e seus empreendimentos.', icone: 'guindaste', acesso: 'gestor' },
       { href: '/dashboard/news', label: 'News', descricao: 'Notícias do portal: escrever, agendar e publicar.', icone: 'jornal', acesso: 'gestor' },
       { href: '/dashboard/feed-especiais', label: 'Depoimentos e destaques', descricao: 'Cards especiais que entram no feed.', icone: 'estrela', acesso: 'gestor' }
     ]
@@ -63,7 +65,7 @@ export const GRUPOS: Grupo[] = [
 
 /** Ordem do menu do topo (mesma de antes). */
 export const ORDEM_MENU = [
-  '/dashboard/crm', '/dashboard/resultados', '/dashboard/custos', '/dashboard/imoveis', '/dashboard/condominios', '/dashboard/mapa',
+  '/dashboard/crm', '/dashboard/resultados', '/dashboard/custos', '/dashboard/imoveis', '/dashboard/condominios', '/dashboard/mapa', '/dashboard/avaliacoes', '/dashboard/tabelas',
   '/dashboard/empresas', '/dashboard/mercado', '/dashboard/monitoramento', '/dashboard/importar-pdf',
   '/dashboard/importar-imagens', '/dashboard/cadastro-ia', '/dashboard/news', '/dashboard/feed-especiais', '/dashboard/jetimob',
   '/dashboard/equipe', '/dashboard/perfil'

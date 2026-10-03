@@ -209,9 +209,11 @@ export default function CondominiosPage() {
                 Importar planilha
               </Link>
             )}
-            <Link href="/dashboard/imoveis/novo" className="flex h-11 items-center rounded-full bg-ink px-5 text-[14px] font-semibold text-white hover:opacity-90">
-              + Novo condomínio
-            </Link>
+            {gestor && (
+              <Link href="/dashboard/imoveis/novo" className="flex h-11 items-center rounded-full bg-ink px-5 text-[14px] font-semibold text-white hover:opacity-90">
+                + Novo condomínio
+              </Link>
+            )}
           </TituloPainel>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {(['breve_lancamento', 'lancamento', 'obras', 'novo'] as StatusBucket[]).map((fs) => {
@@ -318,23 +320,28 @@ export default function CondominiosPage() {
                     >
                       ↗
                     </button>
-                    <Link href={`/dashboard/condominios/${c.id}/editar`} className="ml-auto flex h-8 items-center rounded-full bg-ink px-3.5 text-[12px] font-semibold text-white hover:opacity-90">
-                      {c.status === 'rascunho' ? 'Finalizar' : 'Editar'}
-                    </Link>
+                    {/* corretor não edita condomínios: liga o próprio anúncio pelo cadastro do anúncio */}
+                    {gestor ? (
+                      <Link href={`/dashboard/condominios/${c.id}/editar`} className="ml-auto flex h-8 items-center rounded-full bg-ink px-3.5 text-[12px] font-semibold text-white hover:opacity-90">
+                        {c.status === 'rascunho' ? 'Finalizar' : 'Editar'}
+                      </Link>
+                    ) : (
+                      <span className="ml-auto" />
+                    )}
                     <MenuAcoes
                       itens={[
                         { rotulo: 'Ver página no site', href: `/empreendimento/${c.slug ?? c.id}`, novaAba: true },
-                        { rotulo: 'Ligar anúncios a este condomínio', href: `/dashboard/condominios/${c.id}/editar#anuncios` },
+                        ...(gestor ? [{ rotulo: 'Ligar anúncios a este condomínio', href: `/dashboard/condominios/${c.id}/editar#anuncios` }] : []),
                         { rotulo: 'Fazer proposta', href: `/dashboard/propostas/nova?condominio=${c.id}` },
-                        {
-                          rotulo: c.aceitaTemporada ? '● Aceita temporada (desmarcar)' : '○ Marcar: aceita temporada',
-                          onClick: async () => {
-                            await marcarTemporadaCondominio(c.id, !c.aceitaTemporada);
-                            setItens((lst) => lst?.map((x) => (x.id === c.id ? { ...x, aceitaTemporada: !c.aceitaTemporada } : x)) ?? lst);
-                          }
-                        },
                         ...(gestor
                           ? [
+                              {
+                                rotulo: c.aceitaTemporada ? '● Aceita temporada (desmarcar)' : '○ Marcar: aceita temporada',
+                                onClick: async () => {
+                                  await marcarTemporadaCondominio(c.id, !c.aceitaTemporada);
+                                  setItens((lst) => lst?.map((x) => (x.id === c.id ? { ...x, aceitaTemporada: !c.aceitaTemporada } : x)) ?? lst);
+                                }
+                              },
                               ...([
                                 [0, 'Sem destaque'],
                                 [2, 'Destaque: 2 colunas'],

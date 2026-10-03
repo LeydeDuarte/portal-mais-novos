@@ -710,7 +710,7 @@ export default function MapaImoveis({
       posicao,
       el('div', '', '', [
         linkBotao('Abrir página', `${SITE_URL}${c.url}`, true),
-        linkBotao('Editar', `/dashboard/condominios/${c.id}/editar`),
+        c.podeMover ? linkBotao('Editar', `/dashboard/condominios/${c.id}/editar`) : null,
         linkBotao('Street View', streetView(c.lat, c.lng)),
         botaoSol(c.lat, c.lng, c.nome),
         c.podeMover && onMover ? botaoMover('condominio', c.id, c.nome, c.lat, c.lng) : null

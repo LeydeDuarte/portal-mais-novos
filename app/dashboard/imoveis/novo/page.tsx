@@ -8,6 +8,7 @@ import PropertyForm from '@/components/forms/PropertyForm';
 import DevelopmentForm from '@/components/forms/DevelopmentForm';
 import PreenchimentoRapido from '@/components/forms/PreenchimentoRapido';
 import { useStaffSession } from '@/lib/use-staff-session';
+import { veTudo } from '@/lib/papeis';
 import { createProperty, createDevelopment, saveTipologias, type PropertyEditData } from '@/lib/actions';
 
 type Sucesso = { kind: 'imovel' | 'condominio'; id: string; status?: 'rascunho' | 'publicado' };
@@ -86,6 +87,7 @@ export default function NovoImovelPage() {
           >
             Imóvel
           </button>
+          {veTudo(staff?.role) && (
           <button
             type="button"
             onClick={() => setModo('empreendimento')}
@@ -93,6 +95,7 @@ export default function NovoImovelPage() {
           >
             Condomínio / Empreendimento
           </button>
+          )}
         </div>
 
         {modo === 'imovel' && (
