@@ -103,7 +103,8 @@ export default function CrmFunilPage() {
   const soltar = (destino: string) => ({
     onDragOver: (e: React.DragEvent) => {
       e.preventDefault();
-      setSobre(destino);
+      e.dataTransfer.dropEffect = 'move';
+      setSobre((s) => (s === destino ? s : destino));
     },
     onDragLeave: () => setSobre((s) => (s === destino ? null : s)),
     onDrop: (e: React.DragEvent) => {
@@ -124,10 +125,20 @@ export default function CrmFunilPage() {
     ];
   };
 
-  const Card = ({ c }: { c: CardNegocio }) => (
+  // ATENÇÃO: cartão e coluna são funções chamadas direto ({cartao(c)}), não <Componente />.
+  // Componentes declarados aqui dentro mudam de identidade a cada render: o React
+  // desmontaria o cartão no início do arrastar e o navegador cancelaria o movimento.
+  const cartao = (c: CardNegocio) => (
     <div
+      key={c.id}
       draggable
-      onDragStart={() => setArrastando(c)}
+      onDragStart={(e) => {
+        // o Firefox só começa a arrastar com algum dado no dataTransfer
+        e.dataTransfer.setData('text/plain', c.id);
+        e.dataTransfer.effectAllowed = 'move';
+        // espera o navegador "fotografar" o cartão antes de mudar a tela (faixa do rodapé)
+        requestAnimationFrame(() => setArrastando(c));
+      }}
       onDragEnd={() => {
         setArrastando(null);
         setSobre(null);
@@ -171,8 +182,8 @@ export default function CrmFunilPage() {
     </div>
   );
 
-  const Coluna = ({ id, nome, cor, cards }: { id: string; nome: string; cor: string; cards: CardNegocio[] }) => (
-    <section {...soltar(id)} className="flex h-full w-[248px] shrink-0 flex-col md:w-auto md:min-w-[200px] md:flex-1">
+  const coluna_ = (id: string, nome: string, cor: string, cards: CardNegocio[]) => (
+    <section key={id} {...soltar(id)} className="flex h-full w-[248px] shrink-0 flex-col md:w-auto md:min-w-[200px] md:flex-1">
       <div className="flex items-center gap-1.5 px-1 pb-1.5">
         <h2 className="truncate text-[12.5px] font-semibold">{nome}</h2>
         <span className="text-[11.5px] text-[var(--text-muted)] tabular-nums">{cards.length}</span>
@@ -186,7 +197,7 @@ export default function CrmFunilPage() {
           .slice()
           .sort((a, b) => b.nota.valor - a.nota.valor)
           .map((c) => (
-            <Card key={c.id} c={c} />
+            cartao(c)
           ))}
         {cards.length === 0 && <div className="px-2 py-4 text-center text-[11.5px] text-[var(--text-muted)]">Nenhum aqui</div>}
       </div>
@@ -241,7 +252,7 @@ export default function CrmFunilPage() {
         ) : (
           <div className="mt-3 flex min-h-0 flex-1 gap-2.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
             {d.etapas.map((e, i) => (
-              <Coluna key={e.id} id={e.id} nome={e.nome} cor={CORES[i % CORES.length]} cards={d.cards.filter((c) => coluna(c) === e.id)} />
+              coluna_(e.id, e.nome, CORES[i % CORES.length], d.cards.filter((c) => coluna(c) === e.id))
             ))}
             {d.posVenda.length > 0 && (
               <>
@@ -251,7 +262,7 @@ export default function CrmFunilPage() {
                   <div className="w-px flex-1 bg-[var(--border)]" />
                 </div>
                 {d.posVenda.map((p) => (
-                  <Coluna key={p.id} id={`pv:${p.id}`} nome={p.nome} cor="#13874B" cards={d.cards.filter((c) => coluna(c) === `pv:${p.id}`)} />
+                  coluna_(`pv:${p.id}`, p.nome, '#13874B', d.cards.filter((c) => coluna(c) === `pv:${p.id}`))
                 ))}
               </>
             )}
