@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
 import SolNascente from '@/components/painel/SolNascente';
 import FraseDoDia from '@/components/painel/FraseDoDia';
 import { useStaffSession } from '@/lib/use-staff-session';
-import { fraseDoDia, saudacao } from '@/lib/frases';
+import { CORES_DO_CEU, SAUDACAO_DA_FASE, faseDoDia, fraseDoDia, type FaseDoDia } from '@/lib/frases';
 import { SITE_URL } from '@/lib/seo';
 
 const campo =
@@ -24,6 +24,12 @@ export default function PainelLoginPage() {
   const [entrando, setEntrando] = useState(false);
   // frase diferente da que aparece no painel no mesmo dia
   const frase = fraseDoDia(29);
+  const [fase, setFase] = useState<FaseDoDia>(() => faseDoDia());
+  useEffect(() => {
+    // ?ceu=noite (ou manha, tarde, entardecer) só para conferir as cenas
+    const f = new URLSearchParams(window.location.search).get('ceu');
+    if (f && f in CORES_DO_CEU) setFase(f as FaseDoDia);
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -50,15 +56,15 @@ export default function PainelLoginPage() {
   return (
     <div className="grid min-h-screen md:grid-cols-[minmax(0,1.1fr)_minmax(380px,1fr)]">
       {/* Céu: marca, frase do dia e o sol */}
-      <section className="relative flex flex-col overflow-hidden bg-[var(--ceu)] px-6 pt-6 md:px-12 md:pt-10">
+      <section className="relative flex flex-col overflow-hidden bg-[var(--ceu)] px-6 pt-6 transition-colors md:px-12 md:pt-10" style={CORES_DO_CEU[fase] as React.CSSProperties}>
         <a href={SITE_URL} aria-label="Ir para o site Mais Novos Imóveis" className="self-start">
-          <Logo tipo="completo" altura={36} />
+          <Logo tipo="completo" altura={36} cor={fase === 'noite' ? 'branco' : 'auto'} />
         </a>
         <div className="mt-8 md:mt-auto md:pb-6">
           <FraseDoDia frase={frase} grande />
         </div>
         <div className="mt-6 flex justify-center md:mt-10 md:justify-start">
-          <SolNascente className="h-auto w-[230px] md:w-[min(100%,440px)]" />
+          <SolNascente fase={fase} className="h-auto w-[230px] md:w-[min(100%,440px)]" />
         </div>
       </section>
 
@@ -66,7 +72,7 @@ export default function PainelLoginPage() {
       <main className="flex items-center justify-center px-6 py-10 md:px-12">
         <div className="w-full max-w-[380px]">
           <h1 className="font-serif text-[28px] font-semibold leading-tight tracking-tight md:text-[32px]" suppressHydrationWarning>
-            {saudacao()}! Que bom ter você aqui.
+            {SAUDACAO_DA_FASE[fase]}! Que bom ter você aqui.
           </h1>
           <p className="mt-2 text-[15px] text-[var(--text-muted)]">Entre com o e-mail e a senha da equipe Mais Novos.</p>
 

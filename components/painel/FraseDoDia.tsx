@@ -17,7 +17,7 @@ export default function FraseDoDia({ frase, grande = false }: { frase: Frase; gr
         {frase.texto}
         <span aria-hidden className="ml-0.5 text-accent">”</span>
       </blockquote>
-      <figcaption className="mt-3 text-[14px] text-[var(--text-muted)]" suppressHydrationWarning>
+      <figcaption className="mt-3 text-[14px] text-[var(--ceu-suave,var(--text-muted))]" suppressHydrationWarning>
         <span className="font-semibold text-[var(--ceu-texto)]">{frase.autor}</span>
         {frase.obra && <>, em <i>{frase.obra}</i></>}
       </figcaption>

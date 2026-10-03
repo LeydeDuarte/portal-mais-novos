@@ -97,3 +97,25 @@ export function saudacao(agora = new Date()): string {
 export function dataPorExtenso(agora = new Date()): string {
   return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: 'numeric', month: 'long' }).format(agora);
 }
+
+export type FaseDoDia = 'manha' | 'tarde' | 'entardecer' | 'noite';
+
+/** Momento do dia em Brasília, para a cena do painel e do login. */
+export function faseDoDia(agora = new Date()): FaseDoDia {
+  const h = Number(new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }).format(agora)) % 24;
+  if (h >= 5 && h < 12) return 'manha';
+  if (h >= 12 && h < 17) return 'tarde';
+  if (h >= 17 && h < 18) return 'entardecer';
+  return 'noite';
+}
+
+/** Saudação que combina com a cena do céu (o entardecer ainda é "Boa tarde"). */
+export const SAUDACAO_DA_FASE: Record<FaseDoDia, string> = { manha: 'Bom dia', tarde: 'Boa tarde', entardecer: 'Boa tarde', noite: 'Boa noite' };
+
+/** Cores do céu de cada momento (variáveis CSS usadas na faixa da frase e no login). */
+export const CORES_DO_CEU: Record<FaseDoDia, Record<string, string>> = {
+  manha: { '--ceu': '#EAF3FF', '--ceu-texto': '#14161A', '--ceu-suave': '#5F6368', '--ceu-botao': '#14161A', '--ceu-botao-texto': '#FFFFFF' },
+  tarde: { '--ceu': '#DDEBFF', '--ceu-texto': '#14161A', '--ceu-suave': '#55606E', '--ceu-botao': '#14161A', '--ceu-botao-texto': '#FFFFFF' },
+  entardecer: { '--ceu': '#FFEBDD', '--ceu-texto': '#1F1A17', '--ceu-suave': '#6B5D55', '--ceu-botao': '#14161A', '--ceu-botao-texto': '#FFFFFF' },
+  noite: { '--ceu': '#13233F', '--ceu-texto': '#F3F5FA', '--ceu-suave': '#AEB8CC', '--ceu-botao': '#FFFFFF', '--ceu-botao-texto': '#14161A' }
+};

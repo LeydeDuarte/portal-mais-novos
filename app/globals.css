@@ -210,3 +210,17 @@ html, body { overflow-x: clip; max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .mn-sol-sobe { animation: none; }
 }
+@keyframes mn-sol-desce {
+  from { transform: translateY(0); }
+  to { transform: translateY(18%); }
+}
+@keyframes mn-ceu-aparece {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.mn-sol-desce { transform-box: view-box; animation: mn-sol-desce 1.8s cubic-bezier(0.3, 0.6, 0.3, 1) both; }
+.mn-ceu-aparece { animation: mn-ceu-aparece 1.2s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .mn-sol-desce { animation: none; transform: translateY(18%); }
+  .mn-ceu-aparece { animation: none; }
+}
