@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import PainelNav from '@/components/PainelNav';
 import CabecalhoDocumento from '@/components/CabecalhoDocumento';
+import SituacaoAmostra from '@/components/SituacaoAmostra';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { abrirAvaliacaoInterna, excluirAvaliacaoInterna, type AvaliacaoInterna } from '@/lib/actions-avaliacoes';
 import { TIPOS_AVALIACAO, faixaMetragem, nomeFonte, resumoPorFonte } from '@/lib/avaliacao-calculo';
@@ -140,7 +141,7 @@ export default function RelatorioAvaliacao() {
               </span>
               Amostras utilizadas ({usadas.length})
             </h3>
-            <p className="mb-1 text-[11px] text-[#5f6368] print:text-[8.5px]">Anúncios de imóveis à venda, com o site de origem e quando cada anúncio de portal foi visto. Clique em &quot;ver anúncio&quot; para conferir (anúncios mais antigos podem já ter saído do ar).</p>
+            <p className="mb-1 text-[11px] text-[#5f6368] print:text-[8.5px]">Os dados de cada amostra são os do anúncio na data indicada. Anúncios podem ser alterados ou retirados do ar pelos anunciantes depois dessa data; nesse caso, o link deixa de abrir, mas o registro do dado permanece válido para esta avaliação. As etiquetas VENDIDO e EXCLUÍDO indicam, quando conhecido, que o imóvel foi vendido ou o anúncio saiu do ar, com a data.</p>
             <table className="w-full text-[11.5px] print:text-[9px]">
               <thead className="print:table-header-group">
                 <tr className="text-left text-[10.5px] text-[#5f6368] print:text-[8.5px]">
@@ -161,13 +162,13 @@ export default function RelatorioAvaliacao() {
                   return (
                     <tr key={x.id} className="break-inside-avoid border-t border-[#e6e8eb] align-top">
                       <td className="py-1 pr-2">
+                        <SituacaoAmostra situacao={x.situacao} em={x.situacaoEm} pdf />
                         <strong>{x.condominio || x.titulo || 'Imóvel'}</strong>
                         {x.bairro ? `, ${x.bairro}` : ''}
                       </td>
                       <td className="px-1 py-1">
                         <span className="block font-semibold">
                           {nomeFonte(x)}
-                          {x.origem === 'vendido' ? ' (vendido)' : ''}
                         </span>
                         {x.tambemEm && x.tambemEm.length > 0 && <span className="block text-[9.5px] text-[#5f6368] print:text-[7.5px]">também em {x.tambemEm.join(', ')}</span>}
                         {link && (
@@ -175,7 +176,7 @@ export default function RelatorioAvaliacao() {
                             ver anúncio
                           </a>
                         )}
-                        {x.vistoEm && <span className="block text-[9.5px] text-[#5f6368] print:text-[7.5px]">visto em {x.vistoEm.slice(0, 7).split('-').reverse().join('/')}</span>}
+                        {x.vistoEm && <span className="block text-[9.5px] text-[#5f6368] print:text-[7.5px]">anúncio ativo em {x.vistoEm.slice(0, 10).split('-').reverse().join('/')}</span>}
                       </td>
                       <td className="px-1 py-1 text-right tabular-nums">{Math.round(x.area)}</td>
                       <td className="px-1 py-1 text-right tabular-nums">
@@ -220,7 +221,7 @@ export default function RelatorioAvaliacao() {
           <Secao titulo="Método">
             <p className="text-[11.5px] text-[#3c4043] print:text-[9px]">
               Método comparativo direto de dados de mercado (ABNT NBR 14653-2). Amostras de {fontes.join(', ')}
-              {i.horizontal ? '; condomínio horizontal: apenas casas do próprio condomínio' : i.condominio ? `; mesmo condomínio e prédios a até ${String(i.raioKm ?? 1).replace('.', ',')} km` : '; mesmo bairro'}; metragem até {faixaMetragem(i).pct}% maior ou menor que a do imóvel avaliado
+              {i.horizontal ? `; condomínio horizontal: casas do próprio condomínio e dos condomínios vizinhos a até ${String(i.raioKm ?? 2).replace('.', ',')} km` : i.condominio ? `; mesmo condomínio e prédios a até ${String(i.raioKm ?? 1).replace('.', ',')} km` : '; mesmo bairro'}; metragem até {faixaMetragem(i).pct}% maior ou menor que a do imóvel avaliado
               {i.ano && (i.margemIdade ?? 5) > 0 ? `; prédios entregues até ${i.margemIdade ?? 5} anos antes ou depois de ${i.ano}` : ''}. Cada amostra foi homogeneizada por área, quartos, vagas e idade e, nos anúncios, pelo desconto de negociação estimado
               de {r?.descontoPct ?? 10}% (imóveis vendidos entram pelo valor de venda); o mesmo imóvel anunciado em mais de um site foi contado uma única vez, pela fonte mais completa; foram descartadas as amostras a mais de 35% da mediana; o valor é a média ponderada pela semelhança de cada amostra, com intervalo de confiança de 80%.
             </p>

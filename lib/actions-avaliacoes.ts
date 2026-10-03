@@ -6,8 +6,8 @@
 //   2) memória de buscas anteriores nos portais, por 90 dias, do condomínio OU da região (grátis);
 //   3) anúncios de portais gravados pelo Projeto Claude "Pesquisa de Mercado" (sem custo);
 //   4) amostra manual (link + dados digitados).
-// Regras de área: prédio = mesmo condomínio + condomínios a até 1 km; condomínio horizontal =
-// só o próprio condomínio, casas com a mesma idade (±2 anos); lote/rua = mesmo bairro.
+// Regras de área: prédio ou condomínio horizontal = o próprio condomínio + os vizinhos dentro do
+// raio escolhido (o próprio pesa o dobro); lote/rua = mesmo bairro.
 import { query } from './db';
 import { exigirEquipe } from './staff-auth';
 
@@ -78,11 +78,8 @@ export async function amostrasDaBase(e: ImovelAvaliacao): Promise<AmostraAvaliac
   const params: unknown[] = [tipos, faixa.min, faixa.max];
   let onde: string;
   let proximos: { id: string; nome: string; km: number }[] = [];
-  if (e.developmentId && e.horizontal) {
-    // condomínio horizontal: só o próprio condomínio
-    params.push(e.developmentId);
-    onde = `x.empreendimento_id = $${params.length}`;
-  } else if (e.developmentId) {
+  if (e.developmentId) {
+    // prédio ou condomínio horizontal: o próprio condomínio e os vizinhos dentro do raio escolhido
     proximos = await condominiosProximos(e.developmentId, raioDe(e));
     const ids = proximos.length ? proximos.map((p) => p.id) : [e.developmentId];
     params.push(ids);
@@ -107,13 +104,13 @@ export async function amostrasDaBase(e: ImovelAvaliacao): Promise<AmostraAvaliac
     }),
     query<Record<string, unknown>>(
       `select 'h' || x.id id, x.titulo, coalesce(d.name, x.condominio) condominio, x.bairro, x.area, x.quartos, x.vagas, coalesce(x.valor_venda, x.price_value) preco,
-              x.valor_venda is not null real, x.empreendimento_id,
+              x.valor_venda is not null real, x.empreendimento_id, x.motivo, to_char(x.encerrado_em, 'YYYY-MM-DD') encerrado,
               (select coalesce(nullif(su.nome_publico, ''), su.name) from staff_users su where lower(su.email) = lower(x.corretor_email)) corretor_nome, extract(year from x.delivery_date)::int ano
          from imoveis_historico x left join developments d on d.id = x.empreendimento_id
-        where x.motivo ilike 'vend%' and coalesce(x.valor_venda, x.price_value) > 0 and x.area between $2 and $3
+        where (x.motivo ilike 'vend%' or (x.motivo ilike 'exclu%' and x.encerrado_em > now() - ($${params.length + 1} || ' months')::interval)) and coalesce(x.valor_venda, x.price_value) > 0 and x.area between $2 and $3
           and x.tipo_unidade = any($1::text[]) and ${onde}
         limit 30`,
-      params
+      [...params, Math.min(24, Math.max(1, Number(e.validadeMeses) || 6))]
     ).catch((err) => {
       console.error('amostrasDaBase (vendidos):', err);
       return [] as Record<string, unknown>[];
@@ -145,7 +142,9 @@ export async function amostrasDaBase(e: ImovelAvaliacao): Promise<AmostraAvaliac
     ...vendidos.map((x) => ({
       id: String(x.id),
       origem: (x.real ? 'vendido' : 'nosso') as AmostraAvaliacao['origem'],
-      titulo: `${(x.titulo as string) ?? 'Imóvel'}${x.real ? ' (vendido)' : ' (encerrado)'}`,
+      titulo: (x.titulo as string) ?? 'Imóvel',
+      situacao: (/^vend/i.test(String(x.motivo)) ? 'vendido' : 'excluido') as AmostraAvaliacao['situacao'],
+      situacaoEm: (x.encerrado as string) ?? null,
       condominio: (x.condominio as string) ?? null,
       bairro: (x.bairro as string) ?? null,
       area: Number(x.area),
@@ -190,7 +189,7 @@ export async function buscarNosPortais(e: ImovelAvaliacao, forcar = false): Prom
   const area = Number(e.area) || 0;
   if (!e.bairro || !e.cidade || !area) return { amostras: [], daMemoria: false, custoUsd: 0, erro: 'Preencha o imóvel antes de buscar.' };
   const chave = chaveBusca(e);
-  const proximos = e.developmentId && !e.horizontal ? await condominiosProximos(e.developmentId, raioDe(e)) : [];
+  const proximos = e.developmentId ? await condominiosProximos(e.developmentId, raioDe(e)) : [];
   const converter = (x: Record<string, unknown>): AmostraAvaliacao => {
     const nome = (x.condominio as string) ?? null;
     const perto = nome ? proximos.find((p) => semAcento(p.nome) === semAcento(nome)) : undefined;
@@ -200,6 +199,8 @@ export async function buscarNosPortais(e: ImovelAvaliacao, forcar = false): Prom
       portal: (x.portal as string) ?? null,
       anunciante: (x.anunciante as string) ?? null,
       vistoEm: x.encontrado_em ? new Date(x.encontrado_em as string).toISOString().slice(0, 10) : null,
+      situacao: x.situacao === 'vendido' || x.situacao === 'excluido' ? (x.situacao as AmostraAvaliacao['situacao']) : 'ativo',
+      situacaoEm: x.situacao_em ? new Date(x.situacao_em as string).toISOString().slice(0, 10) : null,
       codigoRef: (x.codigo_ref as string) ?? null,
       andar: num(x.andar),
       caracteristicas: Array.isArray(x.caracteristicas) ? (x.caracteristicas as string[]) : null,
@@ -220,7 +221,7 @@ export async function buscarNosPortais(e: ImovelAvaliacao, forcar = false): Prom
   const filtrar = (l: AmostraAvaliacao[]) =>
     filtrarIdade(
       e,
-      l.filter((a) => a.area >= faixaMetragem(e).min && a.area <= faixaMetragem(e).max && a.preco > 10000 && (!e.horizontal || a.mesmoCondominio))
+      l.filter((a) => a.area >= faixaMetragem(e).min && a.area <= faixaMetragem(e).max && a.preco > 10000)
     );
   // Só lê o que já foi gravado (sem custo): as pesquisas nos portais são feitas pelo
   // Projeto Claude "Pesquisa de Mercado", que grava em amostras_portais e mercado_observacoes.

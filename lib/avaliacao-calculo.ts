@@ -89,6 +89,9 @@ export type AmostraAvaliacao = {
   anunciante?: string | null;
   /** anúncio de portal: quando foi visto pela última vez (AAAA-MM-DD) */
   vistoEm?: string | null;
+  /** situação do anúncio: vendido ou excluído (retirado do ar), com a data (AAAA-MM-DD) */
+  situacao?: 'ativo' | 'vendido' | 'excluido' | null;
+  situacaoEm?: string | null;
   /** fatos extraídos da descrição (nunca o texto): código de referência do anunciante, andar e características curtas */
   codigoRef?: string | null;
   andar?: number | null;

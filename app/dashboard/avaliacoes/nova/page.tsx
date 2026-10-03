@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PainelNav from '@/components/PainelNav';
+import SituacaoAmostra from '@/components/SituacaoAmostra';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { getLocationIndex, type LocalSugestao } from '@/lib/actions';
 import {
@@ -22,7 +23,19 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const campo = 'h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-[14px] outline-none focus:border-accent';
 const rot = 'mb-1 block text-[12px] font-semibold text-[var(--text-muted)]';
-const n = (v: string) => (v.trim() ? Number(v.replace(/\./g, '').replace(',', '.')) : null);
+/** Número digitado: "99,44" e "99.44" = 99,44; "1.250" e "1.250.000" = milhar; "1.250,50" = 1250,50. */
+const n = (v: string) => {
+  const t = String(v ?? '').trim().replace(/[^\d.,-]/g, '');
+  if (!t) return null;
+  let x: string;
+  if (t.includes(',')) x = t.replace(/\./g, '').replace(',', '.'); // vírgula decimal: pontos são milhar
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) x = t.replace(/\./g, ''); // só pontos de milhar (1.250 / 1.250.000)
+  else x = t; // ponto decimal (99.44)
+  const r = Number(x);
+  return Number.isFinite(r) ? r : null;
+};
+/** número no formato brasileiro para os campos (99,44) */
+const br = (v: number | null | undefined) => (v == null ? '' : String(v).replace('.', ','));
 const ORIGEM: Record<AmostraAvaliacao['origem'], { nome: string; cor: string }> = {
   nosso: { nome: 'maisnovosimoveis.com', cor: '#257CFF' },
   vendido: { nome: 'maisnovosimoveis.com', cor: '#13874B' },
@@ -67,7 +80,7 @@ function Avaliar() {
         setModo('condominio');
         setCond({ id: i.developmentId, nome: i.condominio ?? '', bairro: i.bairro, cidade: i.cidade, horizontal: !!i.horizontal, ano: i.ano ?? null, lat: null, lng: null });
       } else setModo('regiao');
-      setF({ bairro: i.bairro, cidade: i.cidade, tipo: i.tipo, area: String(i.area ?? ''), quartos: String(i.quartos ?? ''), suites: String(i.suites ?? ''), vagas: String(i.vagas ?? ''), ano: String(i.ano ?? ''), unidade: i.unidade ?? '', observacao: i.observacao ?? '', margem: String(i.margemPct ?? MARGEM_PADRAO), margemIdade: String(i.margemIdade ?? MARGEM_IDADE_PADRAO), raio: String(i.raioKm ?? RAIO_PADRAO_KM).replace('.', ','), validade: String(i.validadeMeses ?? VALIDADE_PADRAO_MESES), desconto: String(i.descontoPct ?? DESCONTO_PADRAO) });
+      setF({ bairro: i.bairro, cidade: i.cidade, tipo: i.tipo, area: br(i.area), quartos: String(i.quartos ?? ''), suites: String(i.suites ?? ''), vagas: String(i.vagas ?? ''), ano: String(i.ano ?? ''), unidade: i.unidade ?? '', observacao: i.observacao ?? '', margem: String(i.margemPct || MARGEM_PADRAO), margemIdade: String(i.margemIdade ?? MARGEM_IDADE_PADRAO), raio: br(i.raioKm || RAIO_PADRAO_KM), validade: String(i.validadeMeses ?? VALIDADE_PADRAO_MESES), desconto: String(i.descontoPct ?? DESCONTO_PADRAO) });
       setAmostras(a.amostras);
       setResultado(a.resultado);
     });
@@ -120,7 +133,7 @@ function Avaliar() {
     ano: n(f.ano),
     unidade: f.unidade.trim() || null,
     observacao: f.observacao.trim() || null,
-    margemPct: n(f.margem) ?? MARGEM_PADRAO,
+    margemPct: n(f.margem) || MARGEM_PADRAO,
     margemIdade: n(f.margemIdade) ?? MARGEM_IDADE_PADRAO,
     raioKm: n(f.raio) ?? RAIO_PADRAO_KM,
     validadeMeses: n(f.validade) ?? VALIDADE_PADRAO_MESES,
@@ -264,7 +277,7 @@ function Avaliar() {
                         onClick={() => {
                           setCond(c);
                           setBuscaCond('');
-                          setF((x) => ({ ...x, bairro: c.bairro ?? x.bairro, cidade: c.cidade ?? x.cidade, ano: c.ano && !c.horizontal ? String(c.ano) : x.ano, tipo: c.horizontal ? 'casa_condominio' : x.tipo, margemIdade: c.horizontal ? '2' : x.margemIdade }));
+                          setF((x) => ({ ...x, bairro: c.bairro ?? x.bairro, cidade: c.cidade ?? x.cidade, ano: c.ano && !c.horizontal ? String(c.ano) : x.ano, tipo: c.horizontal ? 'casa_condominio' : x.tipo, margemIdade: c.horizontal ? '2' : x.margemIdade, raio: c.horizontal ? '2' : x.raio }));
                           setResultado(null);
                         }}
                         className="block w-full px-3 py-2 text-left text-[13px] hover:bg-[var(--pill-bg)]"
@@ -282,7 +295,7 @@ function Avaliar() {
                 )}
                 {cond && (
                   <span className="mt-1 block text-[12px] text-[var(--text-muted)]">
-                    {cond.horizontal ? 'Condomínio horizontal: só casas dentro do condomínio.' : `Prédio: amostras do condomínio e dos prédios a até ${f.raio || 1} km.`}
+                    {cond.horizontal ? `Condomínio horizontal: casas do condomínio e dos condomínios vizinhos a até ${f.raio || 2} km (as do próprio condomínio pesam o dobro).` : `Prédio: amostras do condomínio e dos prédios a até ${f.raio || 1} km.`}
                   </span>
                 )}
               </label>
@@ -391,9 +404,9 @@ function Avaliar() {
                 </span>
               </div>
             </div>
-            {modo === 'condominio' && !cond?.horizontal && (
+            {modo === 'condominio' && (
               <div className="md:col-span-2">
-                <span className={rot}>Raio de busca (prédios em volta)</span>
+                <span className={rot}>{cond?.horizontal ? 'Raio de busca (condomínios vizinhos)' : 'Raio de busca (prédios em volta)'}</span>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {['0,5', '1', '2', '3', '5'].map((r) => (
                     <button key={r} type="button" onClick={() => mudar('raio', r)} className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${n(f.raio) === n(r) ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}>
@@ -453,10 +466,6 @@ function Avaliar() {
                 <span className={rot}>Link do anúncio</span>
                 <input className={campo} value={manual.url} onChange={(e) => setManual({ ...manual, url: e.target.value })} placeholder="https://..." />
               </label>
-              <label className="md:col-span-2">
-                <span className={rot}>Anunciante</span>
-                <input className={campo} value={manual.anunciante} onChange={(e) => setManual({ ...manual, anunciante: e.target.value })} placeholder="Imobiliária ou corretor" />
-              </label>
               <label>
                 <span className={rot}>Preço (R$) *</span>
                 <input className={campo} inputMode="numeric" value={manual.preco} onChange={(e) => setManual({ ...manual, preco: e.target.value.replace(/\D/g, '') })} />
@@ -488,7 +497,6 @@ function Avaliar() {
                     <th className="py-1.5 pr-2 font-semibold">Usar</th>
                     <th className="py-1.5 pr-2 font-semibold">Imóvel</th>
                     <th className="px-2 py-1.5 font-semibold">Fonte</th>
-                    <th className="px-2 py-1.5 font-semibold">Anunciante</th>
                     <th className="px-2 py-1.5 text-right font-semibold">m²</th>
                     <th className="px-2 py-1.5 text-right font-semibold">Qts / vg</th>
                     <th className="px-2 py-1.5 text-right font-semibold">Entrega</th>
@@ -513,7 +521,10 @@ function Avaliar() {
                         />
                       </td>
                       <td className="py-1.5 pr-2">
-                        <span className="block font-semibold">{a.condominio || a.titulo || 'Imóvel'}</span>
+                        <span className="block font-semibold">
+                          <SituacaoAmostra situacao={a.situacao} em={a.situacaoEm} />
+                          {a.condominio || a.titulo || 'Imóvel'}
+                        </span>
                         <span className="text-[11.5px]">
                           {[a.bairro, a.mesmoCondominio ? 'mesmo condomínio' : a.distKm != null ? `${a.distKm.toFixed(1).replace('.', ',')} km` : null].filter(Boolean).join(' · ')}
                           {a.fora === 'repetido' ? ` · repetido: também em ${a.repetidoDe ?? 'outro site'}` : a.fora === 'raio' ? ' · fora do raio' : a.fora === 'metragem' ? ' · fora da margem de metragem' : a.fora === 'idade' ? ' · fora da margem de idade' : a.fora === 'semIdade' ? ' · idade não informada' : a.descartada ? ' · descartada (fora da faixa)' : ''}
@@ -521,7 +532,7 @@ function Avaliar() {
                       </td>
                       <td className="px-2 py-1.5">
                         <span className="font-semibold" style={{ color: ORIGEM[a.origem].cor }}>
-                          {nomeFonte(a)}{a.origem === 'vendido' ? ' (vendido)' : ''}
+                          {nomeFonte(a)}
                           {a.tambemEm && a.tambemEm.length > 0 && <span className="block text-[11px] font-normal text-[var(--text-muted)]">também em {a.tambemEm.join(', ')}</span>}
                         </span>
                         {a.url && (
@@ -529,9 +540,18 @@ function Avaliar() {
                             ver anúncio
                           </a>
                         )}
-                        {a.vistoEm && <span className="block text-[11px] text-[var(--text-faint)]">visto em {a.vistoEm.slice(0, 7).split('-').reverse().join('/')}</span>}
+                        {a.vistoEm && (() => {
+                          // visto há mais de 90 dias: data em laranja (o anúncio pode já ter saído do ar)
+                          const dias = Math.floor((Date.now() - new Date(`${a.vistoEm}T12:00:00`).getTime()) / 86400000);
+                          const antigo = dias > 90;
+                          return (
+                            <span className={`block text-[11px] ${antigo ? 'font-semibold text-[#B45F06]' : 'text-[var(--text-faint)]'}`}>
+                              ativo em {a.vistoEm.slice(0, 10).split('-').reverse().join('/')}
+                              {antigo ? ` (há ${Math.round(dias / 30)} meses)` : ''}
+                            </span>
+                          );
+                        })()}
                       </td>
-                      <td className="px-2 py-1.5">{a.anunciante || <span className="text-[var(--text-faint)]">não informado</span>}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums">{Math.round(a.area)}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums">
                         {a.quartos ?? '-'} / {a.vagas ?? '-'}
