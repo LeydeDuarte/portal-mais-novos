@@ -9,6 +9,7 @@ import { mercadoPorBairro } from '@/lib/news/mercado';
 import { lerIndicadores } from '@/lib/indicadores';
 import { SeletorRegiao } from './SeletorRegiao';
 import BotaoInstagram from './BotaoInstagram';
+import FaixaRolagem from '@/components/FaixaRolagem';
 
 export const dataCurta = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Sao_Paulo' }).replace('.', '') : '';
@@ -69,14 +70,16 @@ export async function TopoNews({ ativo, q, regiaoAtual }: { ativo?: string; q?: 
           )}
         </div>
       </div>
-      <nav aria-label="Tópicos" className="mt-5 flex gap-2 overflow-x-auto border-y border-[var(--border)] py-3 [scrollbar-width:none]">
-        <Chip href="/news" ativo={!ativo}>Tudo</Chip>
-        {TOPICOS.map((t) => (
-          <Chip key={t.id} href={`/news/${t.id}`} ativo={ativo === t.id}>
-            {t.nome}
-          </Chip>
-        ))}
-        <Chip href="/news/indicadores" ativo={ativo === 'indicadores'}>Indicadores</Chip>
+      <nav aria-label="Tópicos" className="mt-5 border-y border-[var(--border)] py-3">
+        <FaixaRolagem className="flex gap-2">
+          <Chip href="/news" ativo={!ativo}>Tudo</Chip>
+          {TOPICOS.map((t) => (
+            <Chip key={t.id} href={`/news/${t.id}`} ativo={ativo === t.id}>
+              {t.nome}
+            </Chip>
+          ))}
+          <Chip href="/news/indicadores" ativo={ativo === 'indicadores'}>Indicadores</Chip>
+        </FaixaRolagem>
       </nav>
     </div>
     </>
@@ -84,7 +87,7 @@ export async function TopoNews({ ativo, q, regiaoAtual }: { ativo?: string; q?: 
 }
 function Chip({ href, ativo, children }: { href: string; ativo: boolean; children: ReactNode }) {
   return (
-    <Link href={href} className={`flex h-9 shrink-0 items-center rounded-full px-4 text-sm ${ativo ? 'bg-ink font-semibold text-white' : 'bg-[var(--pill-bg)] font-medium'}`}>
+    <Link href={href} aria-current={ativo ? 'page' : undefined} className={`flex h-9 shrink-0 items-center rounded-full px-4 text-sm ${ativo ? 'bg-ink font-semibold text-white' : 'bg-[var(--pill-bg)] font-medium'}`}>
       {children}
     </Link>
   );

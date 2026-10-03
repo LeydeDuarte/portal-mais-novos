@@ -10,7 +10,8 @@ export const TOPICOS = [
   { id: 'investimento', nome: 'Investimento' },
   { id: 'curiosidades', nome: 'Curiosidades' },
   { id: 'direito-imobiliario', nome: 'Direito imobiliário' },
-  { id: 'manchetes-da-semana', nome: 'Manchetes da Semana' }
+  { id: 'manchetes-da-semana', nome: 'Manchetes da Semana' },
+  { id: 'tecnologia', nome: 'Tecnologia' }
 ] as const;
 export type TopicoId = (typeof TOPICOS)[number]['id'];
 export const nomeTopico = (id: string) => TOPICOS.find((t) => t.id === id)?.nome ?? 'Mercado';

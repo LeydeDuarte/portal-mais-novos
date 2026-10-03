@@ -16,6 +16,7 @@ const DESCRICOES: Record<string, string> = {
   investimento: 'Aluguel, valorização e renda com imóveis: onde o dinheiro trabalha e onde ele dorme.',
   curiosidades: 'Histórias da cidade, dos bairros e do mercado que ninguém te contou.',
   'direito-imobiliario': 'Contratos, distrato, condomínio, inventário e usucapião, em português claro.',
+  tecnologia: 'Tecnologia no mercado imobiliário: ferramentas, inteligência artificial, inovação nas construções e as novidades do portal Mais Novos Imóveis.',
   'manchetes-da-semana': 'Todo sábado de manhã: o que aconteceu no Brasil e no mundo na semana e o que isso muda para quem compra, vende ou financia imóvel.'
 };
 
