@@ -11,7 +11,7 @@ import { registrarUsoIA } from './custos';
 import { ehUsadoOuAntigo, limparUmCondominio } from './limpeza-usados';
 
 export type Classificacao = {
-  tipo: 'foto' | 'planta' | 'tabela' | 'ficha' | 'descartar';
+  tipo: 'foto' | 'planta' | 'tabela' | 'ficha' | 'info' | 'descartar';
   categoria: 'fachada' | 'externa' | 'lazer' | 'comum' | 'decorado' | 'vista' | 'implantacao' | 'outro';
   qualidade: number; // 1 a 5
   metragem: number | null;
@@ -25,13 +25,14 @@ const MODELO = process.env.ANTHROPIC_MODEL_VISAO || 'claude-haiku-4-5-20251001';
 
 const INSTRUCAO = `Você classifica imagens do material de vendas de empreendimentos imobiliários (Brasil).
 Responda SÓ com um JSON, sem texto antes ou depois:
-{"tipo":"foto|planta|tabela|ficha|descartar","categoria":"fachada|externa|lazer|comum|decorado|vista|implantacao|outro","qualidade":1-5,"metragem":número ou null,"quartos":número ou null,"suites":número ou null,"nomeTipologia":"texto ou null","legenda":"até 8 palavras em português"}
+{"tipo":"foto|planta|tabela|ficha|info|descartar","categoria":"fachada|externa|lazer|comum|decorado|vista|implantacao|outro","qualidade":1-5,"metragem":número ou null,"quartos":número ou null,"suites":número ou null,"nomeTipologia":"texto ou null","legenda":"até 8 palavras em português"}
 Regras:
 - planta: desenho técnico visto de cima, com cômodos (planta humanizada também). Leia a metragem PRIVATIVA escrita na imagem (ex.: "145,32 m²" → 145.32). Leia quartos, suítes e o nome da tipologia ("Tipo A", "Final 01") se estiverem escritos. Não invente: se não estiver legível, null.
 - foto: fachada (prédio ou casas visto de fora, inteiro), externa (portaria, acesso, jardim), lazer (piscina, academia, salão, quadra, playground, gourmet), comum (hall, lobby, coworking), decorado (interior de unidade), vista, implantacao (vista aérea ilustrada do terreno).
 - tabela: tabela de vendas ou de preços com unidades, metragens e valores.
 - ficha: ficha técnica ou página com dados do empreendimento (endereço, entrega, número de pavimentos ou unidades, lista de lazer, tipologias).
-- descartar: logotipo, mapa de localização, página só de texto institucional, capa de book só com título, imagem muito pequena ou com marca d'água de imobiliária ou portal.
+- info: página com informações úteis sobre o empreendimento em texto (conceito do projeto, localização e pontos próximos, arquitetura, paisagismo, decoração, assinaturas e parceiros, diferenciais, tecnologia, segurança, sustentabilidade, acabamentos). Mapa com lista de pontos próximos também é info.
+- descartar: logotipo, capa de book só com título, página de texto sem informação concreta (só frases de efeito), aviso legal, imagem muito pequena ou com marca d'água de imobiliária ou portal.
 - qualidade: 5 = imagem de capa de revista; 1 = ruim, cortada ou borrada.`;
 
 /** Pede à IA a classificação (imagem reduzida a 768 px para gastar pouco) */
@@ -71,7 +72,7 @@ export async function classificar(img: Buffer): Promise<Classificacao> {
   const o = JSON.parse(m[0]) as Partial<Classificacao>;
   const num = (v: unknown) => (typeof v === 'number' && isFinite(v) && v > 0 ? v : null);
   return {
-    tipo: o.tipo === 'planta' || o.tipo === 'descartar' || o.tipo === 'tabela' || o.tipo === 'ficha' ? o.tipo : 'foto',
+    tipo: o.tipo === 'planta' || o.tipo === 'descartar' || o.tipo === 'tabela' || o.tipo === 'ficha' || o.tipo === 'info' ? o.tipo : 'foto',
     categoria: (['fachada', 'externa', 'lazer', 'comum', 'decorado', 'vista', 'implantacao'] as const).includes(o.categoria as never)
       ? (o.categoria as Classificacao['categoria'])
       : 'outro',
@@ -84,7 +85,7 @@ export async function classificar(img: Buffer): Promise<Classificacao> {
   };
 }
 
-export type ResultadoArquivo = { situacao: 'foto' | 'planta' | 'planta_sem_par' | 'tabela' | 'ficha' | 'descartada' | 'repetida'; detalhe?: string };
+export type ResultadoArquivo = { situacao: 'foto' | 'planta' | 'planta_sem_par' | 'tabela' | 'ficha' | 'info' | 'descartada' | 'repetida'; detalhe?: string };
 
 /** Um arquivo (já reduzido no navegador): classifica, guarda e liga ao empreendimento */
 export async function importarArquivo(devId: string, hash: string, arquivo: string, buf: Buffer, tipoMime: string): Promise<ResultadoArquivo> {
@@ -103,10 +104,16 @@ export async function importarArquivo(devId: string, hash: string, arquivo: stri
     await reg('descartada', null, null);
     return { situacao: 'descartada', detalhe: c.legenda };
   }
-  // tabela de vendas e ficha técnica: completam o cadastro (a imagem não é guardada)
-  if (c.tipo === 'tabela' || c.tipo === 'ficha') {
-    const dados = c.tipo === 'tabela' ? await lerComIA<Tabela>(buf, PEDIDO_TABELA) : await lerComIA<Ficha>(buf, PEDIDO_FICHA);
-    const resumo = c.tipo === 'tabela' ? await aplicarTabela(devId, dados as Tabela) : await aplicarFicha(devId, dados as Ficha);
+  // tabela de vendas, ficha técnica e páginas de informação: completam o cadastro (a imagem não é guardada)
+  if (c.tipo === 'tabela' || c.tipo === 'ficha' || c.tipo === 'info') {
+    const dados =
+      c.tipo === 'tabela' ? await lerComIA<Tabela>(buf, PEDIDO_TABELA) : c.tipo === 'ficha' ? await lerComIA<Ficha>(buf, PEDIDO_FICHA) : await lerComIA<Info>(buf, PEDIDO_INFO);
+    const resumo =
+      c.tipo === 'tabela'
+        ? await aplicarTabela(devId, dados as Tabela)
+        : c.tipo === 'ficha'
+          ? await aplicarFicha(devId, dados as Ficha)
+          : await aplicarFicha(devId, { lazer: (dados as Info).lazer ?? [] }).then(() => `${((dados as Info).fatos ?? []).length} informações guardadas`);
     await reg(c.tipo, null, null);
     await query('update imagens_importadas set dados = $2::jsonb where hash = $1', [hash, JSON.stringify(dados)]);
     return { situacao: c.tipo, detalhe: resumo };
@@ -150,7 +157,13 @@ export async function importarArquivo(devId: string, hash: string, arquivo: stri
 const ORDEM_CAT: Record<string, number> = { fachada: 0, externa: 1, implantacao: 2, lazer: 3, comum: 4, vista: 5, decorado: 6, outro: 7 };
 
 /** Fim da pasta: fotos importadas em ordem (capa = melhor fachada), junto das que já existiam */
-export async function finalizarPasta(devId: string, maxFotos = 40): Promise<{ fotos: number; capa: string | null }> {
+export async function finalizarPasta(devId: string, maxFotos = 40): Promise<{ fotos: number; capa: string | null; descricao: boolean }> {
+  const descricao = await gerarDescricao(devId).catch(() => false);
+  const r = await organizarFotos(devId, maxFotos);
+  return { ...r, descricao };
+}
+
+async function organizarFotos(devId: string, maxFotos: number): Promise<{ fotos: number; capa: string | null }> {
   const novas = await query<{ url: string; categoria: string; qualidade: number }>(
     `select url, categoria, qualidade from imagens_importadas where development_id = $1 and situacao = 'foto' and url is not null`,
     [devId]
@@ -203,7 +216,8 @@ async function lerComIA<T>(img: Buffer, instrucao: string): Promise<T> {
 
 type Linha = { area?: number | null; quartos?: number | null; suites?: number | null; vagas?: number | null; preco?: number | null; tipo?: string | null };
 type Tabela = { entrega?: string | null; linhas?: Linha[] };
-type Ficha = { entrega?: string | null; pavimentos?: number | null; lazer?: string[]; tipos?: string[]; quartos?: number[] };
+type Ficha = { entrega?: string | null; pavimentos?: number | null; lazer?: string[]; tipos?: string[]; quartos?: number[]; fatos?: string[] };
+type Info = { fatos?: string[]; lazer?: string[]; assinaturas?: string[]; pontosProximos?: string[] };
 
 const n = (v: unknown) => (typeof v === 'number' && isFinite(v) && v > 0 ? v : null);
 const mesAno = (s?: string | null) => (s && /^\d{4}-(0[1-9]|1[0-2])$/.test(s) ? `${s}-01` : null);
@@ -309,7 +323,10 @@ const PEDIDO_TABELA = `Esta é a tabela de vendas de um empreendimento imobiliá
 Uma linha por unidade (ou por tipologia, se a tabela for por tipologia). Unidade vendida ou bloqueada: inclua sem preço.`;
 
 const PEDIDO_FICHA = `Esta é uma página de ficha técnica ou de dados de um empreendimento imobiliário brasileiro. Extraia:
-{"entrega":"AAAA-MM ou null","pavimentos":número de pavimentos ou null,"lazer":[itens desta lista que aparecem: ${LAZER_OK.join(', ')}],"tipos":[tipos desta lista: ${TIPOS_OK.join(', ')}],"quartos":[números de quartos das plantas, ex.: [2,3]]}`;
+{"entrega":"AAAA-MM ou null","pavimentos":número de pavimentos ou null,"lazer":[itens desta lista que aparecem: ${LAZER_OK.join(', ')}],"tipos":[tipos desta lista: ${TIPOS_OK.join(', ')}],"quartos":[números de quartos das plantas, ex.: [2,3]],"fatos":["outros dados concretos da página, uma frase curta cada (ex.: 'Torre única com 24 pavimentos', 'Terreno de 5.000 m²', '4 unidades por andar')"]}`;
+
+const PEDIDO_INFO = `Esta é uma página do material de vendas de um empreendimento imobiliário brasileiro. Extraia só fatos concretos (nada de frases de efeito):
+{"fatos":["uma frase curta por fato: conceito do projeto, diferenciais das plantas, tecnologia, segurança, sustentabilidade, acabamentos, áreas comuns que não estão na lista de lazer"],"lazer":[itens desta lista que aparecem: ${LAZER_OK.join(', ')}],"assinaturas":["Arquitetura: nome", "Paisagismo: nome", "Decoração: nome", "Construtora: nome", "Incorporadora: nome"],"pontosProximos":["lugar (distância ou tempo, se informado)"]}`;
 
 /** Planilha (Excel/CSV) da tabela de vendas, já convertida em texto pelo navegador */
 export async function importarPlanilha(devId: string, hash: string, arquivo: string, texto: string): Promise<ResultadoArquivo> {
@@ -343,6 +360,92 @@ export async function importarPlanilha(devId: string, hash: string, arquivo: str
     [hash, devId, arquivo.slice(0, 300), JSON.stringify(dados)]
   );
   return { situacao: 'tabela', detalhe: resumo };
+}
+
+// ---------------- descrição de venda gerada com o material lido ----------------
+const REGRAS_DESCRICAO = `Você escreve a descrição de venda da página de um empreendimento no portal Mais Novos Imóveis (Goiânia), de Leyde Duarte.
+É texto de página de venda, NÃO é notícia: nada de tom jornalístico, datas de acontecimentos ou "nesta semana". Deve continuar verdadeiro enquanto o empreendimento existir.
+REGRA DE OURO: use SOMENTE os fatos fornecidos. Não invente nada (distâncias, nomes, materiais, itens de lazer, números). Se um assunto não tem fato, não escreva a seção.
+Tom: elegante, seguro e aspiracional, luxo silencioso. Benefício antes da característica. Frases curtas, voz ativa, segunda pessoa quando couber.
+Proibido: travessão (—), superlativos vazios ("o melhor", "único", "imperdível"), promessa de valorização, preços ou condições de pagamento (mudam todo mês), clichês ("more bem", "seu sonho realizado", "venha conferir").
+Formato: parágrafos separados por linha em branco, subtítulos com "## ", listas com "- ". Sem título principal (o site já mostra o nome).
+Estrutura (pule seções sem fatos):
+1. Abertura (2 parágrafos curtos, sem subtítulo). A PRIMEIRA FRASE traz: nome + tipo de imóvel + bairro + Goiânia (ou a cidade) + fase (lançamento, em obras ou pronto para morar).
+2. "## Localização no <bairro>": só pontos próximos fornecidos.
+3. "## Plantas e metragens": cada tipologia (área, quartos, suítes, vagas) e para quem ela é.
+4. "## Lazer e áreas comuns": frase de abertura e lista.
+5. "## Tecnologia, segurança e sustentabilidade": só se houver fatos.
+6. "## Quem assina": incorporadora, construtora, arquitetura, paisagismo, decoração (os nomes fornecidos).
+7. "## Entrega": previsão (mês e ano) ou pronto para morar.
+8. Fechamento: convite para pedir a tabela atualizada, consultar as unidades disponíveis e simular o financiamento com a Mais Novos Imóveis.
+SEO natural: nome do empreendimento na primeira frase e mais 2 ou 3 vezes; bairro, tipo, quartos, metragens.
+Responda só com o texto da descrição.`;
+
+/** Escreve a descrição com tudo o que a importação leu (só se o condomínio estiver sem descrição) */
+export async function gerarDescricao(devId: string): Promise<boolean> {
+  const chave = process.env.ANTHROPIC_API_KEY;
+  if (!chave) return false;
+  const d = await query<{ name: string; bairro: string | null; cidade: string | null; tipo: string; entrega: string | null; amenities: string[] | null; pavimentos: number | null; description: string | null; fase: string | null }>(
+    `select name, bairro, cidade, tipo, to_char(delivery_date, 'YYYY-MM') as entrega, amenities, pavimentos, description,
+            case when delivery_date is null then null
+                 when delivery_date > now() then 'lancamento'
+                 when delivery_date > now() - interval '60 months' then 'novo'
+                 when delivery_date > now() - interval '180 months' then 'seminovo' else 'usado' end as fase
+       from developments where id = $1`,
+    [devId]
+  );
+  const dev = d[0];
+  if (!dev || (dev.description ?? '').trim().length >= 400) return false;
+  const [tips, lidos, emp, legendas] = await Promise.all([
+    query<{ area: number; quartos: number | null; vagas: number | null; tipo_unidade: string; description: string }>(
+      `select area, quartos, vagas, tipo_unidade, description from properties where empreendimento_id = $1 and is_tipologia order by area`,
+      [devId]
+    ),
+    query<{ dados: Record<string, unknown> }>(`select dados from imagens_importadas where development_id = $1 and dados is not null and tipo in ('ficha', 'info')`, [devId]),
+    query<{ nome: string; ordem: number }>(
+      `select coalesce(e.nome_perfil, e.razao_social) as nome, de.ordem from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = $1 order by de.ordem`,
+      [devId]
+    ).catch(() => []),
+    query<{ legenda: string }>(`select legenda from imagens_importadas where development_id = $1 and situacao = 'foto' and legenda is not null`, [devId])
+  ]);
+  const fatos = lidos.flatMap((l) => [...((l.dados.fatos as string[]) ?? []), ...((l.dados.assinaturas as string[]) ?? [])]);
+  const pontos = lidos.flatMap((l) => (l.dados.pontosProximos as string[]) ?? []);
+  if (!tips.length && !fatos.length && !(dev.amenities ?? []).length) return false; // sem material suficiente
+  const usado = dev.fase === 'seminovo' || dev.fase === 'usado';
+  const material = {
+    nome: dev.name,
+    bairro: dev.bairro,
+    cidade: dev.cidade ?? 'Goiânia',
+    tipo: dev.tipo === 'horizontal' ? 'condomínio horizontal (casas ou lotes)' : 'edifício (vertical)',
+    fase: dev.fase ?? 'sem data de entrega',
+    entrega: dev.entrega,
+    pavimentos: dev.pavimentos,
+    incorporadoras: emp.map((e) => e.nome),
+    tipologias: tips.map((t) => t.description),
+    lazer: dev.amenities ?? [],
+    pontosProximos: Array.from(new Set(pontos)).slice(0, 15),
+    fatos: Array.from(new Set(fatos)).slice(0, 60),
+    imagensDoMaterial: Array.from(new Set(legendas.map((l) => l.legenda))).slice(0, 30)
+  };
+  const tamanho = usado ? 'Escreva entre 150 e 300 palavras, objetivo, sem linguagem de lançamento.' : 'Escreva no mínimo 400 palavras (ideal 500 a 800).';
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': chave, 'anthropic-version': '2023-06-01' },
+    signal: AbortSignal.timeout(58000),
+    body: JSON.stringify({
+      model: MODELO_LEITURA,
+      max_tokens: 3000,
+      system: `${REGRAS_DESCRICAO}\n${tamanho}`,
+      messages: [{ role: 'user', content: `Material do empreendimento (JSON):\n${JSON.stringify(material)}` }]
+    })
+  });
+  const j = (await r.json().catch(() => ({}))) as { content?: { text?: string }[]; usage?: { input_tokens?: number; output_tokens?: number } };
+  if (!r.ok) return false;
+  await registrarUsoIA(MODELO_LEITURA, j.usage, null);
+  const texto = (j.content ?? []).map((c) => c.text ?? '').join('').replace(/\u2014/g, ',').trim();
+  if (texto.length < 300) return false;
+  await query(`update developments set description = $2, descricao_gerada_em = now() where id = $1 and coalesce(length(trim(description)), 0) < 400`, [devId, texto]);
+  return true;
 }
 
 export { aplicarTabela, aplicarFicha, PEDIDO_TABELA, PEDIDO_FICHA, lerComIA, type Tabela, type Ficha };

@@ -8,7 +8,7 @@ import Link from 'next/link';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
-import { casarPastas, criarRascunhoDaPasta, fecharPasta, pendenciasImportacao, type Casamento, type Pendencia } from '@/lib/actions-importar-massa';
+import { casarPastas, criarRascunhoDaPasta, pendenciasImportacao, type Casamento, type Pendencia } from '@/lib/actions-importar-massa';
 import { contarPaginas, renderizarPaginas } from '@/lib/pdf-import/extract';
 
 type Pasta = Casamento & { arquivos: File[]; destino: string; contagem: Record<string, number>; estado: 'esperando' | 'rodando' | 'feita' | 'pulada' };
@@ -84,7 +84,7 @@ async function enviar(devId: string, blob: Blob, hash: string, nome: string): Pr
   throw new Error('falhou 3 vezes');
 }
 
-const ROTULO: Record<string, string> = { foto: 'fotos', planta: 'plantas', planta_sem_par: 'plantas sem par', tabela: 'tabelas lidas', ficha: 'fichas lidas', descartada: 'descartadas', repetida: 'já importadas', erro: 'erros' };
+const ROTULO: Record<string, string> = { foto: 'fotos', planta: 'plantas', planta_sem_par: 'plantas sem par', tabela: 'tabelas lidas', ficha: 'fichas lidas', info: 'páginas de informação lidas', descricao: 'descrição escrita', descartada: 'descartadas', repetida: 'já importadas', erro: 'erros' };
 
 export default function ImportarImagensPage() {
   const { staff, loaded } = useStaffSession();
@@ -232,7 +232,10 @@ export default function ImportarImagensPage() {
           }
         })
       );
-      await fecharPasta(devId).catch(() => null);
+      const fim = (await fetch('/api/importar-massa/fechar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ devId }) })
+        .then((r) => r.json())
+        .catch(() => null)) as { descricao?: boolean } | null;
+      if (fim?.descricao) conta('descricao');
       setPastas((xs) => xs.map((x, k) => (k === i ? { ...x, estado: parar.current ? 'esperando' : 'feita' } : x)));
     }
     setRodando(false);
@@ -251,7 +254,7 @@ export default function ImportarImagensPage() {
         <p className="mt-1 max-w-3xl text-sm text-[var(--text-muted)]">
           Escolha a pasta principal: dentro dela, uma subpasta para cada empreendimento, com o nome dele (pode ter &quot; - Bairro&quot; no fim). Pode
           deixar tudo misturado, do jeito que veio: fotos, plantas, PDFs (book, caderno de plantas, ficha técnica, tabela), planilhas Excel e arquivos ZIP. A IA separa foto de planta, descarta logos, mapas e tabelas, liga
-          cada planta à tipologia de mesma metragem (e cria a tipologia se faltar), lê a tabela de vendas e a ficha técnica para completar o cadastro e escolhe a capa. Arquivos já importados são pulados: pode parar e continuar depois.
+          cada planta à tipologia de mesma metragem (e cria a tipologia se faltar), lê a tabela de vendas, a ficha técnica e as páginas do book para completar o cadastro, escreve a descrição de venda (se o condomínio estiver sem) e escolhe a capa. Arquivos já importados são pulados: pode parar e continuar depois.
         </p>
 
         <label className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white">

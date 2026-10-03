@@ -71,7 +71,7 @@ export async function criarRascunhoDaPasta(pasta: string): Promise<Candidato> {
   return { id, nome, bairro: bairroBruto?.trim() || null, cidade: 'Goiânia', status: 'rascunho', fotos: 0 };
 }
 
-export async function fecharPasta(devId: string): Promise<{ fotos: number; capa: string | null }> {
+export async function fecharPasta(devId: string): Promise<{ fotos: number; capa: string | null; descricao: boolean }> {
   await exigirGestor();
   return finalizarPasta(devId);
 }
