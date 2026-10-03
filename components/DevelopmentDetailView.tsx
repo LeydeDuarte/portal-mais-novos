@@ -189,6 +189,7 @@ export default async function DevelopmentDetailView({ development }: { developme
                     {badge.text}
                   </span>
                   {development.aceitaTemporada && <TemporadaBadge grande />}
+                  {development.obraParalisada && <span className="rounded-md bg-[#B45F06] px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">Obra paralisada</span>}
                 </div>
               }
             />
@@ -197,6 +198,21 @@ export default async function DevelopmentDetailView({ development }: { developme
 
         <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="min-w-0">
+            {/* obra paralisada (marcada pela equipe): aviso neutro, com a data da informação */}
+            {development.obraParalisada && (
+              <div className="mb-4 flex gap-3 rounded-2xl border border-[#F5C99B] bg-[#FFF6EC] p-4" role="note">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B45F06" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0" aria-hidden>
+                  <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+                  <path d="M12 9v4M12 17h.01" />
+                </svg>
+                <div>
+                  <div className="text-[15px] font-bold text-[#8A4B00]">Obra paralisada</div>
+                  <p className="mt-0.5 text-[13.5px] text-[#5C3A12]">
+                    Pelas últimas informações que recebemos{development.obraParalisadaEm ? ` (${mesPorExtenso(development.obraParalisadaEm)})` : ''}, a obra deste empreendimento está paralisada. Fale conosco para saber a situação atual.
+                  </p>
+                </div>
+              </div>
+            )}
             {/* preço primeiro; entrega e metragens logo ABAIXO do preço */}
             <CaixaPreco
               rotulo={precoInicial ? 'Valores a partir de' : 'Valores'}

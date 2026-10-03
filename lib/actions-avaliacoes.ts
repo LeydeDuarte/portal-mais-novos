@@ -17,7 +17,7 @@ async function exigirGestorAval() {
   return eu;
 }
 import { veTudo } from './papeis';
-import { GRUPO_TIPO, type AmostraAvaliacao, type ImovelAvaliacao, type ResultadoAvaliacaoInterna } from './avaliacao-calculo';
+import { GRUPO_TIPO, faixaMetragem, type AmostraAvaliacao, type ImovelAvaliacao, type ResultadoAvaliacaoInterna } from './avaliacao-calculo';
 
 const RAIO_KM = 1;
 const MEMORIA_DIAS = 90; // um imóvel leva em média uns 90 dias para vender
@@ -73,7 +73,8 @@ export async function amostrasDaBase(e: ImovelAvaliacao): Promise<AmostraAvaliac
   const area = Number(e.area) || 0;
   if (!e.bairro || !e.cidade || !area) return [];
   const tipos = tiposDoGrupo(e.tipo);
-  const params: unknown[] = [tipos, area];
+  const faixa = faixaMetragem(e);
+  const params: unknown[] = [tipos, area, faixa.min, faixa.max];
   let onde: string;
   let proximos: { id: string; nome: string; km: number }[] = [];
   if (e.developmentId && e.horizontal) {
@@ -95,7 +96,7 @@ export async function amostrasDaBase(e: ImovelAvaliacao): Promise<AmostraAvaliac
               extract(year from coalesce(x.delivery_date, case when coalesce(d.tipo, '') <> 'horizontal' then d.delivery_date end))::int ano, x.slug
          from properties x left join developments d on d.id = x.empreendimento_id
         where x.finalidade = 'venda' and x.vendido_em is null and not coalesce(x.is_tipologia, false) and x.price_value > 0
-          and x.area between $2 * 0.5 and $2 * 2 and x.tipo_unidade = any($1::text[]) and ${onde}
+          and x.area between $3 and $4 and x.tipo_unidade = any($1::text[]) and ${onde}
         limit 60`,
       params
     ).catch(() => []),
@@ -103,7 +104,7 @@ export async function amostrasDaBase(e: ImovelAvaliacao): Promise<AmostraAvaliac
       `select 'h' || x.id id, x.titulo, coalesce(d.name, x.condominio) condominio, x.bairro, x.area, x.quartos, x.vagas, coalesce(x.valor_venda, x.price_value) preco,
               x.valor_venda is not null real, x.empreendimento_id, extract(year from x.delivery_date)::int ano
          from imoveis_historico x left join developments d on d.id = x.empreendimento_id
-        where x.motivo ilike 'vend%' and coalesce(x.valor_venda, x.price_value) > 0 and x.area between $2 * 0.5 and $2 * 2
+        where x.motivo ilike 'vend%' and coalesce(x.valor_venda, x.price_value) > 0 and x.area between $3 and $4
           and x.tipo_unidade = any($1::text[]) and ${onde}
         limit 30`,
       params
@@ -187,7 +188,7 @@ export async function buscarNosPortais(e: ImovelAvaliacao, forcar = false): Prom
   const filtrar = (l: AmostraAvaliacao[]) =>
     filtrarIdade(
       e,
-      l.filter((a) => a.area >= area * 0.5 && a.area <= area * 2 && a.preco > 10000 && (!e.horizontal || a.mesmoCondominio))
+      l.filter((a) => a.area >= faixaMetragem(e).min && a.area <= faixaMetragem(e).max && a.preco > 10000 && (!e.horizontal || a.mesmoCondominio))
     );
   // Só lê o que já foi gravado (sem custo): as pesquisas nos portais são feitas pelo
   // Projeto Claude "Pesquisa de Mercado", que grava em amostras_portais e mercado_observacoes.

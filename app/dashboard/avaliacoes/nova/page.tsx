@@ -16,7 +16,7 @@ import {
   salvarAvaliacaoInterna,
   type CondominioAval
 } from '@/lib/actions-avaliacoes';
-import { TIPOS_AVALIACAO, calcularAvaliacaoInterna, type AmostraAvaliacao, type ImovelAvaliacao, type ResultadoAvaliacaoInterna } from '@/lib/avaliacao-calculo';
+import { MARGEM_PADRAO, TIPOS_AVALIACAO, calcularAvaliacaoInterna, faixaMetragem, type AmostraAvaliacao, type ImovelAvaliacao, type ResultadoAvaliacaoInterna } from '@/lib/avaliacao-calculo';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -42,7 +42,7 @@ function Avaliar() {
   const [opcoesCond, setOpcoesCond] = useState<CondominioAval[]>([]);
   const [indice, setIndice] = useState<LocalSugestao[]>([]);
   const [buscaBairro, setBuscaBairro] = useState('');
-  const [f, setF] = useState({ bairro: '', cidade: '', tipo: 'apartamento', area: '', quartos: '', suites: '', vagas: '', ano: '', unidade: '', observacao: '' });
+  const [f, setF] = useState({ bairro: '', cidade: '', tipo: 'apartamento', area: '', quartos: '', suites: '', vagas: '', ano: '', unidade: '', observacao: '', margem: String(MARGEM_PADRAO) });
   const [amostras, setAmostras] = useState<AmostraAvaliacao[]>([]);
   const [resultado, setResultado] = useState<ResultadoAvaliacaoInterna | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -66,7 +66,7 @@ function Avaliar() {
         setModo('condominio');
         setCond({ id: i.developmentId, nome: i.condominio ?? '', bairro: i.bairro, cidade: i.cidade, horizontal: !!i.horizontal, ano: i.ano ?? null, lat: null, lng: null });
       } else setModo('regiao');
-      setF({ bairro: i.bairro, cidade: i.cidade, tipo: i.tipo, area: String(i.area ?? ''), quartos: String(i.quartos ?? ''), suites: String(i.suites ?? ''), vagas: String(i.vagas ?? ''), ano: String(i.ano ?? ''), unidade: i.unidade ?? '', observacao: i.observacao ?? '' });
+      setF({ bairro: i.bairro, cidade: i.cidade, tipo: i.tipo, area: String(i.area ?? ''), quartos: String(i.quartos ?? ''), suites: String(i.suites ?? ''), vagas: String(i.vagas ?? ''), ano: String(i.ano ?? ''), unidade: i.unidade ?? '', observacao: i.observacao ?? '', margem: String(i.margemPct ?? MARGEM_PADRAO) });
       setAmostras(a.amostras);
       setResultado(a.resultado);
     });
@@ -77,6 +77,20 @@ function Avaliar() {
     const tm = setTimeout(() => buscarCondominiosAval(q).then(setOpcoesCond).catch(() => {}), 250);
     return () => clearTimeout(tm);
   }, [buscaCond]);
+  useEffect(() => {
+    const area = Number(n(f.area)) || 0;
+    if (!area) return;
+    const faixa = faixaMetragem({ area, margemPct: n(f.margem) });
+    setAmostras((l) =>
+      l.map((a) => {
+        if (a.origem === 'manual') return a; // amostra digitada à mão nunca sai sozinha
+        const fora = a.area < faixa.min || a.area > faixa.max;
+        if (fora === !!a.foraMargem) return a;
+        setResultado(null);
+        return { ...a, foraMargem: fora, usar: fora ? false : true };
+      })
+    );
+  }, [f.area, f.margem, amostras.length]);
   const sugestoesBairro = useMemo(() => {
     const t = semAcento(buscaBairro.trim());
     if (t.length < 2) return [];
@@ -98,7 +112,8 @@ function Avaliar() {
     vagas: n(f.vagas),
     ano: n(f.ano),
     unidade: f.unidade.trim() || null,
-    observacao: f.observacao.trim() || null
+    observacao: f.observacao.trim() || null,
+    margemPct: n(f.margem) ?? MARGEM_PADRAO
   });
   const pronto = !!f.bairro && !!n(f.area) && (modo === 'regiao' || !!cond);
   const juntar = (novas: AmostraAvaliacao[]) =>
@@ -315,6 +330,25 @@ function Avaliar() {
                 <input className={campo} value={f.unidade} onChange={(e) => mudar('unidade', e.target.value)} />
               </label>
             </div>
+            <div className="md:col-span-2">
+              <span className={rot}>Margem de metragem das amostras</span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[10, 20, 30, 50].map((p) => (
+                  <button key={p} type="button" onClick={() => mudar('margem', String(p))} className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${Number(f.margem) === p ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}>
+                    {p}%
+                  </button>
+                ))}
+                <span className="flex items-center gap-1 text-[13px]">
+                  ou
+                  <input className="h-10 w-16 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-center text-[14px] outline-none focus:border-accent" inputMode="numeric" value={f.margem} onChange={(e) => mudar('margem', e.target.value.replace(/\D/g, '').slice(0, 2))} />%
+                </span>
+                {n(f.area) ? (
+                  <span className="text-[12.5px] text-[var(--text-muted)]">
+                    entram de {Math.round(faixaMetragem({ area: Number(n(f.area)), margemPct: n(f.margem) }).min)} a {Math.round(faixaMetragem({ area: Number(n(f.area)), margemPct: n(f.margem) }).max)} m²
+                  </span>
+                ) : null}
+              </div>
+            </div>
           </div>
         </section>
 
@@ -401,7 +435,7 @@ function Avaliar() {
                         <span className="block font-semibold">{a.condominio || a.titulo || 'Imóvel'}</span>
                         <span className="text-[11.5px]">
                           {[a.bairro, a.mesmoCondominio ? 'mesmo condomínio' : a.distKm != null ? `${a.distKm.toFixed(1).replace('.', ',')} km` : null].filter(Boolean).join(' · ')}
-                          {a.descartada ? ' · descartada (fora da faixa)' : ''}
+                          {a.foraMargem ? ' · fora da margem de metragem' : a.descartada ? ' · descartada (fora da faixa)' : ''}
                         </span>
                       </td>
                       <td className="px-2 py-1.5">

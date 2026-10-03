@@ -35,7 +35,17 @@ export type ImovelAvaliacao = {
   ano?: number | null;
   unidade?: string | null;
   observacao?: string | null;
+  /** margem de metragem das amostras, em % (20 = de 20% a menos a 20% a mais); padrão 20 */
+  margemPct?: number | null;
 };
+
+export const MARGEM_PADRAO = 20;
+/** faixa de metragem aceita para as amostras */
+export function faixaMetragem(e: Pick<ImovelAvaliacao, 'area' | 'margemPct'>): { min: number; max: number; pct: number } {
+  const pct = Math.min(90, Math.max(1, Number(e.margemPct) || MARGEM_PADRAO));
+  const a = Number(e.area) || 0;
+  return { min: a * (1 - pct / 100), max: a * (1 + pct / 100), pct };
+}
 
 /** origem: 'nosso' (anúncio do portal), 'vendido' (histórico com valor de venda), 'portal' (internet), 'manual' */
 export type AmostraAvaliacao = {
@@ -54,6 +64,8 @@ export type AmostraAvaliacao = {
   distKm?: number | null;
   mesmoCondominio?: boolean;
   usar: boolean; // o corretor pode tirar antes do cálculo
+  /** fora da margem de metragem escolhida (sai do cálculo; volta se a margem aumentar) */
+  foraMargem?: boolean;
   // preenchidos no cálculo
   m2?: number;
   m2Homog?: number;

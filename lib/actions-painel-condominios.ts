@@ -39,13 +39,15 @@ export type CondoPainel = {
   tabelaReferencia: string | null;
   tabelaAcompanhar: boolean;
   vendido100: boolean;
+  obraParalisada: boolean;
+  obraParalisadaObs: string | null;
   tabelaMotivo: string | null;
 };
 
 export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
   const eu = await exigirEquipe();
   const rows = await query<Record<string, unknown>>(
-    `select d.id, d.slug, d.name, d.status, d.tipo, d.bairro, d.cidade, d.uf, to_char(d.delivery_date, 'YYYY-MM') as entrega, d.disponiveis, to_char(d.tabela_referencia, 'YYYY-MM') as tabela_ref, d.tabela_acompanhar, d.tabela_parou_motivo, d.vendido_100,
+    `select d.id, d.slug, d.name, d.status, d.tipo, d.bairro, d.cidade, d.uf, to_char(d.delivery_date, 'YYYY-MM') as entrega, d.disponiveis, to_char(d.tabela_referencia, 'YYYY-MM') as tabela_ref, d.tabela_acompanhar, d.tabela_parou_motivo, d.vendido_100, d.obra_paralisada, d.obra_paralisada_obs,
             coalesce(nullif(d.capa_mini, ''), d.photos->>0) as capa, jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) as fotos,
             length(coalesce(d.description, '')) as descricao, coalesce(d.tipos_unidade, '[]'::jsonb) as tipos, coalesce(d.visualizacoes, 0) as visualizacoes,
             coalesce(d.compartilhamentos, 0) as compartilhamentos, d.corretor_email, d.destaque, d.destaque_tamanho, d.video_url, d.aceita_temporada,
@@ -95,6 +97,8 @@ export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
       tabelaReferencia: (r.tabela_ref as string) ?? null,
       tabelaAcompanhar: r.tabela_acompanhar !== false,
       vendido100: !!r.vendido_100,
+      obraParalisada: !!r.obra_paralisada,
+      obraParalisadaObs: (r.obra_paralisada_obs as string) ?? null,
       tabelaMotivo: (r.tabela_parou_motivo as string) ?? null
     }))
     .filter((c) => veTudo(eu.role) || c.status === 'publicado' || c.corretorEmail?.toLowerCase() === eu.email.toLowerCase());
@@ -140,4 +144,14 @@ export async function marcarTemporadaCondominio(id: string, aceita: boolean): Pr
   const eu = await exigirEquipe();
   if (!veTudo(eu.role)) throw new Error('Só o analista ou o administrador marcam a temporada do condomínio.');
   await query('update developments set aceita_temporada = $2 where id = $1', [id, aceita]);
+}
+
+/** Obra paralisada (só analista e admin). A observação é interna (não aparece no site). */
+export async function marcarObraParalisada(id: string, paralisada: boolean, observacao?: string): Promise<void> {
+  const eu = await exigirEquipe();
+  if (!veTudo(eu.role)) throw new Error('Só o analista ou o administrador marcam obra paralisada.');
+  const obs = String(observacao ?? '').trim().slice(0, 300);
+  if (paralisada)
+    await query(`update developments set obra_paralisada = true, obra_paralisada_em = now(), obra_paralisada_obs = $2 where id = $1`, [id, obs ? `${obs} (por ${eu.email})` : `por ${eu.email}`]);
+  else await query(`update developments set obra_paralisada = false, obra_paralisada_em = null, obra_paralisada_obs = null where id = $1`, [id]);
 }

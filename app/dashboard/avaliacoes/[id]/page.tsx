@@ -154,7 +154,7 @@ export default function RelatorioAvaliacao() {
           <Secao titulo="Método">
             <p className="text-[11.5px] text-[#3c4043] print:text-[9px]">
               Método comparativo direto de dados de mercado (ABNT NBR 14653-2). Amostras: {portais.map((p) => ORIGEM[p].toLowerCase()).join(', ')}
-              {i.horizontal ? '; condomínio horizontal: apenas casas do próprio condomínio, com idade semelhante' : i.condominio ? '; mesmo condomínio e prédios a até 1 km' : '; mesmo bairro'}. Cada amostra foi
+              {i.horizontal ? '; condomínio horizontal: apenas casas do próprio condomínio, com idade semelhante' : i.condominio ? '; mesmo condomínio e prédios a até 1 km' : '; mesmo bairro'}; metragem até {i.margemPct ?? 20}% maior ou menor que a do imóvel avaliado. Cada amostra foi
               homogeneizada por fator de oferta (anúncios: 10% de desconto usual de negociação), área, quartos, vagas e idade; foram descartadas as amostras a mais
               de 35% da mediana; o valor é a média ponderada pela semelhança, com intervalo de confiança de 80%. É uma estimativa estatística de valor de mercado,
               baseada em preços de oferta, e não substitui laudo técnico de engenharia.

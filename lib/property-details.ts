@@ -30,6 +30,9 @@ export type Development = {
   disponiveis?: number | null;
   tabelaReferencia?: string | null; // AAAA-MM
   vendido100?: boolean;
+  /** obra paralisada (marcada pela equipe); a data em AAAA-MM */
+  obraParalisada?: boolean;
+  obraParalisadaEm?: string | null;
   heroHeight: number;
   videoUrl?: string;
   photos?: string[]; // fachada, área comum — a primeira é a capa

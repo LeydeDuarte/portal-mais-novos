@@ -8,7 +8,7 @@ import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { contarDuplicados, juntarCondominios } from '@/lib/duplicados';
-import { compartilharCondominio, excluirCondominio, listarCondominiosPainel, marcarTemporadaCondominio, type CondoPainel } from '@/lib/actions-painel-condominios';
+import { compartilharCondominio, excluirCondominio, listarCondominiosPainel, marcarObraParalisada, marcarTemporadaCondominio, type CondoPainel } from '@/lib/actions-painel-condominios';
 import { marcarDestaqueFeed } from '@/lib/actions';
 import { BUCKET_LABEL, FASES, getStatusBucket, type StatusBucket } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
@@ -37,8 +37,8 @@ const COR: Record<StatusBucket, string> = {
   antigo: '#75787e'
 };
 
-type Filtros = { nome: string; uf: string; cidade: string; bairro: string; empresa: string; anoDe: string; anoAte: string; data: string; status: string; fase: string; tipo: string; temporada: string; tabela: string };
-const VAZIO: Filtros = { nome: '', uf: '', cidade: '', bairro: '', empresa: '', anoDe: '', anoAte: '', data: '', status: '', fase: '', tipo: '', temporada: '', tabela: '' };
+type Filtros = { nome: string; uf: string; cidade: string; bairro: string; empresa: string; anoDe: string; anoAte: string; data: string; status: string; fase: string; tipo: string; temporada: string; tabela: string; obra: string };
+const VAZIO: Filtros = { nome: '', uf: '', cidade: '', bairro: '', empresa: '', anoDe: '', anoAte: '', data: '', status: '', fase: '', tipo: '', temporada: '', tabela: '', obra: '' };
 
 // "Mais informações" = mais fotos, texto, data e anúncios (o principal ao unificar)
 const pontos = (c: CondoPainel) => c.fotos * 3 + Math.min(c.descricao, 2000) / 100 + (c.entrega ? 5 : 0) + c.anuncios * 4 + c.empresas.length * 2;
@@ -96,6 +96,7 @@ export default function CondominiosPage() {
       if (f.fase && !marcados(f.fase).includes(fase as string)) return false;
       if (f.temporada && !marcados(f.temporada).includes(c.aceitaTemporada ? 'sim' : 'nao')) return false;
       if (f.tabela && !marcados(f.tabela).includes(situacaoTabela(c))) return false;
+      if (f.obra && !marcados(f.obra).includes(c.obraParalisada ? 'paralisada' : 'normal')) return false;
       return true;
     });
   }, [comFase, f]);
@@ -157,6 +158,9 @@ export default function CondominiosPage() {
       <SecaoFiltro titulo={<span className="flex items-center gap-1.5"><span className="text-[#FF385C]"><SinoRecepcao size={13} /></span>Temporada</span>}>
         <Chips opcoes={[{ v: 'sim', l: 'Aceita' }, { v: 'nao', l: 'Não marcado' }]} valor={f.temporada} onChange={(v) => set('temporada', v)} multi />
       </SecaoFiltro>
+      <SecaoFiltro titulo="Obra">
+        <Chips opcoes={[{ v: 'paralisada', l: 'Obra paralisada', n: (itens ?? []).filter((c) => c.obraParalisada).length }]} valor={f.obra} onChange={(v) => set('obra', v)} multi />
+      </SecaoFiltro>
       <SecaoFiltro titulo="Tabela de vendas">
         <Chips
           opcoes={(['em_dia', 'desatualizada', 'sem_tabela', 'vendido', 'nao_acompanha'] as const).map((v) => ({ v, l: TABELA_LABEL[v], n: (itens ?? []).filter((c) => situacaoTabela(c) === v).length }))}
@@ -181,6 +185,7 @@ export default function CondominiosPage() {
     f.data && { rotulo: marcados(f.data).map((x) => (x === 'com' ? 'Com data' : 'Sem data')).join(', '), tirar: () => set('data', '') },
     (f.anoDe || f.anoAte) && { rotulo: `Entrega ${f.anoDe || '…'}–${f.anoAte || '…'}`, tirar: () => setF((x) => ({ ...x, anoDe: '', anoAte: '' })) },
     f.tipo && { rotulo: marcados(f.tipo).map((x) => (x === 'vertical' ? 'Vertical' : 'Horizontal')).join(', '), tirar: () => set('tipo', '') },
+    f.obra && { rotulo: 'Obra paralisada', tirar: () => set('obra', '') },
     f.tabela && { rotulo: `Tabela: ${marcados(f.tabela).map((x) => TABELA_LABEL[x] ?? x).join(', ')}`, tirar: () => set('tabela', '') },
     f.temporada && { rotulo: `Temporada: ${marcados(f.temporada).map((x) => (x === 'sim' ? 'Aceita' : 'Não marcado')).join(', ')}`, tirar: () => set('temporada', '') },
     f.status && { rotulo: marcados(f.status).map((x) => (x === 'publicado' ? 'Publicados' : 'Rascunhos')).join(', '), tirar: () => set('status', '') },
@@ -314,6 +319,11 @@ export default function CondominiosPage() {
                       {c.empresas.length > 0 && <div className="truncate text-[11px] text-[var(--text-faint)]">{c.empresas.join(' · ')}</div>}
                       <div className="mt-1 flex flex-wrap gap-x-2 text-[11px]">
                         <span className={c.anuncios ? 'font-bold text-[#16A34A]' : 'text-[var(--text-faint)]'}>{c.anuncios} anúncio(s)</span>
+                        {c.obraParalisada && (
+                          <span className="font-bold text-[#B45F06]" title={c.obraParalisadaObs ?? undefined}>
+                            Obra paralisada
+                          </span>
+                        )}
                         {c.vendido100 ? (
                           <span className="font-bold text-[#E62F2F]">100% vendido</span>
                         ) : !c.tabelaAcompanhar && c.tabelaReferencia ? (
@@ -372,6 +382,23 @@ export default function CondominiosPage() {
                         { rotulo: 'Fazer proposta', href: `/dashboard/propostas/nova?condominio=${c.id}` },
                         ...(gestor
                           ? [
+                              {
+                                rotulo: c.obraParalisada ? '● Obra paralisada (desmarcar)' : '○ Marcar obra paralisada',
+                                onClick: async () => {
+                                  if (c.obraParalisada) {
+                                    await marcarObraParalisada(c.id, false);
+                                    setItens((lst) => lst?.map((x) => (x.id === c.id ? { ...x, obraParalisada: false, obraParalisadaObs: null } : x)) ?? lst);
+                                    return;
+                                  }
+                                  const obs = window.prompt(
+                                    `Marcar a obra do ${c.nome} como paralisada?\n\nNo site aparece um aviso neutro com o mês da informação.\nObservação INTERNA (opcional, só a equipe vê): motivo, fonte...`,
+                                    ''
+                                  );
+                                  if (obs === null) return;
+                                  await marcarObraParalisada(c.id, true, obs);
+                                  setItens((lst) => lst?.map((x) => (x.id === c.id ? { ...x, obraParalisada: true, obraParalisadaObs: obs || null } : x)) ?? lst);
+                                }
+                              },
                               {
                                 rotulo: c.vendido100 ? '● 100% vendido (desmarcar)' : '○ Marcar 100% vendido',
                                 onClick: async () => {
