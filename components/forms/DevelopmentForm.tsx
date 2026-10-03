@@ -344,7 +344,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
         <button
           type="submit"
           disabled={!!saving || uploading || pendencias.length > 0}
-          className="rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-40"
+          className="rounded-full bg-[#13874B] px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[#0F6E3D] disabled:opacity-40"
         >
           {saving === 'publicado' ? 'Publicando…' : uploading ? 'Aguarde as fotos…' : initial?.status === 'publicado' ? 'Salvar e manter publicado' : 'Publicar'}
         </button>
@@ -352,7 +352,7 @@ export default function DevelopmentForm({ initial, onSave }: Props) {
           type="button"
           disabled={!!saving || uploading}
           onClick={() => salvar('rascunho')}
-          className="rounded-full border border-[var(--border)] px-5 py-2.5 text-sm font-semibold hover:bg-[var(--pill-bg)] disabled:opacity-40"
+          className="rounded-full border border-[#D5D8DD] bg-[#EEF0F3] px-5 py-2.5 text-sm font-semibold text-[#5B6068] hover:bg-[#E2E5EA] disabled:opacity-40"
         >
           {saving === 'rascunho' ? 'Salvando…' : initial?.status === 'publicado' ? 'Tirar do ar (voltar para rascunho)' : 'Salvar rascunho'}
         </button>

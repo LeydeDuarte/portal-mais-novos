@@ -27,8 +27,8 @@ function TabelaTempo({ linhas }: { linhas: LinhaTop[] }) {
             {linhas.map((l, i) => (
               <tr key={i} className="border-t border-[var(--border)] first:border-t-0">
                 <td className="px-4 py-2.5 text-[var(--text-muted)]">{i + 1}</td>
-                <td className="max-w-0 py-2.5 pr-2">
-                  <a href={l.url ?? '#'} target="_blank" rel="noopener" className="block truncate font-semibold hover:text-accent">
+                <td className="w-full max-w-0 py-2.5 pr-2">
+                  <a href={l.url ?? '#'} target="_blank" rel="noopener" title={l.url ?? l.nome} className="block truncate font-semibold hover:text-accent">
                     {l.nome}
                   </a>
                   <span className="block truncate text-xs text-[var(--text-muted)]">{l.contatos} visita(s) medida(s)</span>
@@ -124,13 +124,13 @@ function Tabela({ titulo, linhas, colunas, vazio }: { titulo: string; linhas: Li
             {linhas.map((l, i) => (
               <tr key={i} className="border-t border-[var(--border)]">
                 <td className="px-4 py-2.5 text-[var(--text-muted)]">{i + 1}</td>
-                <td className="max-w-0 py-2.5 pr-2">
+                <td className="w-full max-w-0 py-2.5 pr-2">
                   {l.url ? (
-                    <a href={l.url} target="_blank" rel="noopener" className="block truncate font-semibold hover:text-accent">
+                    <a href={l.url} target="_blank" rel="noopener" title={l.url} className="block truncate font-semibold hover:text-accent">
                       {l.nome}
                     </a>
                   ) : (
-                    <span className="block truncate font-semibold">{l.nome}</span>
+                    <span title={l.nome} className="block truncate font-semibold">{l.nome}</span>
                   )}
                   {l.sub && <span className="block truncate text-xs text-[var(--text-muted)]">{l.sub}</span>}
                 </td>

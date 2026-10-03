@@ -89,7 +89,9 @@ export async function dadosDoPainel(periodo: Periodo = 'mes', de?: string, ate?:
   if (eu.role !== 'admin') return null; // só o administrador principal
   const [deSql, ateSql] = intervalo(periodo, de, ate);
   // eventos no período (em horário de Brasília)
-  const EV = `(created_at at time zone 'America/Sao_Paulo')::date >= ${deSql} and (created_at at time zone 'America/Sao_Paulo')::date < ${ateSql}`;
+  // fora as visitas dos aparelhos da equipe (marcados quando alguém da equipe entra no painel)
+  const EV = `(created_at at time zone 'America/Sao_Paulo')::date >= ${deSql} and (created_at at time zone 'America/Sao_Paulo')::date < ${ateSql}
+    and coalesce(visitante, '') not in (select visitante from visitantes_equipe)`;
   // fontes dos contatos (crm_contatos criados no período) e o que virou no funil
   await sincronizarCRM().catch(() => 0);
   const fontesSql = (grupo: string, extra = '', limite = 30) => `

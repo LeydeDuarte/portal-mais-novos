@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import MarcarAparelhoEquipe from '@/components/MarcarAparelhoEquipe';
 import { cookies, headers } from 'next/headers';
 import { ehHostApp } from '@/lib/dominios';
 import { verifySession } from '@/lib/session';
@@ -79,6 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AtualizarVersao />
         <SurgirAoRolar />
         {equipe && <RegistrarApp />}
+        {equipe && <MarcarAparelhoEquipe />}
         {children}
       </body>
     </html>

@@ -14,7 +14,20 @@ const ROBO = /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp\/|head
 export async function POST(request: Request) {
   const h = headers();
   if (ROBO.test(h.get('user-agent') ?? '')) return new NextResponse(null, { status: 204 });
-  if (verifySession(cookies().get('mn_staff')?.value)) return new NextResponse(null, { status: 204 });
+  const equipe = verifySession(cookies().get('mn_staff')?.value);
+  if (equipe) {
+    // aparelho da equipe: guarda o identificador anônimo para tirar as visitas dele das estatísticas
+    let vidEq = cookies().get('mn_vid')?.value;
+    const novoEq = !vidEq;
+    if (!vidEq) vidEq = randomUUID();
+    await query(
+      `insert into visitantes_equipe (visitante, email) values ($1, $2) on conflict (visitante) do update set email = excluded.email`,
+      [vidEq, equipe.email]
+    ).catch(() => {});
+    const r = new NextResponse(null, { status: 204 });
+    if (novoEq) r.cookies.set('mn_vid', vidEq, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
+    return r;
+  }
   let b: { t?: string; p?: string; r?: string; o?: string; v?: number };
   try {
     b = JSON.parse(await request.text());
