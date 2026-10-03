@@ -38,7 +38,7 @@ export function extractFieldsFromText(text: string): ExtractedFields {
   result.banheiros = findNumber(text, /(\d+)\s?banheiros?/i);
 
   result.finalidade = /aluguel|locação|alugar/.test(lower) ? 'aluguel' : 'venda';
-  result.aceitaTemporada = /temporada/.test(lower);
+  if (/temporada/.test(lower)) result.aceitaTemporada = true;
 
   for (const tipo of Object.keys(TIPO_UNIDADE_LABEL) as TipoUnidade[]) {
     if (lower.includes(TIPO_UNIDADE_LABEL[tipo].toLowerCase())) {

@@ -1,5 +1,6 @@
 'use client';
 
+import TemporadaBadge from '@/components/TemporadaBadge';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -7,7 +8,7 @@ import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { contarDuplicados, juntarCondominios } from '@/lib/duplicados';
-import { compartilharCondominio, excluirCondominio, listarCondominiosPainel, type CondoPainel } from '@/lib/actions-painel-condominios';
+import { compartilharCondominio, excluirCondominio, listarCondominiosPainel, marcarTemporadaCondominio, type CondoPainel } from '@/lib/actions-painel-condominios';
 import { marcarDestaqueFeed } from '@/lib/actions';
 import { BUCKET_LABEL, FASES, getStatusBucket, type StatusBucket } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
@@ -269,6 +270,7 @@ export default function CondominiosPage() {
                         {c.status === 'rascunho' && <span className="rounded bg-amber-500 px-1.5 py-0.5 text-[9.5px] font-bold text-white">RASCUNHO</span>}
                         {c.destaque && <span className="rounded bg-accent px-1.5 py-0.5 text-[9.5px] font-bold text-white">★ {c.destaqueTamanho === 3 ? '2×2' : '2 COL.'}</span>}
                         {c.temVideo && <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[9.5px] font-bold text-sky-800">▶ VÍDEO</span>}
+                        {c.aceitaTemporada && <TemporadaBadge compacto />}
                       </div>
                       <div className="absolute bottom-1.5 right-1.5 flex gap-1 text-[10px] font-bold text-white">
                         <span className="rounded bg-black/55 px-1.5 py-0.5" title="Visualizações">👁 {c.visualizacoes}</span>
@@ -319,6 +321,13 @@ export default function CondominiosPage() {
                         { rotulo: 'Ver página no site', href: `/empreendimento/${c.slug ?? c.id}`, novaAba: true },
                         { rotulo: 'Ligar anúncios a este condomínio', href: `/dashboard/condominios/${c.id}/editar#anuncios` },
                         { rotulo: 'Fazer proposta', href: `/dashboard/propostas/nova?condominio=${c.id}` },
+                        {
+                          rotulo: c.aceitaTemporada ? '● Aceita temporada (desmarcar)' : '○ Marcar: aceita temporada',
+                          onClick: async () => {
+                            await marcarTemporadaCondominio(c.id, !c.aceitaTemporada);
+                            setItens((lst) => lst?.map((x) => (x.id === c.id ? { ...x, aceitaTemporada: !c.aceitaTemporada } : x)) ?? lst);
+                          }
+                        },
                         ...(gestor
                           ? [
                               ...([

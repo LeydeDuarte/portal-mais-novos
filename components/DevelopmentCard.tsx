@@ -154,7 +154,6 @@ export default function DevelopmentCard({
             <span className="whitespace-nowrap rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide" style={{ background: badge.bg, color: badge.color }}>
               {badge.text}
             </span>
-            <span className="rounded-md bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ink">Empreendimento</span>
             {development.aceitaTemporada && (
               <TemporadaBadge compacto />
             )}

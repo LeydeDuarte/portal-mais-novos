@@ -24,7 +24,7 @@ export type PropertyRow = {
   area: string | null;
   video: boolean;
   video_url: string | null;
-  aceita_temporada: boolean;
+  aceita_temporada: boolean | null;
   match_score: number;
   description: string;
   amenities: string[];

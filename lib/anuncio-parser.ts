@@ -225,7 +225,7 @@ export function extrairAnuncio(texto: string): AnuncioExtraido {
     // sem ano: deixa para preencher
   }
 
-  r.aceitaTemporada = /temporada|airbnb/.test(lower);
+  if (/temporada|airbnb/.test(lower)) r.aceitaTemporada = true;
   r.amenities = AMENIDADES_PADRAO.filter((a) => AMENIDADE_REGRAS.find(([n]) => n === a)?.[1].test(lower));
   if (r.amenities.length) achou(`Lazer: ${r.amenities.join(', ')}`);
 

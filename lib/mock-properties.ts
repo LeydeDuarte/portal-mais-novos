@@ -46,7 +46,7 @@ export type Property = {
   video: boolean;
   // Selo "Aceita temporada" — sim/não, definido no cadastro (regra do
   // condomínio ou do próprio anúncio, quando permite locação por temporada).
-  aceitaTemporada: boolean;
+  aceitaTemporada: boolean | null;
   // matchScore é onde o motor de recomendação (ver documento de arquitetura) entraria de
   // verdade — aqui é um valor mockado só para demonstrar a priorização do autoplay/feed.
   matchScore: number;

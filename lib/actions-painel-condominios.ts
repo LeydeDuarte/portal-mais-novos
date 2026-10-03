@@ -33,6 +33,7 @@ export type CondoPainel = {
   destaque: boolean;
   destaqueTamanho: 2 | 3;
   temVideo: boolean;
+  aceitaTemporada: boolean;
 };
 
 export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
@@ -41,7 +42,7 @@ export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
     `select d.id, d.slug, d.name, d.status, d.tipo, d.bairro, d.cidade, d.uf, to_char(d.delivery_date, 'YYYY-MM') as entrega,
             coalesce(nullif(d.capa_mini, ''), d.photos->>0) as capa, jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) as fotos,
             length(coalesce(d.description, '')) as descricao, coalesce(d.tipos_unidade, '[]'::jsonb) as tipos, coalesce(d.visualizacoes, 0) as visualizacoes,
-            coalesce(d.compartilhamentos, 0) as compartilhamentos, d.corretor_email, d.destaque, d.destaque_tamanho, d.video_url,
+            coalesce(d.compartilhamentos, 0) as compartilhamentos, d.corretor_email, d.destaque, d.destaque_tamanho, d.video_url, d.aceita_temporada,
             s.anuncios, s.salvamentos, s.m2, s.minimo,
             (select array_agg(coalesce(nullif(e.nome_perfil, ''), nullif(e.nome_fantasia, ''), e.razao_social) order by de.ordem)
                from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = d.id) as empresas
@@ -82,7 +83,8 @@ export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
       corretorEmail: (r.corretor_email as string) ?? null,
       destaque: !!r.destaque,
       destaqueTamanho: (r.destaque_tamanho === 3 ? 3 : 2) as 2 | 3,
-      temVideo: !!r.video_url
+      temVideo: !!r.video_url,
+      aceitaTemporada: !!r.aceita_temporada
     }))
     .filter((c) => veTudo(eu.role) || c.status === 'publicado' || c.corretorEmail?.toLowerCase() === eu.email.toLowerCase());
 }
@@ -120,4 +122,14 @@ export async function excluirCondominio(id: string): Promise<{ ok: boolean; erro
   await query('delete from properties where empreendimento_id = $1 and is_tipologia', [id]);
   await query('delete from developments where id = $1', [id]);
   return { ok: true };
+}
+
+/** Três pontinhos → marcar/desmarcar "aceita temporada" no condomínio */
+export async function marcarTemporadaCondominio(id: string, aceita: boolean): Promise<void> {
+  const eu = await exigirEquipe();
+  if (!veTudo(eu.role)) {
+    const r = await query<{ corretor_email: string | null }>('select corretor_email from developments where id = $1', [id]);
+    if (r[0]?.corretor_email?.toLowerCase() !== eu.email.toLowerCase()) throw new Error('Só quem cadastrou, o analista ou o administrador.');
+  }
+  await query('update developments set aceita_temporada = $2 where id = $1', [id, aceita]);
 }

@@ -63,7 +63,7 @@ export type DevelopmentCardData = {
   areaMin: number | null;
   areaMax: number | null;
   unitsCount: number;
-  aceitaTemporada: boolean;
+  aceitaTemporada: boolean | null;
   height: number;
   visualizacoes: number;
   tipo: 'vertical' | 'horizontal';
@@ -935,7 +935,7 @@ export type CreatePropertyInput = {
   video: boolean;
   videoUrl?: string;
   videoVertical?: boolean; // vídeo gravado em pé (celular) — ocupa o espaço sem faixas pretas
-  aceitaTemporada: boolean;
+  aceitaTemporada: boolean | null;
   description: string;
   amenities: string[];
   empreendimentoId?: string;

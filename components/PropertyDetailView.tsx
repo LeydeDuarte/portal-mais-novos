@@ -92,6 +92,9 @@ export default async function PropertyDetailView({
                 {property.aceitaTemporada && (
                   <TemporadaBadge grande />
                 )}
+                {property.aceitaTemporada === false && (
+                  <span className="rounded-md bg-black/55 px-3 py-1 text-xs font-semibold text-white">Não aceita temporada</span>
+                )}
               </div>
   );
 

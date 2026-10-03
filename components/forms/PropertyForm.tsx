@@ -34,7 +34,7 @@ type Values = {
   banheiros: string;
   escaninhos: string;
   area: string;
-  aceitaTemporada: boolean;
+  aceitaTemporada: boolean | null;
   visibilidade: 'publico' | 'privado';
   video: boolean;
   videoUrl: string;
@@ -69,7 +69,7 @@ const EMPTY: Values = {
   banheiros: '',
   escaninhos: '',
   area: '',
-  aceitaTemporada: false,
+  aceitaTemporada: null,
   visibilidade: 'publico',
   video: false,
   videoUrl: '',
@@ -108,7 +108,7 @@ function fromEditData(d: PropertyEditData): Values {
     banheiros: chip(d.banheiros),
     escaninhos: d.escaninhos == null ? '' : d.escaninhos >= 3 ? '3+' : String(d.escaninhos),
     area: d.area != null ? String(d.area) : '',
-    aceitaTemporada: d.aceitaTemporada,
+    aceitaTemporada: d.aceitaTemporada ?? null,
     visibilidade: d.visibilidade === 'privado' ? 'privado' : 'publico',
     video: d.video,
     videoUrl: d.videoUrl ?? '',
@@ -442,10 +442,37 @@ export default function PropertyForm({ initial, submitLabel, onSave }: Props) {
       />
 
       <div className="flex flex-col gap-2 pt-1">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={v.aceitaTemporada} onChange={(e) => set('aceitaTemporada', e.target.checked)} />
-          Aceita temporada
-        </label>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-semibold">Locação por temporada (Airbnb, por dias)</span>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                [true, 'Aceita temporada', 'border-[#FF385C] bg-[#FFF0F3] text-[#C8102E]'],
+                [false, 'Não aceita temporada', 'border-[#5B6068] bg-[#EEF0F3] text-[#14161A]'],
+                [null, 'Não informado', 'border-[#257CFF] bg-[#E8F1FF] text-[#1F5FCC]']
+              ] as const
+            ).map(([valor, rotulo, cor]) => (
+              <button
+                key={rotulo}
+                type="button"
+                onClick={() => set('aceitaTemporada', valor)}
+                aria-pressed={v.aceitaTemporada === valor}
+                className={`rounded-full border px-3.5 py-1.5 text-[13px] font-semibold ${
+                  v.aceitaTemporada === valor ? cor : 'border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--text-muted)]'
+                }`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+          <span className="text-xs text-[var(--text-muted)]">
+            {v.aceitaTemporada === true
+              ? 'O anúncio mostra o selo "Aceita temporada" e aparece no filtro de temporada.'
+              : v.aceitaTemporada === false
+                ? 'A página do anúncio informa que não aceita temporada.'
+                : 'Nada aparece no site sobre temporada.'}
+          </span>
+        </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={v.video} onChange={(e) => set('video', e.target.checked)} />
           Tem vídeo de capa
