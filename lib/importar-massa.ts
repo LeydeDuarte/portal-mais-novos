@@ -4,7 +4,7 @@
 // planta à tipologia de mesma área e, no fim da pasta, ordena as fotos e escolhe a capa.
 import sharp from 'sharp';
 import { query } from './db';
-import { enviarParaR2 } from './r2';
+import { apagarVariosDoR2, enviarParaR2 } from './r2';
 import { prepararFoto } from './fotos-fila';
 import { miniaturaDe } from './miniaturas';
 import { registrarUsoIA } from './custos';
@@ -242,9 +242,11 @@ export async function tipologiaDaArea(devId: string, area: number, info: { quart
   );
   if (ja[0]) {
     // completa só o que está vazio; preço: o menor ("a partir de")
+    // preço: o da tabela oficial substitui o estimado pelos portais; entre tabelas, fica o menor ("a partir de")
     await query(
       `update properties set quartos = coalesce(quartos, $2), vagas = coalesce(vagas, $3),
-              price_value = case when $4::numeric > 0 and (price_value = 0 or $4::numeric < price_value) then $4::numeric else price_value end
+              price_value = case when $4::numeric > 0 and (price_value = 0 or coalesce(preco_origem, '') <> 'tabela' or $4::numeric < price_value) then $4::numeric else price_value end,
+              preco_origem = case when $4::numeric > 0 then 'tabela' else preco_origem end
         where id = $1`,
       [ja[0].id, info.quartos ?? null, info.vagas ?? null, info.preco ?? 0]
     );
@@ -264,6 +266,7 @@ export async function tipologiaDaArea(devId: string, area: number, info: { quart
      on conflict (id) do nothing`,
     [id, devId, tipo, area, info.quartos ?? null, info.vagas ?? null, info.preco ?? 0, d.delivery_date, d.bairro, d.cidade, d.uf ?? 'GO', d.cep, d.name, local || d.name, desc, JSON.stringify(d.amenities ?? []), d.corretor_email ?? 'admin@maisnovos.com']
   );
+  if (info.preco) await query(`update properties set preco_origem = 'tabela' where id = $1`, [id]);
   await query(
     `update developments set tipos_unidade = (select jsonb_agg(distinct x) from jsonb_array_elements_text(coalesce(tipos_unidade, '[]'::jsonb) || to_jsonb(array[$2::text])) x),
             quartos_opcoes = case when $3::int is null then quartos_opcoes else (select jsonb_agg(distinct x::int order by x::int) from jsonb_array_elements_text(coalesce(quartos_opcoes, '[]'::jsonb) || to_jsonb(array[$3::int])) x) end
@@ -449,3 +452,28 @@ export async function gerarDescricao(devId: string): Promise<boolean> {
 }
 
 export { aplicarTabela, aplicarFicha, PEDIDO_TABELA, PEDIDO_FICHA, lerComIA, type Tabela, type Ficha };
+
+/** Desfaz tudo o que a importação em massa fez num condomínio: fotos, plantas, tipologias
+ *  criadas por ela, descrição gerada, registros e os arquivos no R2. */
+export async function desfazerImportacao(devId: string): Promise<{ arquivos: number; tipologias: number }> {
+  const urls = (await query<{ url: string }>(`select url from imagens_importadas where development_id = $1 and url is not null`, [devId])).map((r) => r.url);
+  const inicio = await query<{ t: string | null }>(`select min(criado_em) as t from imagens_importadas where development_id = $1`, [devId]);
+  await query(
+    `update developments set photos = coalesce((select jsonb_agg(u) from jsonb_array_elements_text(coalesce(photos, '[]'::jsonb)) u where u <> all($2::text[])), '[]'::jsonb) where id = $1`,
+    [devId, urls]
+  );
+  const tips = await query<{ id: string }>(
+    `delete from properties where empreendimento_id = $1 and is_tipologia and id ~ ('^' || $1 || '-tip-[0-9]+$') and created_at >= coalesce($2::timestamptz, now()) returning id`,
+    [devId, inicio[0]?.t ?? null]
+  );
+  await query(
+    `update properties set plantas = coalesce((select jsonb_agg(u) from jsonb_array_elements_text(coalesce(plantas, '[]'::jsonb)) u where u <> all($2::text[])), '[]'::jsonb)
+      where empreendimento_id = $1 and is_tipologia`,
+    [devId, urls]
+  );
+  await query(`update developments set description = '', descricao_gerada_em = null where id = $1 and descricao_gerada_em is not null`, [devId]);
+  await query(`delete from imagens_importadas where development_id = $1`, [devId]);
+  const n = await apagarVariosDoR2(urls).catch(() => 0);
+  await miniaturaDe('developments', devId).catch(() => {});
+  return { arquivos: n, tipologias: tips.length };
+}

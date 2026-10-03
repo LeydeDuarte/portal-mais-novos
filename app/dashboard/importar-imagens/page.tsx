@@ -3,15 +3,31 @@
 // Painel → Importar imagens em massa. Uma pasta principal com uma subpasta por empreendimento
 // (fotos, perspectivas, plantas e PDFs misturados). O navegador reduz as imagens e recorta as
 // páginas dos PDFs; o portal classifica com IA, guarda, liga as plantas e escolhe a capa.
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
-import { casarPastas, criarRascunhoDaPasta, pendenciasImportacao, type Casamento, type Pendencia } from '@/lib/actions-importar-massa';
+import { casarPastas, criarRascunhoDaPasta, listarImportacoes, pendenciasImportacao, type Casamento, type Importacao, type Pendencia } from '@/lib/actions-importar-massa';
 import { contarPaginas, renderizarPaginas } from '@/lib/pdf-import/extract';
 
-type Pasta = Casamento & { arquivos: File[]; destino: string; contagem: Record<string, number>; estado: 'esperando' | 'rodando' | 'feita' | 'pulada' };
+type Pasta = Casamento & { caminho: string; aviso: string | null; arquivos: File[]; destino: string; contagem: Record<string, number>; estado: 'esperando' | 'rodando' | 'feita' | 'pulada' };
+
+// Nomes de subpasta que NÃO são empreendimento (organização interna do material)
+const GENERICA = /^(plantas?|fotos?|imagens?|imgs?|book|books|decorad[oa]s?|perspectivas?|renders?|tabelas?|pdfs?|materia(l|is)( de vendas)?|kit( de vendas)?|fachadas?|lazer|obras?|drone|aereas?|a[ée]reas?|videos?|v[ií]deos|redes sociais|posts?|stories|instagram|whats ?app|divulga[cç][aã]o|marketing|tour|ficha( t[ée]cnica)?|memorial|documentos?|docs?|arquivos?|outros|novos?|antigos?|final|finais|r\d+|\d{4}([-_ ]\d{2})?)$/i;
+const MAX_ARQUIVOS_SEM_CONFERIR = 300;
+
+/** Pasta do empreendimento = a subpasta mais funda que não é "Plantas", "Fotos", "Book"... */
+function pastaDoEmpreendimento(caminho: string): { nome: string; caminho: string } {
+  const partes = caminho.split('/').slice(0, -1); // sem o nome do arquivo
+  const internas = partes.slice(1); // sem a pasta principal escolhida
+  for (let i = internas.length - 1; i >= 0; i--) {
+    const nome = internas[i].trim();
+    if (!GENERICA.test(nome.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))) return { nome, caminho: internas.slice(0, i + 1).join(' / ') };
+  }
+  const raiz = partes[0] ?? caminho;
+  return { nome: raiz, caminho: raiz };
+}
 const IMAGEM = /\.(jpe?g|png|webp)$/i;
 const PDF = /\.pdf$/i;
 const PLANILHA = /\.(xlsx|csv)$/i;
@@ -94,6 +110,23 @@ export default function ImportarImagensPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [pend, setPend] = useState<Pendencia[] | null>(null);
   const parar = useRef(false);
+  const [feitas, setFeitas] = useState<Importacao[] | null>(null);
+  const [desfazendo, setDesfazendo] = useState<string | null>(null);
+  const carregarFeitas = () => listarImportacoes().then(setFeitas).catch(() => setFeitas([]));
+  useEffect(() => {
+    if (staff && veTudo(staff.role)) carregarFeitas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staff]);
+  const desfazer = async (x: Importacao) => {
+    if (!window.confirm(`Desfazer a importação de "${x.nome}"? Saem as ${x.fotos} fotos e ${x.plantas} plantas importadas, as tipologias criadas pela importação e a descrição gerada.`)) return;
+    setDesfazendo(x.id);
+    const r = (await fetch('/api/importar-massa/desfazer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ devId: x.id }) })
+      .then((r) => r.json())
+      .catch(() => null)) as { ok?: boolean; arquivos?: number; tipologias?: number; erro?: string } | null;
+    setDesfazendo(null);
+    setMsg(r?.ok ? `Desfeito: ${r.arquivos ?? 0} arquivos apagados e ${r.tipologias ?? 0} tipologias removidas de "${x.nome}".` : `Não consegui desfazer: ${r?.erro ?? 'erro'}`);
+    carregarFeitas();
+  };
 
   if (!loaded) return <PainelNav />;
   if (!staff || !veTudo(staff.role))
@@ -108,30 +141,46 @@ export default function ImportarImagensPage() {
     if (!lista?.length) return;
     setLendo(true);
     setMsg(null);
-    const grupos = new Map<string, File[]>();
+    // agrupa pelo caminho da pasta do empreendimento (aceita Incorporadora / Empreendimento / Plantas / ...)
+    const grupos = new Map<string, { nome: string; arquivos: File[] }>();
+    const comFilhas = new Set<string>(); // pastas que têm subpastas de empreendimento
     let ignorados = 0;
     for (const f of Array.from(lista)) {
       if (!IMAGEM.test(f.name) && !PDF.test(f.name) && !PLANILHA.test(f.name) && !ZIP.test(f.name)) {
         ignorados++;
         continue;
       }
-      const partes = (f.webkitRelativePath || f.name).split('/');
-      const pasta = partes.length > 2 ? partes[1] : partes[0];
-      if (!grupos.has(pasta)) grupos.set(pasta, []);
-      grupos.get(pasta)!.push(f);
+      const emp = pastaDoEmpreendimento(f.webkitRelativePath || f.name);
+      const pai = emp.caminho.split(' / ').slice(0, -1).join(' / ');
+      if (pai) comFilhas.add(pai);
+      if (!grupos.has(emp.caminho)) grupos.set(emp.caminho, { nome: emp.nome, arquivos: [] });
+      grupos.get(emp.caminho)!.arquivos.push(f);
     }
-    const nomes = Array.from(grupos.keys()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const caminhos = Array.from(grupos.keys()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
     const res: Casamento[] = [];
-    for (let i = 0; i < nomes.length; i += 100) res.push(...(await casarPastas(nomes.slice(i, i + 100))));
+    for (let i = 0; i < caminhos.length; i += 100) res.push(...(await casarPastas(caminhos.slice(i, i + 100).map((c) => grupos.get(c)!.nome))));
     setPastas(
-      res.map((c) => ({
-        ...c,
-        arquivos: grupos.get(c.pasta) ?? [],
-        // com certeza → liga; sem nenhum parecido → cria rascunho; dúvida → você escolhe (fica "pular")
-        destino: c.escolhido ? c.escolhido.id : c.opcoes.length ? 'pular' : 'criar',
-        contagem: {},
-        estado: 'esperando'
-      }))
+      res.map((c, k) => {
+        const caminho = caminhos[k];
+        const arquivos = grupos.get(caminho)!.arquivos;
+        // pasta que tem outras pastas de empreendimento dentro (ex.: a pasta da incorporadora) ou grande demais:
+        // não liga sozinho, para não misturar materiais de prédios diferentes
+        const aviso = comFilhas.has(caminho)
+          ? 'arquivos soltos na pasta da incorporadora: podem ser de vários empreendimentos'
+          : arquivos.length > MAX_ARQUIVOS_SEM_CONFERIR
+            ? `${arquivos.length} arquivos: confira se é um empreendimento só`
+            : null;
+        return {
+          ...c,
+          caminho,
+          aviso,
+          arquivos,
+          // nome igual → liga; nenhum parecido → cria rascunho; dúvida ou aviso → "pular" até você escolher
+          destino: aviso ? 'pular' : c.escolhido ? c.escolhido.id : c.opcoes.length ? 'pular' : 'criar',
+          contagem: {},
+          estado: 'esperando'
+        };
+      })
     );
     setLendo(false);
     if (ignorados) setMsg(`${ignorados} arquivo(s) ignorado(s): vídeos, Word, HEIC do iPhone e outros formatos. Entram JPG, PNG, WEBP, PDF, Excel (.xlsx), CSV e ZIP.`);
@@ -240,11 +289,12 @@ export default function ImportarImagensPage() {
     }
     setRodando(false);
     setPend(await pendenciasImportacao().catch(() => []));
+    carregarFeitas();
   };
 
   const total = pastas.reduce((a, p) => a + p.arquivos.length, 0);
-  const feitas = pastas.filter((p) => p.estado === 'feita').length;
-  const duvidas = pastas.filter((p) => !p.escolhido && p.opcoes.length && p.destino === 'pular').length;
+  const prontas = pastas.filter((p) => p.estado === 'feita').length;
+  const duvidas = pastas.filter((p) => p.destino === 'pular' && (p.opcoes.length || p.aviso)).length;
 
   return (
     <div className="min-h-screen">
@@ -252,7 +302,7 @@ export default function ImportarImagensPage() {
       <main className="mx-auto w-full max-w-6xl px-5 py-6 md:px-8">
         <h1 className="text-2xl font-bold">Importar imagens em massa</h1>
         <p className="mt-1 max-w-3xl text-sm text-[var(--text-muted)]">
-          Escolha a pasta principal: dentro dela, uma subpasta para cada empreendimento, com o nome dele (pode ter &quot; - Bairro&quot; no fim). Pode
+          Escolha a pasta principal. Pode ser organizada por empreendimento (Empreendimentos / Nome do prédio) ou por incorporadora (Empreendimentos / Terral / Nest23): cada empreendimento precisa ter a sua pasta, com o nome dele (pode ter &quot; - Bairro&quot; no fim). Subpastas como Plantas, Fotos ou Book dentro dela são entendidas como parte do mesmo empreendimento. Pode
           deixar tudo misturado, do jeito que veio: fotos, plantas, PDFs (book, caderno de plantas, ficha técnica, tabela), planilhas Excel e arquivos ZIP. A IA separa foto de planta, descarta logos, mapas e tabelas, liga
           cada planta à tipologia de mesma metragem (e cria a tipologia se faltar), lê a tabela de vendas, a ficha técnica e as páginas do book para completar o cadastro, escreve a descrição de venda (se o condomínio estiver sem) e escolhe a capa. Arquivos já importados são pulados: pode parar e continuar depois.
         </p>
@@ -274,12 +324,12 @@ export default function ImportarImagensPage() {
         {pastas.length > 0 && (
           <>
             <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--border)] p-4 text-sm">
-              <b>{pastas.length} pastas</b> · {total} arquivos · {feitas} feitas
+              <b>{pastas.length} pastas</b> · {total} arquivos · {prontas} feitas
               {duvidas > 0 && <span className="rounded-full bg-[#FFF4D6] px-2.5 py-0.5 font-semibold text-[#8A5A00]">{duvidas} para você escolher o condomínio</span>}
               <span className="ml-auto flex gap-2">
                 {!rodando ? (
                   <button type="button" onClick={rodar} className="rounded-full bg-accent px-5 py-2 font-bold text-white">
-                    {feitas ? 'Continuar' : 'Começar'}
+                    {prontas ? 'Continuar' : 'Começar'}
                   </button>
                 ) : (
                   <button type="button" onClick={() => (parar.current = true)} className="rounded-full border border-[var(--border)] px-5 py-2 font-semibold">
@@ -303,7 +353,11 @@ export default function ImportarImagensPage() {
                 <tbody>
                   {pastas.map((p, i) => (
                     <tr key={p.pasta} className="border-t border-[var(--border)]">
-                      <td className="p-2.5 font-semibold">{p.pasta}</td>
+                      <td className="p-2.5">
+                        <b>{p.pasta}</b>
+                        {p.caminho !== p.pasta && <span className="block text-xs text-[var(--text-muted)]">{p.caminho}</span>}
+                        {p.aviso && <span className="mt-1 block rounded bg-[#FFF4D6] px-2 py-0.5 text-xs font-semibold text-[#8A5A00]">⚠ {p.aviso}</span>}
+                      </td>
                       <td className="p-2.5 tabular-nums">{p.arquivos.length}</td>
                       <td className="p-2.5">
                         <select
@@ -344,6 +398,31 @@ export default function ImportarImagensPage() {
               </table>
             </div>
           </>
+        )}
+
+        {feitas && feitas.length > 0 && (
+          <section className="mt-8">
+            <h2 className="text-lg font-bold">Importações feitas</h2>
+            <p className="text-sm text-[var(--text-muted)]">Se uma importação saiu errada (material de outro prédio, por exemplo), desfaça e importe de novo a pasta certa.</p>
+            <ul className="mt-3 divide-y divide-[var(--border)] rounded-2xl border border-[var(--border)] text-sm">
+              {feitas.map((x) => (
+                <li key={x.id} className="flex flex-wrap items-center gap-3 p-2.5">
+                  <span className="min-w-0 flex-1">
+                    <b>{x.nome}</b>
+                    <span className="block text-xs text-[var(--text-muted)]">
+                      {x.fotos} fotos · {x.plantas} plantas · {x.lidos} páginas lidas · {x.total} arquivos · {new Date(x.quando).toLocaleString('pt-BR')}
+                    </span>
+                  </span>
+                  <Link href={`/dashboard/condominios/${x.id}/editar`} target="_blank" className="text-xs font-semibold text-accent">
+                    Abrir ↗
+                  </Link>
+                  <button type="button" disabled={!!desfazendo || rodando} onClick={() => desfazer(x)} className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 disabled:opacity-50">
+                    {desfazendo === x.id ? 'Desfazendo…' : 'Desfazer'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {pend && pend.length > 0 && (

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, DeleteObjectsCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { r2PublicBase } from './r2-url';
 
 // Envio de arquivos para o Cloudflare R2 (servidor). Usado pelo upload do
@@ -51,4 +51,17 @@ export async function apagarDoR2(url: string): Promise<boolean> {
   const key = decodeURIComponent(url.slice(base.length + 1));
   await getClient().send(new DeleteObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key }));
   return true;
+}
+
+/** Apaga vários arquivos do R2 de uma vez (até 1000 por pedido) */
+export async function apagarVariosDoR2(urls: string[]): Promise<number> {
+  const base = r2PublicBase();
+  const keys = urls.filter((u) => base && u.startsWith(`${base}/`)).map((u) => decodeURIComponent(u.slice(base.length + 1)));
+  let n = 0;
+  for (let i = 0; i < keys.length; i += 1000) {
+    const lote = keys.slice(i, i + 1000);
+    await getClient().send(new DeleteObjectsCommand({ Bucket: process.env.R2_BUCKET_NAME, Delete: { Objects: lote.map((Key) => ({ Key })), Quiet: true } }));
+    n += lote.length;
+  }
+  return n;
 }

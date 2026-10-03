@@ -45,12 +45,13 @@ export async function casarPastas(pastas: string[]): Promise<Casamento[]> {
     const cand = rows.map((r) => ({ id: r.id, nome: r.name, bairro: r.bairro, cidade: r.cidade, status: r.status, fotos: Number(r.fotos) || 0, nn: r.nn, nb: r.nb }));
     const exatos = cand.filter((c) => c.nn === n && (!b || c.nb === b));
     const mesmoNome = cand.filter((c) => c.nn === n);
+    // só liga sozinho quando o nome é IGUAL (sem "Residencial/Edifício/Condomínio"); parecido = você escolhe
     const escolhido = exatos.length === 1 ? exatos[0] : mesmoNome.length === 1 ? mesmoNome[0] : null;
     const limpa = ({ nn, nb, ...c }: (typeof cand)[number]) => (void nn, void nb, c);
     out.push({
       pasta,
       confianca: escolhido ? (exatos.length === 1 ? 'exato' : 'provavel') : cand.length ? 'provavel' : 'nenhum',
-      escolhido: escolhido ? limpa(escolhido) : cand.length === 1 ? limpa(cand[0]) : null,
+      escolhido: escolhido ? limpa(escolhido) : null,
       opcoes: cand.slice(0, 5).map(limpa)
     });
   }
@@ -86,4 +87,19 @@ export async function pendenciasImportacao(): Promise<Pendencia[]> {
       where i.situacao = 'planta_sem_par' order by i.criado_em desc limit 300`
   );
   return r.map((x) => ({ id: x.id, nome: x.nome, arquivo: x.arquivo, url: x.url, detalhe: x.metragem ? `planta de ${Number(x.metragem)} m² sem tipologia` : 'planta sem metragem legível' }));
+}
+
+export type Importacao = { id: string; nome: string; total: number; fotos: number; plantas: number; lidos: number; quando: string };
+
+/** Condomínios que receberam importação em massa (para conferir ou desfazer) */
+export async function listarImportacoes(): Promise<Importacao[]> {
+  await exigirGestor();
+  const r = await query<{ id: string; nome: string; total: string; fotos: string; plantas: string; lidos: string; quando: string }>(
+    `select d.id, d.name as nome, count(*) as total, count(*) filter (where i.situacao = 'foto') as fotos,
+            count(*) filter (where i.situacao in ('planta', 'planta_sem_par')) as plantas,
+            count(*) filter (where i.situacao in ('tabela', 'ficha', 'info')) as lidos, max(i.criado_em)::text as quando
+       from imagens_importadas i join developments d on d.id = i.development_id
+      group by d.id, d.name order by max(i.criado_em) desc limit 200`
+  );
+  return r.map((x) => ({ id: x.id, nome: x.nome, total: Number(x.total), fotos: Number(x.fotos), plantas: Number(x.plantas), lidos: Number(x.lidos), quando: x.quando }));
 }
