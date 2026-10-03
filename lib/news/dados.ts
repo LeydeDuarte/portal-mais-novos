@@ -65,17 +65,18 @@ export async function noticiasPublicadas(f: Filtro = {}): Promise<Noticia[]> {
   const limite = Math.min(f.limite ?? 12, 60);
   const offset = Math.max(0, (f.pagina ?? 0) * limite);
   const rows = await query<Row>(
-    `select *, ${DATA_PUB} as publicado_em from noticias where ${conds.join(' and ')} order by principal desc, ${DATA_PUB} desc limit ${limite} offset ${offset}`,
+    `select *, ${DATA_PUB} as publicado_em from noticias where ${conds.join(' and ')} order by (principal and ${DATA_PUB} > now() - interval '24 hours') desc, ${DATA_PUB} desc limit ${limite} offset ${offset}`,
     params
   ).catch(() => []);
   return rows.map(mapNoticia);
 }
 
-/** Capa: a principal (marcada ou a mais recente) e as demais mais recentes */
+/** Capa: a mais recente publicada em cima. "Fixar no topo" só segura a notícia por 24 h
+ *  depois de publicada; depois disso, vale a ordem de publicação. */
 export async function noticiasDaCapa(): Promise<Noticia[]> {
   const rows = await query<Row>(
     `select *, ${DATA_PUB} as publicado_em from noticias where ${PUBLICADA}
-      order by (principal and ${DATA_PUB} > now() - interval '30 days') desc, ${DATA_PUB} desc limit 40`
+      order by (principal and ${DATA_PUB} > now() - interval '24 hours') desc, ${DATA_PUB} desc limit 40`
   ).catch(() => []);
   return rows.map(mapNoticia);
 }
@@ -147,7 +148,7 @@ export async function noticiasParaLugar(bairro?: string | null, cidade?: string 
     `select *, ${DATA_PUB} as publicado_em from noticias where ${PUBLICADA}
       order by (case when $1::text is not null and lower(bairro) = lower($1) then 0
                      when $2::text is not null and lower(cidade) = lower($2) then 1 else 2 end),
-               principal desc, ${DATA_PUB} desc limit $3`,
+               ${DATA_PUB} desc limit $3`,
     [bairro ?? null, cidade ?? null, limite]
   ).catch(() => []);
   return rows.map(mapNoticia);

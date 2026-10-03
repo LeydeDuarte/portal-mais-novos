@@ -348,7 +348,10 @@ export default function EditorNoticia() {
                 <input className={campoPainel} value={f.autor} onChange={(e) => set('autor', e.target.value)} />
               </Campo>
               <label className="flex items-center justify-between text-sm">
-                <span>Principal da capa</span>
+                <span>
+                  Fixar no topo da capa por 24 h
+                  <span className="block text-xs text-[var(--text-muted)]">Sem marcar, a mais recente publicada fica em cima.</span>
+                </span>
                 <input type="checkbox" checked={f.principal} onChange={(e) => set('principal', e.target.checked)} />
               </label>
             </div>
