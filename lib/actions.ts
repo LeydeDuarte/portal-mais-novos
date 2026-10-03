@@ -45,6 +45,8 @@ const STAFF_COOKIE = 'mn_staff';
 // antes do catálogo chegar a dezenas de milhares de linhas.
 export type DevelopmentCardData = {
   id: string;
+  /** unidades disponíveis pela tabela de vendas mais recente (só lançamento, obras e pronto novo) */
+  disponiveis?: number | null;
   slug?: string;
   concepcao?: string | null; // construtoras/incorporadoras, ex.: "Consciente · EBM"
   destaqueTamanho?: 2 | 3;
@@ -591,6 +593,10 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       visualizacoes: Number(row.visualizacoes) || 0,
       tipo: base.tipo,
       anuncios: Number(row.anuncios) || 0,
+      disponiveis:
+        (row as { disponiveis?: number | null }).disponiveis && base.deliveryDate && ['breve_lancamento', 'lancamento', 'obras', 'novo'].includes(getStatusBucket(base.deliveryDate))
+          ? Number((row as { disponiveis?: number | null }).disponiveis)
+          : null,
       capaMini: miniValida(row),
       concepcao: row.concepcao ?? null,
       destaqueTamanho: (row as { destaque_tamanho?: number }).destaque_tamanho === 3 ? 3 : 2
@@ -1848,11 +1854,14 @@ export async function getOscilacao(de: string, ate: string, tipos?: string[]): P
        union all
        select bairro, cidade, tipo, mes, preco / area from mercado_observacoes where preco > 0 and area > 0 and bairro is not null
      ),
-     sel as (select * from obs where mes in ($1::date, $2::date) ${ft})
+     -- "todo o histórico" (de antes de 2000): o início de cada bairro é o 1º mês com dados dele
+     base as (select *, ${norm('bairro')} nb, ${norm("coalesce(cidade, '')")} nc from obs where mes <= $2::date ${ft}),
+     inicio as (select nb, nc, case when $1::date < '2000-01-01' then min(mes) else $1::date end mes_de from base group by nb, nc),
+     sel as (select b.*, i.mes_de from base b join inicio i using (nb, nc) where b.mes in (i.mes_de, $2::date))
      select mode() within group (order by bairro) bairro, mode() within group (order by cidade) cidade,
-            avg(m2) filter (where mes = $1::date) m2de, count(*) filter (where mes = $1::date) nde,
-            avg(m2) filter (where mes = $2::date) m2ate, count(*) filter (where mes = $2::date) nate
-       from sel group by ${norm('bairro')}, ${norm("coalesce(cidade, '')")}`,
+            avg(m2) filter (where mes = mes_de) m2de, count(*) filter (where mes = mes_de) nde,
+            avg(m2) filter (where mes = $2::date and mes <> mes_de) m2ate, count(*) filter (where mes = $2::date and mes <> mes_de) nate
+       from sel group by nb, nc`,
     params
   ).catch(() => []);
   const n = (v: string | null) => (v != null ? Math.round(Number(v)) : null);

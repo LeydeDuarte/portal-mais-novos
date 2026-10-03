@@ -17,6 +17,11 @@ export type UnidadeTabela = {
   area: number;
   valor?: number;
   vagas?: number;
+  /** números das garagens como vieram na tabela ("17, 18 e 19") */
+  garagens?: string;
+  /** número do escaninho (depósito), quando houver */
+  escaninho?: string;
+  torre?: string;
   situacao: 'disponivel' | 'vendida' | 'reservada' | 'outra';
 };
 
@@ -179,14 +184,19 @@ export function lerTabela(doc: PdfDoc): UnidadeTabela[] {
       // Vagas: célula logo depois da área ("17, 18 e 19"); se a célula quebrou em
       // duas linhas ("216, 217, 218" em cima e "e 219" embaixo), junta as duas.
       const idxArea = cels.findIndex((c) => /m(?:²|2)/i.test(c));
+      let garagens = idxArea >= 0 && contarVagas(cels[idxArea + 1] ?? '') != null ? (cels[idxArea + 1] ?? '').trim() : undefined;
       let vagas = idxArea >= 0 ? contarVagas(cels[idxArea + 1] ?? '') : undefined;
       if (vagas == null) {
         const antes = celulas(pag[i - 1] ?? '')[0] ?? '';
         const depois = celulas(pag[i + 1] ?? '')[0] ?? '';
-        if (/^\d+[a-z]?(\s*,\s*\d+[a-z]?)*(\s*,?\s*e)?$/i.test(antes.trim()) && !RE_LINHA_UNIDADE.test(pag[i - 1] ?? ''))
-          vagas = contarVagas(`${antes} ${/^(e\s)?\d/i.test(depois.trim()) ? depois : ''}`.replace(/\s+/g, ' '));
+        if (/^\d+[a-z]?(\s*,\s*\d+[a-z]?)*(\s*,?\s*e)?$/i.test(antes.trim()) && !RE_LINHA_UNIDADE.test(pag[i - 1] ?? '')) {
+          const junto = `${antes} ${/^(e\s)?\d/i.test(depois.trim()) ? depois : ''}`.replace(/\s+/g, ' ').trim();
+          vagas = contarVagas(junto);
+          if (vagas != null) garagens = junto;
+        }
       }
-      out.push({ unidade: m[1], area, valor, vagas, situacao: situacaoDe(linha) });
+      const esc = linha.match(/escaninho\s*(?:n[ºo°.]?\s*)?[:\-]?\s*([a-z0-9-]{1,8})/i)?.[1];
+      out.push({ unidade: m[1], area, valor, vagas, garagens, escaninho: esc, situacao: situacaoDe(linha) });
     });
   }
   return out;

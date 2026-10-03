@@ -4,7 +4,7 @@
 // Amostras, do grátis para o pago:
 //   1) nossa base: anúncios do portal e vendidos do histórico (grátis);
 //   2) memória de buscas anteriores nos portais, por 90 dias, do condomínio OU da região (grátis);
-//   3) busca nos portais pela IA mais barata (Haiku), no máximo 3 pesquisas, só quando pedida;
+//   3) anúncios de portais gravados pelo Projeto Claude "Pesquisa de Mercado" (sem custo);
 //   4) amostra manual (link + dados digitados).
 // Regras de área: prédio = mesmo condomínio + condomínios a até 1 km; condomínio horizontal =
 // só o próprio condomínio, casas com a mesma idade (±2 anos); lote/rua = mesmo bairro.
@@ -17,12 +17,10 @@ async function exigirGestorAval() {
   return eu;
 }
 import { veTudo } from './papeis';
-import { registrarUsoIA } from './custos';
 import { GRUPO_TIPO, type AmostraAvaliacao, type ImovelAvaliacao, type ResultadoAvaliacaoInterna } from './avaliacao-calculo';
 
 const RAIO_KM = 1;
 const MEMORIA_DIAS = 90; // um imóvel leva em média uns 90 dias para vender
-const MODELO_BUSCA = process.env.ANTHROPIC_MODEL_BUSCA || 'claude-haiku-4-5-20251001';
 const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/^(edif[ií]cio|residencial|condom[ií]nio)\s+/, '').trim();
 const num = (v: unknown) => (v == null || v === '' ? null : Number(v));
 const grupoDe = (tipo: string) => GRUPO_TIPO[tipo] ?? 'vertical';
@@ -191,103 +189,24 @@ export async function buscarNosPortais(e: ImovelAvaliacao, forcar = false): Prom
       e,
       l.filter((a) => a.area >= area * 0.5 && a.area <= area * 2 && a.preco > 10000 && (!e.horizontal || a.mesmoCondominio))
     );
-  if (!forcar) {
-    const mem = await query<Record<string, unknown>>(
-      `select * from amostras_portais
-        where encontrado_em > now() - ($2 || ' days')::interval
-          and (chave = $1 or (lower(bairro) = lower($3) and lower(coalesce(cidade, '')) = lower($4) and tipo = any($5::text[])))`,
-      [chave, MEMORIA_DIAS, e.bairro, e.cidade, tiposDoGrupo(e.tipo)]
-    ).catch(() => []);
-    if (mem.length) return { amostras: filtrar(mem.map(converter)), daMemoria: true, custoUsd: 0 };
-  }
-  const chaveApi = process.env.ANTHROPIC_API_KEY;
-  if (!chaveApi) return { amostras: [], daMemoria: false, custoUsd: 0, erro: 'A IA não está configurada (ANTHROPIC_API_KEY).' };
-
-  const tipoTxt = e.tipo.replace(/_/g, ' ');
-  const alvo = e.condominio
-    ? e.horizontal
-      ? `casas à venda dentro do condomínio "${e.condominio}" (${e.bairro}, ${e.cidade})`
-      : `${tipoTxt} à venda no condomínio "${e.condominio}" ou em prédios vizinhos (${proximos.slice(1, 6).map((p) => p.nome).join(', ') || e.bairro}), ${e.bairro}, ${e.cidade}`
-    : `${tipoTxt} à venda no bairro ${e.bairro}, ${e.cidade}`;
-  const instrucao = `Você pesquisa anúncios de imóveis à venda em portais brasileiros (ZAP, VivaReal, OLX, QuintoAndar, Imovelweb, Chaves na Mão e sites de imobiliárias).
-Procure: ${alvo}, com área perto de ${area} m²${e.quartos ? `, ${e.quartos} quartos` : ''}${e.vagas != null ? `, ${e.vagas} vagas` : ''}.
-Responda SOMENTE com um array JSON, sem texto antes ou depois. Cada item: {"portal": "", "url": "", "titulo": "", "condominio": "", "bairro": "", "area": 0, "quartos": 0, "vagas": 0, "preco": 0, "ano": 0}.
-Regras: só anúncios de VENDA com preço e área claramente informados no resultado; não invente nem estime números; use null no que não souber; url do anúncio (não da busca); no máximo 15 itens; não repita o mesmo imóvel.`;
-  let j: { content?: { type: string; text?: string }[]; usage?: Record<string, unknown>; error?: { message?: string } };
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': chaveApi, 'anthropic-version': '2023-06-01' },
-      signal: AbortSignal.timeout(90000),
-      body: JSON.stringify({
-        model: MODELO_BUSCA,
-        max_tokens: 2000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3, user_location: { type: 'approximate', city: e.cidade, region: 'Goiás', country: 'BR' } }],
-        messages: [{ role: 'user', content: instrucao }]
-      })
-    });
-    j = await r.json().catch(() => ({}));
-    if (!r.ok) return { amostras: [], daMemoria: false, custoUsd: 0, erro: j.error?.message ?? `IA: HTTP ${r.status}` };
-  } catch (err) {
-    return { amostras: [], daMemoria: false, custoUsd: 0, erro: err instanceof Error ? err.message : 'A busca não respondeu.' };
-  }
-  await registrarUsoIA(MODELO_BUSCA, j.usage as Parameters<typeof registrarUsoIA>[1], null);
-  const u = (j.usage ?? {}) as { input_tokens?: number; output_tokens?: number; server_tool_use?: { web_search_requests?: number } };
-  const custoUsd = ((u.input_tokens ?? 0) * 1 + (u.output_tokens ?? 0) * 5) / 1_000_000 + (u.server_tool_use?.web_search_requests ?? 0) * 0.01;
-  const texto = (j.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('');
-  const m = texto.match(/\[[\s\S]*\]/);
-  let itens: Record<string, unknown>[] = [];
-  try {
-    itens = m ? (JSON.parse(m[0]) as Record<string, unknown>[]) : [];
-  } catch {
-    itens = [];
-  }
-  const vistos = new Set<string>();
-  const validos = itens.filter((x) => {
-    const url = typeof x.url === 'string' && /^https?:\/\//.test(x.url) ? x.url : '';
-    if (!url || vistos.has(url)) return false;
-    vistos.add(url);
-    return Number(x.area) > 0 && Number(x.preco) > 0;
-  });
-  for (const x of validos) {
-    await query(
-      `insert into amostras_portais (url, chave, portal, titulo, condominio, bairro, cidade, tipo, area, quartos, vagas, preco, ano, encontrado_em)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, now())
-       on conflict (url) do update set chave = excluded.chave, preco = excluded.preco, area = excluded.area, encontrado_em = now()`,
-      [
-        String(x.url).slice(0, 600),
-        chave,
-        String(x.portal ?? '').slice(0, 60) || null,
-        String(x.titulo ?? '').slice(0, 200) || null,
-        String(x.condominio ?? '').slice(0, 160) || null,
-        String(x.bairro ?? '').slice(0, 100) || null,
-        e.cidade,
-        e.tipo,
-        Number(x.area),
-        num(x.quartos),
-        num(x.vagas),
-        Number(x.preco),
-        num(x.ano) && Number(x.ano) > 1950 ? Number(x.ano) : null
-      ]
-    ).catch(() => {});
-  }
-  await registrarObservacoes(
-    validos.map((x) => ({
-      url: String(x.url),
-      portal: (x.portal as string) ?? null,
-      condominio: (x.condominio as string) ?? null,
-      bairro: (x.bairro as string) || e.bairro,
-      cidade: e.cidade,
-      tipo: e.tipo,
-      area: Number(x.area),
-      quartos: num(x.quartos),
-      vagas: num(x.vagas),
-      preco: Number(x.preco),
-      ano: num(x.ano)
-    }))
-  );
+  // Só lê o que já foi gravado (sem custo): as pesquisas nos portais são feitas pelo
+  // Projeto Claude "Pesquisa de Mercado", que grava em amostras_portais e mercado_observacoes.
+  void forcar;
+  const mem = await query<Record<string, unknown>>(
+    `select * from amostras_portais
+      where encontrado_em > now() - ($2 || ' days')::interval
+        and (chave = $1 or (lower(bairro) = lower($3) and lower(coalesce(cidade, '')) = lower($4) and tipo = any($5::text[])))`,
+    [chave, MEMORIA_DIAS, e.bairro, e.cidade, tiposDoGrupo(e.tipo)]
+  ).catch(() => []);
   void eu;
-  return { amostras: filtrar(validos.map(converter)), daMemoria: false, custoUsd, erro: validos.length ? undefined : 'A busca não encontrou anúncios com preço e área informados.' };
+  if (!mem.length)
+    return {
+      amostras: [],
+      daMemoria: true,
+      custoUsd: 0,
+      erro: `Ainda não há anúncios de portais gravados para ${e.condominio ? `o ${e.condominio} ou ` : ''}o ${e.bairro} nos últimos ${MEMORIA_DIAS} dias. Peça no Projeto Claude "Pesquisa de Mercado" e depois clique de novo.`
+    };
+  return { amostras: filtrar(mem.map(converter)), daMemoria: true, custoUsd: 0 };
 }
 
 // ---------------- histórico do mercado (para sempre) ----------------

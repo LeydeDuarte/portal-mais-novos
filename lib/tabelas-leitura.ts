@@ -62,8 +62,10 @@ function lerLinhasPlanilha(linhas: unknown[][]): UnidadeTabela[] {
     const iA = achar(cab, /(area|metragem|m2|m²|privativ)/);
     const iV = achar(cab, /(valor|preco|total|a vista)/);
     if (iU < 0 || iA < 0 || iV < 0) continue;
-    const iVg = achar(cab, /(vaga|garag)/);
+    const iVg = achar(cab, /(vaga|garag|box)/);
     const iS = achar(cab, /(situac|status|disponib)/);
+    const iEsc = achar(cab, /(escaninho|deposito|hobby)/);
+    const iT = achar(cab, /^(torre|bloco|quadra)/);
     const out: UnidadeTabela[] = [];
     for (const l of linhas.slice(h + 1)) {
       const un = String(l?.[iU] ?? '').trim();
@@ -71,11 +73,19 @@ function lerLinhasPlanilha(linhas: unknown[][]): UnidadeTabela[] {
       const valor = numeroBR(l?.[iV]);
       if (!un || !area || area < 15 || area > 5000) continue;
       const st = norm(String(iS >= 0 ? l?.[iS] ?? '' : ''));
+      // garagens: "17, 18" / "17 e 18" = números das vagas (guarda o texto e conta);
+      // um número sozinho pequeno (até 9) = quantidade de vagas
+      const g = iVg >= 0 ? String(l?.[iVg] ?? '').trim() : '';
+      const partes = g.split(/\s*(?:,|;|\/|\be\b)\s*/i).filter((x) => /\d/.test(x));
+      const soQuantidade = partes.length === 1 && /^\d$/.test(partes[0]) && !/[,;\/e]/i.test(g);
       out.push({
         unidade: un,
         area,
         valor: valor && valor >= 30000 ? valor : undefined,
-        vagas: iVg >= 0 ? Number(String(l?.[iVg] ?? '').replace(/\D/g, '')) || undefined : undefined,
+        vagas: g ? (soQuantidade ? Number(partes[0]) : partes.length || undefined) : undefined,
+        garagens: g && !soQuantidade ? g : undefined,
+        escaninho: iEsc >= 0 ? String(l?.[iEsc] ?? '').trim() || undefined : undefined,
+        torre: iT >= 0 ? String(l?.[iT] ?? '').trim() || undefined : undefined,
         situacao: /vend/.test(st) ? 'vendida' : /reserv/.test(st) ? 'reservada' : 'disponivel'
       });
     }

@@ -25,6 +25,10 @@ export type Development = {
   // Selo "Aceita temporada" — regra do condomínio, sim/não, cadastrada uma
   // vez para o empreendimento inteiro (vale para todas as unidades nele).
   aceitaTemporada: boolean;
+  /** Unidades disponíveis por metragem, pela tabela de vendas mais recente (Painel → Tabelas de preços) */
+  disponibilidade?: { area: number; disponiveis: number; aPartirDe: number | null }[] | null;
+  disponiveis?: number | null;
+  tabelaReferencia?: string | null; // AAAA-MM
   heroHeight: number;
   videoUrl?: string;
   photos?: string[]; // fachada, área comum — a primeira é a capa

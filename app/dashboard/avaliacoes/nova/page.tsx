@@ -128,8 +128,8 @@ function Avaliar() {
       r.erro
         ? r.erro
         : r.daMemoria
-          ? `${r.amostras.length} anúncio(s) de portais guardados de buscas recentes (sem custo). Para pesquisar de novo, use "Nova busca nos portais".`
-          : `${r.amostras.length} anúncio(s) encontrados nos portais. Custo desta busca: cerca de R$ ${(r.custoUsd * 5.5).toFixed(2).replace('.', ',')}.`
+          ? `${r.amostras.length} anúncio(s) de portais das pesquisas dos últimos 90 dias (sem custo).`
+          : `${r.amostras.length} anúncio(s) encontrados nos portais.`
     );
     setOcupado(null);
   };
@@ -327,10 +327,7 @@ function Avaliar() {
                 {ocupado === 'base' ? 'Buscando…' : 'Buscar na nossa base (grátis)'}
               </button>
               <button type="button" disabled={!pronto || !!ocupado} onClick={() => dosPortais(false)} className="h-9 rounded-full border border-[#6A3CFF] px-4 text-[13px] font-semibold text-[#6A3CFF] disabled:opacity-40">
-                {ocupado === 'portais' ? 'Pesquisando nos portais…' : 'Buscar nos portais'}
-              </button>
-              <button type="button" disabled={!pronto || !!ocupado} onClick={() => dosPortais(true)} title="Ignora a memória e pesquisa de novo (custa)" className="h-9 rounded-full px-3 text-[12.5px] font-semibold text-[var(--text-muted)] hover:bg-[var(--pill-bg)] disabled:opacity-40">
-                Nova busca nos portais
+                {ocupado === 'portais' ? 'Buscando…' : 'Buscar nos portais (grátis)'}
               </button>
               <button type="button" onClick={() => setVerManual((v) => !v)} className="h-9 rounded-full px-3 text-[12.5px] font-semibold text-accent hover:bg-[var(--pill-bg)]">
                 + Amostra manual
@@ -338,7 +335,7 @@ function Avaliar() {
             </div>
           </div>
           <p className="mt-1 text-[12px] text-[var(--text-muted)]">
-            Comece pela nossa base. "Buscar nos portais" reaproveita buscas dos últimos 90 dias (do condomínio ou do bairro) sem custo; quando não há, pesquisa com a IA (cerca de R$ 0,30 a R$ 0,60). Tire as amostras que não servem antes de calcular.
+            Comece pela nossa base. "Buscar nos portais" traz os anúncios de portais gravados nos últimos 90 dias para o condomínio ou o bairro, pelas pesquisas feitas no Projeto Claude "Pesquisa de Mercado" (sem custo). Tire as amostras que não servem antes de calcular.
           </p>
           {verManual && (
             <div className="mt-3 grid gap-2 rounded-xl bg-[var(--pill-bg)] p-3 md:grid-cols-6">

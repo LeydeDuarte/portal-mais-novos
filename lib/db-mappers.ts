@@ -72,6 +72,9 @@ export type DevelopmentRow = {
   area_terreno: string | null;
   amenities: string[];
   aceita_temporada: boolean;
+  disponibilidade?: unknown;
+  disponiveis?: number | null;
+  tabela_referencia?: string | Date | null;
   hero_height: number;
   video_url: string | null;
   corretor_email: string | null;
@@ -214,6 +217,9 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     areaTerreno: row.area_terreno ?? undefined,
     amenities: row.amenities ?? [],
     aceitaTemporada: row.aceita_temporada,
+    disponibilidade: Array.isArray(row.disponibilidade) ? (row.disponibilidade as Development['disponibilidade']) : null,
+    disponiveis: row.disponiveis ?? null,
+    tabelaReferencia: row.tabela_referencia ? new Date(row.tabela_referencia).toISOString().slice(0, 7) : null,
     heroHeight: row.hero_height,
     videoUrl: row.video_url ?? undefined,
     photos: toStringArray(row.photos),

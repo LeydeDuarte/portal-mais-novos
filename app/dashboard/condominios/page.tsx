@@ -13,8 +13,10 @@ import { marcarDestaqueFeed } from '@/lib/actions';
 import { BUCKET_LABEL, FASES, getStatusBucket, type StatusBucket } from '@/lib/classification';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { BarraSelecao, BuscaGrande, Chips, marcados, FiltrosAtivos, MenuAcoes, SecaoFiltro, TituloPainel, Vazio, botaoBarra, campoPainel } from '@/components/painel/ui';
+import { paraBusca } from '@/lib/busca-texto';
 
-const sa = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// busca tolerante: acentos, y/i, w/v, ph/f, letras dobradas (lib/busca-texto.ts)
+const sa = paraBusca;
 const campo = 'w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-2 text-[13px] outline-none focus:border-accent';
 const rotulo = 'mb-1 block text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]';
 const brl = (v: number | null) => (v ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : null);
@@ -73,7 +75,7 @@ export default function CondominiosPage() {
     const nome = sa(f.nome.trim());
     return comFase.filter(({ c, fase }) => {
       const ano = c.entrega ? Number(c.entrega.slice(0, 4)) : null;
-      if (nome && !sa(`${c.nome} ${c.bairro ?? ''}`).includes(nome)) return false;
+      if (nome && !sa(`${c.nome} ${c.bairro ?? ''} ${c.empresas.join(' ')}`).includes(nome)) return false;
       if (f.uf && c.uf !== f.uf) return false;
       if (f.cidade && c.cidade !== f.cidade) return false;
       if (f.bairro && c.bairro !== f.bairro) return false;
@@ -98,7 +100,7 @@ export default function CondominiosPage() {
     const nome = sa(semFase.nome.trim());
     for (const { c, fase } of comFase) {
       if (!fase) continue;
-      if (nome && !sa(`${c.nome} ${c.bairro ?? ''}`).includes(nome)) continue;
+      if (nome && !sa(`${c.nome} ${c.bairro ?? ''} ${c.empresas.join(' ')}`).includes(nome)) continue;
       if ((f.uf && c.uf !== f.uf) || (f.cidade && c.cidade !== f.cidade) || (f.bairro && c.bairro !== f.bairro) || (f.empresa && !c.empresas.includes(f.empresa))) continue;
       m[fase] = (m[fase] ?? 0) + 1;
     }
@@ -234,7 +236,7 @@ export default function CondominiosPage() {
               );
             })}
           </div>
-          <BuscaGrande value={f.nome} onChange={(v) => set('nome', v)} placeholder="Buscar condomínio pelo nome ou bairro" />
+          <BuscaGrande value={f.nome} onChange={(v) => set('nome', v)} placeholder="Buscar pelo nome, bairro ou construtora" />
           <FiltrosAtivos itens={ativosLista} onLimpar={() => setF(VAZIO)} />
           {aviso && (
             <p className="rounded-2xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800" onClick={() => setAviso(null)}>
@@ -294,6 +296,11 @@ export default function CondominiosPage() {
                       {c.empresas.length > 0 && <div className="truncate text-[11px] text-[var(--text-faint)]">{c.empresas.join(' · ')}</div>}
                       <div className="mt-1 flex flex-wrap gap-x-2 text-[11px]">
                         <span className={c.anuncios ? 'font-bold text-[#16A34A]' : 'text-[var(--text-faint)]'}>{c.anuncios} anúncio(s)</span>
+                        {c.disponiveis ? (
+                          <span className="font-bold text-[#1B5FCC]" title={c.tabelaReferencia ? `Tabela de ${c.tabelaReferencia.split('-').reverse().join('/')}` : undefined}>
+                            {c.disponiveis} disponíve{c.disponiveis === 1 ? 'l' : 'is'} na tabela
+                          </span>
+                        ) : null}
                         {c.m2Medio ? <span className="text-[var(--text-muted)]">{brl(c.m2Medio)}/m²</span> : null}
                         {c.aPartirDe ? <span className="text-[var(--text-muted)]">a partir de {brl(c.aPartirDe)}</span> : null}
                       </div>

@@ -3,13 +3,13 @@
 // Painel → Tabelas de preços: sobe tabelas de vendas em massa (PDF, Excel, CSV, ZIP ou pasta),
 // lê no navegador (grátis), confere e grava com o HISTÓRICO (mês de referência de cada uma).
 // O empreendimento recebe só a tabela mais recente.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { acharEmpreendimento, expandirArquivos, lerArquivoTabela, type ArquivoTabela } from '@/lib/tabelas-leitura';
-import { gravarTabelas, hashesJaGravados, listarTabelas, nomesEmpreendimentos, type TabelaResumo } from '@/lib/actions-tabelas';
+import { gravarTabelas, hashesJaGravados, listarTabelas, nomesEmpreendimentos, recalcularDisponibilidade, unidadesDaTabela, type TabelaResumo, type UnidadeSalva } from '@/lib/actions-tabelas';
 import type { UnidadeTabela } from '@/lib/pdf-import/parse';
 
 type Linha = {
@@ -37,6 +37,7 @@ export default function TabelasPage() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [recentes, setRecentes] = useState<TabelaResumo[] | null>(null);
   const [filtro, setFiltro] = useState<'todas' | 'pendentes'>('todas');
+  const [aberta, setAberta] = useState<{ id: string; unidades: UnidadeSalva[] | null } | null>(null);
   const parar = useRef(false);
   const inputPasta = useRef<HTMLInputElement>(null);
 
@@ -264,7 +265,24 @@ export default function TabelasPage() {
         )}
 
         <section className="mt-8">
-          <h2 className="text-[15px] font-bold">Últimas tabelas gravadas</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-[15px] font-bold">Últimas tabelas gravadas</h2>
+            {pode && (
+              <button
+                type="button"
+                disabled={gravando}
+                onClick={async () => {
+                  setGravando(true);
+                  const n = await recalcularDisponibilidade().catch(() => 0);
+                  setGravando(false);
+                  setAviso(`Disponibilidade por metragem atualizada em ${n} empreendimento(s).`);
+                }}
+                className="h-9 rounded-full border border-[var(--border)] px-4 text-[12.5px] font-semibold disabled:opacity-40"
+              >
+                Atualizar a disponibilidade dos empreendimentos
+              </button>
+            )}
+          </div>
           {!recentes ? (
             <p className="mt-2 text-sm text-[var(--text-muted)]">Carregando…</p>
           ) : recentes.length === 0 ? (
@@ -276,22 +294,75 @@ export default function TabelasPage() {
                   <tr>
                     <th className="px-3 py-2 font-semibold">Empreendimento</th>
                     <th className="px-2 py-2 font-semibold">Mês</th>
-                    <th className="px-2 py-2 text-right font-semibold">Unidades</th>
+                    <th className="px-2 py-2 text-right font-semibold">Disp./unidades</th>
+                    <th className="px-2 py-2 text-right font-semibold">Metragens</th>
                     <th className="px-2 py-2 text-right font-semibold">A partir de</th>
                     <th className="px-3 py-2 text-right font-semibold">m² médio</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentes.map((t) => (
-                    <tr key={t.id} className="border-t border-[var(--border)]">
-                      <td className="px-3 py-1.5">{t.empreendimento ?? <span className="text-[#B45F06]">sem empreendimento</span>}</td>
+                    <Fragment key={t.id}>
+                    <tr className="cursor-pointer border-t border-[var(--border)] hover:bg-[var(--pill-bg)]" onClick={() => {
+                      if (aberta?.id === t.id) return setAberta(null);
+                      setAberta({ id: t.id, unidades: null });
+                      unidadesDaTabela(t.id).then((u) => setAberta((a) => (a?.id === t.id ? { id: t.id, unidades: u } : a))).catch(() => {});
+                    }}>
+                      <td className="px-3 py-1.5">
+                        <span className="mr-1 text-[var(--text-muted)]">{aberta?.id === t.id ? '▾' : '▸'}</span>
+                        {t.empreendimento ?? <span className="text-[#B45F06]">sem empreendimento</span>}
+                      </td>
                       <td className="px-2 py-1.5">{t.mes.split('-').reverse().join('/')}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums">
                         {t.disponiveis}/{t.unidades}
                       </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">
+                        {t.areaMin ? `${Math.round(t.areaMin)}${t.areaMax && Math.round(t.areaMax) !== Math.round(t.areaMin) ? ` a ${Math.round(t.areaMax)}` : ''} m²` : '-'}
+                      </td>
                       <td className="px-2 py-1.5 text-right tabular-nums">{t.valorMin ? brl(t.valorMin) : '-'}</td>
                       <td className="px-3 py-1.5 text-right tabular-nums">{t.m2 ? brl(t.m2) : '-'}</td>
                     </tr>
+                    {aberta?.id === t.id && (
+                      <tr className="bg-[var(--pill-bg)]/50">
+                        <td colSpan={6} className="px-3 py-2">
+                          {!aberta.unidades ? (
+                            <span className="text-[12px] text-[var(--text-muted)]">Carregando unidades…</span>
+                          ) : (
+                            <div className="max-h-80 overflow-auto rounded-xl border border-[var(--border)] bg-[var(--bg)]">
+                              <table className="w-full text-[12px]">
+                                <thead className="sticky top-0 bg-[var(--bg)] text-left text-[11px] text-[var(--text-muted)]">
+                                  <tr>
+                                    <th className="px-2 py-1.5">Unidade</th>
+                                    <th className="px-2 py-1.5">Torre</th>
+                                    <th className="px-2 py-1.5 text-right">m²</th>
+                                    <th className="px-2 py-1.5 text-right">Vagas</th>
+                                    <th className="px-2 py-1.5">Garagens</th>
+                                    <th className="px-2 py-1.5">Escaninho</th>
+                                    <th className="px-2 py-1.5 text-right">Valor</th>
+                                    <th className="px-2 py-1.5">Situação</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {aberta.unidades.map((u, i) => (
+                                    <tr key={i} className="border-t border-[var(--border)] tabular-nums">
+                                      <td className="px-2 py-1 font-semibold">{u.unidade}</td>
+                                      <td className="px-2 py-1">{u.torre ?? '-'}</td>
+                                      <td className="px-2 py-1 text-right">{u.area?.toLocaleString('pt-BR') ?? '-'}</td>
+                                      <td className="px-2 py-1 text-right">{u.vagas ?? '-'}</td>
+                                      <td className="px-2 py-1">{u.garagens ?? '-'}</td>
+                                      <td className="px-2 py-1">{u.escaninho ?? '-'}</td>
+                                      <td className="px-2 py-1 text-right">{u.valor ? brl(u.valor) : '-'}</td>
+                                      <td className={`px-2 py-1 ${u.situacao === 'disponivel' ? 'text-[#13874B]' : 'text-[var(--text-muted)]'}`}>{u.situacao === 'disponivel' ? 'Disponível' : u.situacao === 'vendida' ? 'Vendida' : u.situacao === 'reservada' ? 'Reservada' : u.situacao ?? '-'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

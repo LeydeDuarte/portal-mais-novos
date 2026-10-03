@@ -10,9 +10,11 @@ import { excluirProprietario, listarProprietarios } from '@/lib/actions-propriet
 import { faltandoNoCadastro, type Proprietario } from '@/lib/proprietarios-tipos';
 import { formatarDocumento, formatarTelefone } from '@/lib/formatos';
 import { CrmNav } from '@/components/crm/comum';
+import { paraBusca } from '@/lib/busca-texto';
 
 // Painel → Proprietários: lista, busca, cadastro completo, exclusão e importação por planilha.
-const sa = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// busca tolerante: acentos, y/i, w/v, ph/f, letras dobradas (lib/busca-texto.ts)
+const sa = paraBusca;
 const linkWhats = (d?: string | null) => {
   const n = (d ?? '').replace(/\D/g, '');
   return n.length >= 10 ? `https://wa.me/${n.length <= 11 ? `55${n}` : n}` : null;

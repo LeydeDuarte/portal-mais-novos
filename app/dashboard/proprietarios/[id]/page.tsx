@@ -19,6 +19,7 @@ import { listarImoveisPainel, type ImovelPainel } from '@/lib/actions-painel-imo
 import { ESTADOS_CIVIS, REGIMES_BENS, faltandoNoCadastro, temConjuge, type Conjuge } from '@/lib/proprietarios-tipos';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { CrmNav } from '@/components/crm/comum';
+import { paraBusca } from '@/lib/busca-texto';
 
 // Cadastro completo do proprietário. Tudo o que estiver aqui já sai preenchido na
 // proposta; e o que for preenchido na proposta volta para cá (só campos vazios).
@@ -40,7 +41,8 @@ type Form = {
 const VAZIO: Form = { tipo: 'pf', nome: '', documento: '', rg: '', nascimento: '', nacionalidade: 'Brasileira', profissao: '', estadoCivil: '', regimeBens: '', representante: '', whatsapp: '', email: '', observacao: '' };
 const CONJ_VAZIO: Conjuge = { nome: '', documento: '', rg: '', nascimento: '', profissao: '', nacionalidade: 'Brasileira', telefone: '', email: '' };
 const brl = (v: number) => `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
-const sa = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// busca tolerante: acentos, y/i, w/v, ph/f, letras dobradas (lib/busca-texto.ts)
+const sa = paraBusca;
 
 function Campo({ rotulo, children, largo = false }: { rotulo: string; children: React.ReactNode; largo?: boolean }) {
   return (

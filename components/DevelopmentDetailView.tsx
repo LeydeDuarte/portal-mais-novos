@@ -38,6 +38,11 @@ function formatBRL(v: number): string {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 }
 
+const mesPorExtenso = (aaaamm: string) => {
+  const [a, m] = aaaamm.split('-').map(Number);
+  return `${['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][m - 1]} de ${a}`;
+};
+
 export default async function DevelopmentDetailView({ development }: { development: Development }) {
   const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
   const tipologias = development.units.filter((u) => u.isTipologia);
@@ -248,6 +253,39 @@ export default async function DevelopmentDetailView({ development }: { developme
                 )}
               </div>
             )}
+
+            {/* Unidades disponíveis por metragem: tabela de vendas mais recente (lançamento, obras ou pronto novo) */}
+            {lancamentoOuNovo(development.deliveryDate) && (development.disponiveis ?? 0) > 0 && development.disponibilidade?.length ? (
+              <div className="mt-6">
+                <h2 className="text-lg font-bold">Unidades disponíveis</h2>
+                <p className="mb-3 text-[13px] text-[var(--text-muted)]">
+                  {development.disponiveis} {development.disponiveis === 1 ? 'unidade disponível' : 'unidades disponíveis'}
+                  {development.tabelaReferencia ? ` pela tabela de vendas de ${mesPorExtenso(development.tabelaReferencia)}` : ''}. Sujeito a alteração; confirme com um corretor.
+                </p>
+                <div className="overflow-hidden rounded-[20px] border border-[var(--border)]">
+                  <table className="w-full text-[14px]">
+                    <thead className="bg-[var(--pill-bg)] text-left text-[12px] text-[var(--text-muted)]">
+                      <tr>
+                        <th className="px-4 py-2 font-semibold">Metragem</th>
+                        <th className="px-3 py-2 text-right font-semibold">Disponíveis</th>
+                        <th className="px-4 py-2 text-right font-semibold">A partir de</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {development.disponibilidade.map((g) => (
+                        <tr key={g.area} className="border-t border-[var(--border)] tabular-nums">
+                          <td className="px-4 py-2.5 font-semibold">{g.area.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m²</td>
+                          <td className="px-3 py-2.5 text-right">{g.disponiveis}</td>
+                          <td className="px-4 py-2.5 text-right font-sans font-bold text-accent">
+                            {g.aPartirDe ? g.aPartirDe.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : 'Consulte'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
 
             <ConcepcaoBloco itens={concepcao} />
 

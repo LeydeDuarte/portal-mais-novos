@@ -6,14 +6,16 @@ import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { getMercado, getMercadoMensal, getOscilacao, listHistorico, type MercadoBairro, type MercadoMes, type HistoricoLinha, type OscilacaoBairro } from '@/lib/actions';
-import { panoramaLancamentos, type PanoramaLancamentos } from '@/lib/actions-tabelas';
+import { panoramaEstoque, panoramaLancamentos, type LinhaEstoque, type PanoramaEstoque, type PanoramaLancamentos } from '@/lib/actions-tabelas';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 
 const COR_ANUNCIOS = '#257CFF';
 const COR_VENDIDOS = '#E8590C';
 const COR_PORTAIS = '#6A3CFF';
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+const INICIO = '1990-01'; // "todo o histórico"
 const mesLabel = (m: string) => {
+  if (m === INICIO) return 'o início';
   const [a, mm] = m.split('-');
   return `${['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][Number(mm) - 1]}/${a.slice(2)}`;
 };
@@ -109,13 +111,15 @@ export default function MercadoPage() {
   const [sel, setSel] = useState<MercadoBairro | null>(null);
   const [mensal, setMensal] = useState<MercadoMes[] | null>(null);
   const [historico, setHistorico] = useState<HistoricoLinha[]>([]);
-  const [aba, setAba] = useState<'bairros' | 'oscilacao' | 'lancamentos' | 'historico'>('bairros');
+  const [aba, setAba] = useState<'bairros' | 'oscilacao' | 'lancamentos' | 'estoque' | 'historico'>('bairros');
+  const [estoque, setEstoque] = useState<PanoramaEstoque | null>(null);
+  const [visaoEstoque, setVisaoEstoque] = useState<'empreendimentos' | 'bairros' | 'incorporadoras'>('empreendimentos');
   const [lanc, setLanc] = useState<PanoramaLancamentos | null>(null);
   // oscilação: compara o m² de cada bairro entre dois meses
   const meses = useMemo(() => {
     const l: string[] = [];
     const d = new Date();
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 121; i++) {
       const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
       l.push(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`);
     }
@@ -193,9 +197,9 @@ export default function MercadoPage() {
               </optgroup>
             ))}
           </select>
-          {(['bairros', 'oscilacao', 'lancamentos', 'historico'] as const).map((a) => (
+          {(['bairros', 'oscilacao', 'lancamentos', 'estoque', 'historico'] as const).map((a) => (
             <button key={a} type="button" onClick={() => setAba(a)} className={`rounded-full px-4 py-2 text-sm font-bold ${aba === a ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}>
-              {a === 'bairros' ? 'Por bairro' : a === 'oscilacao' ? 'Oscilação' : a === 'lancamentos' ? 'Lançamentos e obras' : `Histórico (${historico.length})`}
+              {a === 'bairros' ? 'Por bairro' : a === 'oscilacao' ? 'Oscilação' : a === 'lancamentos' ? 'Lançamentos e obras' : a === 'estoque' ? 'Estoque e vendas' : `Histórico (${historico.length})`}
             </button>
           ))}
         </div>
@@ -266,12 +270,34 @@ export default function MercadoPage() {
         {aba === 'oscilacao' && (
           <section className="mt-5">
             <div className="flex flex-wrap items-end gap-3">
+              <div className="flex basis-full flex-wrap gap-1.5">
+                {(
+                  [
+                    [12, 'Últimos 12 meses'],
+                    [60, '5 anos'],
+                    [120, '10 anos'],
+                    [0, 'Todo o histórico']
+                  ] as const
+                ).map(([n, l]) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => {
+                      setAte(meses[0]);
+                      setDe(n === 0 ? INICIO : meses[Math.min(n, meses.length - 1)]);
+                    }}
+                    className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${(n === 0 ? de === INICIO : de === meses[n]) && ate === meses[0] ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
               <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
                 De
                 <select value={de} onChange={(e) => setDe(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-sm">
-                  {meses.map((m) => (
+                  {[...meses, INICIO].map((m) => (
                     <option key={m} value={m}>
-                      {mesLabel(m)}
+                      {m === INICIO ? 'Desde o início' : mesLabel(m)}
                     </option>
                   ))}
                 </select>
@@ -343,12 +369,34 @@ export default function MercadoPage() {
         {aba === 'lancamentos' && (
           <section className="mt-5">
             <div className="flex flex-wrap items-end gap-3">
+              <div className="flex basis-full flex-wrap gap-1.5">
+                {(
+                  [
+                    [12, 'Últimos 12 meses'],
+                    [60, '5 anos'],
+                    [120, '10 anos'],
+                    [0, 'Todo o histórico']
+                  ] as const
+                ).map(([n, l]) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => {
+                      setAte(meses[0]);
+                      setDe(n === 0 ? INICIO : meses[Math.min(n, meses.length - 1)]);
+                    }}
+                    className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${(n === 0 ? de === INICIO : de === meses[n]) && ate === meses[0] ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
               <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
                 De
                 <select value={de} onChange={(e) => setDe(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-sm">
-                  {meses.map((m) => (
+                  {[...meses, INICIO].map((m) => (
                     <option key={m} value={m}>
-                      {mesLabel(m)}
+                      {m === INICIO ? 'Desde o início' : mesLabel(m)}
                     </option>
                   ))}
                 </select>
@@ -464,6 +512,161 @@ export default function MercadoPage() {
                   )}
                 </div>
               </div>
+            )}
+          </section>
+        )}
+
+        {aba === 'estoque' && (
+          <section className="mt-5">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex basis-full flex-wrap gap-1.5">
+                {(
+                  [
+                    [12, 'Últimos 12 meses'],
+                    [60, '5 anos'],
+                    [120, '10 anos'],
+                    [0, 'Todo o histórico']
+                  ] as const
+                ).map(([n, l]) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => {
+                      setAte(meses[0]);
+                      setDe(n === 0 ? INICIO : meses[Math.min(n, meses.length - 1)]);
+                    }}
+                    className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${(n === 0 ? de === INICIO : de === meses[n]) && ate === meses[0] ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
+                De
+                <select value={de} onChange={(e) => setDe(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-sm">
+                  {[...meses, INICIO].map((m) => (
+                    <option key={m} value={m}>
+                      {m === INICIO ? 'Desde o início' : mesLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--text-muted)]">
+                Até
+                <select value={ate} onChange={(e) => setAte(e.target.value)} className="h-10 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-sm">
+                  {meses.map((m) => (
+                    <option key={m} value={m}>
+                      {mesLabel(m)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setEstoque(null);
+                  panoramaEstoque(de, ate).then(setEstoque).catch(() => setEstoque(null));
+                }}
+                className="h-10 rounded-full bg-ink px-5 text-sm font-bold text-white"
+              >
+                Ver período
+              </button>
+              <p className="basis-full text-xs text-[var(--text-muted)]">
+                Pelas tabelas de vendas das incorporadoras. Estoque = unidades disponíveis na tabela mais recente de cada empreendimento até o fim do período. Vendida = unidade que estava disponível numa tabela e não está mais na seguinte.
+              </p>
+            </div>
+            {estoque && (
+              <>
+                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+                  {(
+                    [
+                      ['Unidades em estoque', estoque.total.disponiveis.toLocaleString('pt-BR'), `${estoque.total.empreendimentos} empreendimento(s)`],
+                      ['VGV em estoque', brl(estoque.total.vgvDisponivel), 'soma das disponíveis'],
+                      ['Vendidas no período', estoque.total.vendidas.toLocaleString('pt-BR'), 'entre tabelas seguidas'],
+                      ['Velocidade de vendas', estoque.total.velocidade != null ? `${estoque.total.velocidade.toLocaleString('pt-BR')}/mês` : '-', estoque.total.vsoPct != null ? `VSO de ${estoque.total.vsoPct.toLocaleString('pt-BR')}% ao mês` : 'VSO: precisa de 2 tabelas'],
+                      ['Estoque dura', estoque.total.mesesEstoque != null ? `${estoque.total.mesesEstoque.toLocaleString('pt-BR')} meses` : '-', 'no ritmo atual']
+                    ] as const
+                  ).map(([t, v, sub]) => (
+                    <div key={t} className="rounded-2xl border border-[var(--border)] p-4">
+                      <div className="text-[12px] font-semibold text-[var(--text-muted)]">{t}</div>
+                      <div className="text-[22px] font-bold leading-tight tabular-nums">{v}</div>
+                      <div className="text-xs text-[var(--text-muted)]">{sub}</div>
+                    </div>
+                  ))}
+                </div>
+                {estoque.porMes.length > 0 && (
+                  <div className="mt-4 rounded-2xl border border-[var(--border)] p-4">
+                    <h3 className="text-sm font-bold">Unidades vendidas por mês (pelas tabelas recebidas)</h3>
+                    <div className="mt-3 flex h-36 items-end gap-2 overflow-x-auto">
+                      {(() => {
+                        const max = Math.max(1, ...estoque.porMes.map((x) => x.vendidas));
+                        return estoque.porMes.map((x) => (
+                          <div key={x.mes} className="flex h-full min-w-[46px] flex-1 flex-col items-center justify-end gap-1" title={`${mesLabel(x.mes)}: ${x.vendidas} vendidas`}>
+                            <span className="text-[10.5px] font-bold tabular-nums">{x.vendidas}</span>
+                            <div className="w-full max-w-[40px] rounded-t bg-[#13874B]" style={{ height: `${Math.max(2, (x.vendidas / max) * 100)}%` }} />
+                            <span className="whitespace-nowrap text-[10.5px] text-[var(--text-muted)]">{mesLabel(x.mes)}</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                )}
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      ['empreendimentos', 'Por empreendimento'],
+                      ['bairros', 'Por bairro'],
+                      ['incorporadoras', 'Por incorporadora']
+                    ] as const
+                  ).map(([v, l]) => (
+                    <button key={v} type="button" onClick={() => setVisaoEstoque(v)} className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${visaoEstoque === v ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 overflow-x-auto rounded-2xl border border-[var(--border)]">
+                  <table className="w-full min-w-[820px] text-sm">
+                    <thead className="bg-[var(--pill-bg)] text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                      <tr>
+                        <th className="px-3 py-2">{visaoEstoque === 'empreendimentos' ? 'Empreendimento' : visaoEstoque === 'bairros' ? 'Bairro' : 'Incorporadora'}</th>
+                        {visaoEstoque !== 'empreendimentos' && <th className="px-2 py-2 text-right">Empreend.</th>}
+                        <th className="px-2 py-2 text-right">Estoque</th>
+                        <th className="px-2 py-2 text-right">VGV em estoque</th>
+                        <th className="px-2 py-2 text-right">Vendidas</th>
+                        <th className="px-2 py-2 text-right">Por mês</th>
+                        <th className="px-2 py-2 text-right">VSO</th>
+                        <th className="px-3 py-2 text-right">Dura</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(estoque[visaoEstoque] as LinhaEstoque[]).length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="px-3 py-4 text-[var(--text-muted)]">Nenhuma tabela ligada a empreendimento até esse mês.</td>
+                        </tr>
+                      )}
+                      {(estoque[visaoEstoque] as LinhaEstoque[]).map((x) => (
+                        <tr key={`${x.nome}-${x.sub ?? ''}`} className="border-t border-[var(--border)] tabular-nums">
+                          <td className="px-3 py-2">
+                            <span className="font-semibold">{x.nome}</span>
+                            {x.sub && <span className="text-[var(--text-muted)]"> · {x.sub}</span>}
+                            {visaoEstoque === 'empreendimentos' && x.ultimaTabela && <span className="block text-xs text-[var(--text-muted)]">tabela de {mesLabel(x.ultimaTabela)}</span>}
+                          </td>
+                          {visaoEstoque !== 'empreendimentos' && <td className="px-2 py-2 text-right">{x.empreendimentos}</td>}
+                          <td className="px-2 py-2 text-right font-semibold">{x.disponiveis}</td>
+                          <td className="px-2 py-2 text-right">{x.vgvDisponivel ? brl(x.vgvDisponivel) : '-'}</td>
+                          <td className="px-2 py-2 text-right">{x.vendidas}</td>
+                          <td className="px-2 py-2 text-right">{x.velocidade != null ? x.velocidade.toLocaleString('pt-BR') : '-'}</td>
+                          <td className="px-2 py-2 text-right">{x.vsoPct != null ? `${x.vsoPct.toLocaleString('pt-BR')}%` : '-'}</td>
+                          <td className="px-3 py-2 text-right">{x.mesesEstoque != null ? `${x.mesesEstoque.toLocaleString('pt-BR')} meses` : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  VSO (vendas sobre oferta): quanto do estoque é vendido por mês. Para calcular vendas e VSO de um empreendimento são precisas pelo menos duas tabelas dele em meses diferentes.
+                </p>
+              </>
             )}
           </section>
         )}

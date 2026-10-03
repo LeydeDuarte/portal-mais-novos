@@ -17,8 +17,10 @@ import { linkParaCorretor, listarImoveisPainel, mudarVisibilidade, type ImovelPa
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { veTudo } from '@/lib/papeis';
 import { SinoRecepcao } from '@/components/TemporadaBadge';
+import { paraBusca } from '@/lib/busca-texto';
 
-const sa = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// busca tolerante: acentos, y/i, w/v, ph/f, letras dobradas (lib/busca-texto.ts)
+const sa = paraBusca;
 const POR_PAGINA = 48;
 
 type Filtros = {
@@ -106,10 +108,10 @@ export default function ImoveisPainelPage() {
       if (f.corretor && i.corretorEmail !== f.corretor) return false;
       const temps = marcados(f.temporada);
       if (temps.length && !temps.includes(i.aceitaTemporada == null ? 'ni' : i.aceitaTemporada ? 'sim' : 'nao')) return false;
-      if (c && !sa(i.condominio ?? '').includes(c)) return false;
+      if (c && !sa(`${i.condominio ?? ''} ${i.construtoras ?? ''}`).includes(c)) return false;
       if (pr && !i.proprietarios.some((p) => sa(p.nome).includes(pr) || (prDig.length >= 4 && ((p.documento ?? '').includes(prDig) || (p.whatsapp ?? '').includes(prDig)))))
         return false;
-      if (b && !sa([i.titulo, i.condominio, i.bairro, i.cidade, i.codigo, i.complemento, i.obsInterna, ...i.proprietarios.map((p) => p.nome)].filter(Boolean).join(' ')).includes(b))
+      if (b && !sa([i.titulo, i.condominio, i.construtoras, i.bairro, i.cidade, i.codigo, i.complemento, i.obsInterna, ...i.proprietarios.map((p) => p.nome)].filter(Boolean).join(' ')).includes(b))
         return false;
       return true;
     });
@@ -216,7 +218,7 @@ export default function ImoveisPainelPage() {
         <Chips opcoes={['0', '1', '2', '3', '4'].map((v) => ({ v, l: v === '4' ? '4+' : v }))} valor={f.vagas} onChange={(v) => set('vagas', v)} multi />
       </SecaoFiltro>
       <SecaoFiltro titulo="Condomínio">
-        <input className={campoPainel} value={f.condominio} onChange={(e) => set('condominio', e.target.value)} placeholder="Nome do condomínio" />
+        <input className={campoPainel} value={f.condominio} onChange={(e) => set('condominio', e.target.value)} placeholder="Condomínio ou construtora" />
       </SecaoFiltro>
       <SecaoFiltro titulo="Proprietário">
         <input className={campoPainel} value={f.proprietario} onChange={(e) => set('proprietario', e.target.value)} placeholder="Nome, empresa, CPF/CNPJ ou telefone" />
@@ -276,7 +278,7 @@ export default function ImoveisPainelPage() {
               + Novo imóvel
             </Link>
           </TituloPainel>
-          <BuscaGrande value={f.busca} onChange={(v) => set('busca', v)} placeholder="Buscar por condomínio, bairro, código, proprietário ou OBS" />
+          <BuscaGrande value={f.busca} onChange={(v) => set('busca', v)} placeholder="Buscar por condomínio, construtora, bairro, código, proprietário ou OBS" />
           <FiltrosAtivos itens={ativos} onLimpar={() => setF(VAZIO)} />
           {aviso && (
             <p className="rounded-2xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800" onClick={() => setAviso(null)}>

@@ -51,6 +51,8 @@ export type ImovelPainel = {
   compartilhamentos: number;
   corretorEmail: string | null;
   codigo: string | null;
+  /** construtoras/incorporadoras do condomínio (para a busca) */
+  construtoras: string | null;
   criadoEm: string;
   proprietarios: { id: string; nome: string; whatsapp: string | null; documento: string | null; email: string | null; principal: boolean }[];
 };
@@ -102,12 +104,15 @@ function mapear(r: Row): ImovelPainel {
     compartilhamentos: Number(r.compartilhamentos) || 0,
     corretorEmail: (r.corretor_email as string) ?? null,
     codigo: (r.jetimob_codigo as string) ?? null,
+    construtoras: (r.construtoras as string) ?? null,
     criadoEm: new Date(r.created_at as string).toISOString(),
     proprietarios: []
   };
 }
 
-const SELECT = `select p.*, d.name as condo_nome, (select count(*) from favorites f where f.property_id = p.id) as salvamentos
+const SELECT = `select p.*, d.name as condo_nome, (select count(*) from favorites f where f.property_id = p.id) as salvamentos,
+                  (select string_agg(distinct coalesce(nullif(e.nome_perfil, ''), nullif(e.nome_fantasia, ''), e.razao_social), ' ')
+                     from development_empresas de join empresas e on e.id = de.empresa_id where de.development_id = p.empreendimento_id) as construtoras
                   from properties p left join developments d on d.id = p.empreendimento_id`;
 
 /** Todos os imóveis que a pessoa pode ver (corretor: só os dele). Filtros ficam na tela. */
