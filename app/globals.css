@@ -224,3 +224,13 @@ html, body { overflow-x: clip; max-width: 100%; }
   .mn-sol-desce { animation: none; transform: translateY(18%); }
   .mn-ceu-aparece { animation: none; }
 }
+
+/* Escassez (menos de 10 unidades disponíveis): brilho vermelho suave que acende e apaga */
+@keyframes mn-escassez {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230, 47, 47, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(230, 47, 47, 0.22); }
+}
+.mn-escassez { animation: mn-escassez 2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .mn-escassez { animation: none; }
+}

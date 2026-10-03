@@ -8,6 +8,8 @@ import InterestForm from '@/components/InterestForm';
 import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
+import DisponiveisBadge, { LIMITE_ESCASSEZ } from '@/components/DisponiveisBadge';
+import { disponiveisParaMostrar } from '@/lib/disponibilidade';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getRelatedListings, getOcultosDoCondominio, getOcultosPerto, mercadoDoBairro, condominiosProximos, lancamentosProximos } from '@/lib/actions';
@@ -255,9 +257,12 @@ export default async function DevelopmentDetailView({ development }: { developme
             )}
 
             {/* Unidades disponíveis por metragem: tabela de vendas mais recente (lançamento, obras ou pronto novo) */}
-            {lancamentoOuNovo(development.deliveryDate) && (development.disponiveis ?? 0) > 0 && development.disponibilidade?.length ? (
+            {lancamentoOuNovo(development.deliveryDate) && disponiveisParaMostrar(development.disponiveis, development.tabelaReferencia) && development.disponibilidade?.length ? (
               <div className="mt-6">
-                <h2 className="text-lg font-bold">Unidades disponíveis</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-bold">Unidades disponíveis</h2>
+                  {(development.disponiveis ?? 0) < LIMITE_ESCASSEZ && <DisponiveisBadge n={development.disponiveis} />}
+                </div>
                 <p className="mb-3 text-[13px] text-[var(--text-muted)]">
                   {development.disponiveis} {development.disponiveis === 1 ? 'unidade disponível' : 'unidades disponíveis'}
                   {development.tabelaReferencia ? ` pela tabela de vendas de ${mesPorExtenso(development.tabelaReferencia)}` : ''}. Sujeito a alteração; confirme com um corretor.

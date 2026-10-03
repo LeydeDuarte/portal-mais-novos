@@ -20,6 +20,7 @@ import { SITE_URL } from './seo';
 import { chaveNome, mesmoCondominio } from './planilha-condominios';
 import { depoimentosAtivos, destaquesAtivos, hashTexto } from './especiais';
 import { MESES, FASES_EXIGEM_CONCEPCAO, getStatusBucket } from './classification';
+import { disponiveisParaMostrar } from './disponibilidade';
 import { gravarConcepcao, resolverEmpresaImport, acrescentarConcepcao } from './empresas';
 import { gravarProprietariosDoImovel } from './proprietarios';
 import { corretoresPublicos, comCorretores } from './corretores';
@@ -593,9 +594,13 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       visualizacoes: Number(row.visualizacoes) || 0,
       tipo: base.tipo,
       anuncios: Number(row.anuncios) || 0,
+      // só com tabela recente (até 3 meses) e só lançamento, obras ou pronto novo
       disponiveis:
-        (row as { disponiveis?: number | null }).disponiveis && base.deliveryDate && ['breve_lancamento', 'lancamento', 'obras', 'novo'].includes(getStatusBucket(base.deliveryDate))
-          ? Number((row as { disponiveis?: number | null }).disponiveis)
+        base.deliveryDate && ['breve_lancamento', 'lancamento', 'obras', 'novo'].includes(getStatusBucket(base.deliveryDate))
+          ? disponiveisParaMostrar(
+              (row as { disponiveis?: number | null }).disponiveis,
+              (row as { tabela_referencia?: string | Date | null }).tabela_referencia ? new Date((row as { tabela_referencia: string | Date }).tabela_referencia).toISOString().slice(0, 7) : null
+            )
           : null,
       capaMini: miniValida(row),
       concepcao: row.concepcao ?? null,

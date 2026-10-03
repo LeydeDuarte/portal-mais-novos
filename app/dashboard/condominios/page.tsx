@@ -14,6 +14,7 @@ import { BUCKET_LABEL, FASES, getStatusBucket, type StatusBucket } from '@/lib/c
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { BarraSelecao, BuscaGrande, Chips, marcados, FiltrosAtivos, MenuAcoes, SecaoFiltro, TituloPainel, Vazio, botaoBarra, campoPainel } from '@/components/painel/ui';
 import { paraBusca } from '@/lib/busca-texto';
+import { tabelaVigente } from '@/lib/disponibilidade';
 
 // busca tolerante: acentos, y/i, w/v, ph/f, letras dobradas (lib/busca-texto.ts)
 const sa = paraBusca;
@@ -297,9 +298,15 @@ export default function CondominiosPage() {
                       <div className="mt-1 flex flex-wrap gap-x-2 text-[11px]">
                         <span className={c.anuncios ? 'font-bold text-[#16A34A]' : 'text-[var(--text-faint)]'}>{c.anuncios} anúncio(s)</span>
                         {c.disponiveis ? (
-                          <span className="font-bold text-[#1B5FCC]" title={c.tabelaReferencia ? `Tabela de ${c.tabelaReferencia.split('-').reverse().join('/')}` : undefined}>
-                            {c.disponiveis} disponíve{c.disponiveis === 1 ? 'l' : 'is'} na tabela
-                          </span>
+                          tabelaVigente(c.tabelaReferencia) ? (
+                            <span className={`font-bold ${c.disponiveis < 10 ? 'text-[#C81E1E]' : 'text-[#1B5FCC]'}`} title={c.tabelaReferencia ? `Tabela de ${c.tabelaReferencia.split('-').reverse().join('/')}` : undefined}>
+                              {c.disponiveis} disponíve{c.disponiveis === 1 ? 'l' : 'is'} na tabela
+                            </span>
+                          ) : (
+                            <span className="text-[var(--text-faint)]" title="Não aparece no site: suba uma tabela nova">
+                              {c.disponiveis} na tabela antiga{c.tabelaReferencia ? ` (${c.tabelaReferencia.split('-').reverse().join('/')})` : ''}
+                            </span>
+                          )
                         ) : null}
                         {c.m2Medio ? <span className="text-[var(--text-muted)]">{brl(c.m2Medio)}/m²</span> : null}
                         {c.aPartirDe ? <span className="text-[var(--text-muted)]">a partir de {brl(c.aPartirDe)}</span> : null}
