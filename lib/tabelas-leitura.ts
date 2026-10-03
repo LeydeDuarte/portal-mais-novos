@@ -66,6 +66,8 @@ function lerLinhasPlanilha(linhas: unknown[][]): UnidadeTabela[] {
     const iS = achar(cab, /(situac|status|disponib)/);
     const iEsc = achar(cab, /(escaninho|deposito|hobby)/);
     const iT = achar(cab, /^(torre|bloco|quadra)/);
+    // revenda: coluna com o empreendimento de cada unidade
+    const iEmp = cab.findIndex((c, k) => k !== iU && /(empreendimento|condominio|edificio|residencial|produto|obra|predio)/.test(c));
     const out: UnidadeTabela[] = [];
     for (const l of linhas.slice(h + 1)) {
       const un = String(l?.[iU] ?? '').trim();
@@ -86,6 +88,7 @@ function lerLinhasPlanilha(linhas: unknown[][]): UnidadeTabela[] {
         garagens: g && !soQuantidade ? g : undefined,
         escaninho: iEsc >= 0 ? String(l?.[iEsc] ?? '').trim() || undefined : undefined,
         torre: iT >= 0 ? String(l?.[iT] ?? '').trim() || undefined : undefined,
+        empreendimento: iEmp >= 0 ? String(l?.[iEmp] ?? '').trim() || undefined : undefined,
         situacao: /vend/.test(st) ? 'vendida' : /reserv/.test(st) ? 'reservada' : 'disponivel'
       });
     }

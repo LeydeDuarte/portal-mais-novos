@@ -15,9 +15,14 @@ import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { BarraSelecao, BuscaGrande, Chips, marcados, FiltrosAtivos, MenuAcoes, SecaoFiltro, TituloPainel, Vazio, botaoBarra, campoPainel } from '@/components/painel/ui';
 import { paraBusca } from '@/lib/busca-texto';
 import { tabelaVigente } from '@/lib/disponibilidade';
+import { acompanharTabela, marcarVendido100 } from '@/lib/actions-tabelas';
 
 // busca tolerante: acentos, y/i, w/v, ph/f, letras dobradas (lib/busca-texto.ts)
 const sa = paraBusca;
+/** situação da tabela de vendas: em dia, desatualizada, sem tabela ou não acompanhar */
+const situacaoTabela = (c: CondoPainel): 'em_dia' | 'desatualizada' | 'sem_tabela' | 'nao_acompanha' | 'vendido' =>
+  c.vendido100 ? 'vendido' : !c.tabelaAcompanhar ? 'nao_acompanha' : !c.tabelaReferencia ? 'sem_tabela' : tabelaVigente(c.tabelaReferencia) ? 'em_dia' : 'desatualizada';
+const TABELA_LABEL: Record<string, string> = { em_dia: 'Em dia', desatualizada: 'Desatualizada', sem_tabela: 'Sem tabela', nao_acompanha: 'Não acompanhar', vendido: '100% vendido' };
 const campo = 'w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2.5 py-2 text-[13px] outline-none focus:border-accent';
 const rotulo = 'mb-1 block text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]';
 const brl = (v: number | null) => (v ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : null);
@@ -32,8 +37,8 @@ const COR: Record<StatusBucket, string> = {
   antigo: '#75787e'
 };
 
-type Filtros = { nome: string; uf: string; cidade: string; bairro: string; empresa: string; anoDe: string; anoAte: string; data: string; status: string; fase: string; tipo: string; temporada: string };
-const VAZIO: Filtros = { nome: '', uf: '', cidade: '', bairro: '', empresa: '', anoDe: '', anoAte: '', data: '', status: '', fase: '', tipo: '', temporada: '' };
+type Filtros = { nome: string; uf: string; cidade: string; bairro: string; empresa: string; anoDe: string; anoAte: string; data: string; status: string; fase: string; tipo: string; temporada: string; tabela: string };
+const VAZIO: Filtros = { nome: '', uf: '', cidade: '', bairro: '', empresa: '', anoDe: '', anoAte: '', data: '', status: '', fase: '', tipo: '', temporada: '', tabela: '' };
 
 // "Mais informações" = mais fotos, texto, data e anúncios (o principal ao unificar)
 const pontos = (c: CondoPainel) => c.fotos * 3 + Math.min(c.descricao, 2000) / 100 + (c.entrega ? 5 : 0) + c.anuncios * 4 + c.empresas.length * 2;
@@ -80,7 +85,7 @@ export default function CondominiosPage() {
       if (f.uf && c.uf !== f.uf) return false;
       if (f.cidade && c.cidade !== f.cidade) return false;
       if (f.bairro && c.bairro !== f.bairro) return false;
-      if (f.empresa && !c.empresas.includes(f.empresa)) return false;
+      if (f.empresa && (f.empresa === '__sem__' ? c.empresas.length > 0 : !c.empresas.includes(f.empresa))) return false;
       const datas = marcados(f.data);
       if (datas.length === 1 && datas[0] === 'com' && !c.entrega) return false;
       if (datas.length === 1 && datas[0] === 'sem' && c.entrega) return false;
@@ -90,6 +95,7 @@ export default function CondominiosPage() {
       if (f.tipo && !marcados(f.tipo).includes(c.tipo)) return false;
       if (f.fase && !marcados(f.fase).includes(fase as string)) return false;
       if (f.temporada && !marcados(f.temporada).includes(c.aceitaTemporada ? 'sim' : 'nao')) return false;
+      if (f.tabela && !marcados(f.tabela).includes(situacaoTabela(c))) return false;
       return true;
     });
   }, [comFase, f]);
@@ -102,7 +108,7 @@ export default function CondominiosPage() {
     for (const { c, fase } of comFase) {
       if (!fase) continue;
       if (nome && !sa(`${c.nome} ${c.bairro ?? ''} ${c.empresas.join(' ')}`).includes(nome)) continue;
-      if ((f.uf && c.uf !== f.uf) || (f.cidade && c.cidade !== f.cidade) || (f.bairro && c.bairro !== f.bairro) || (f.empresa && !c.empresas.includes(f.empresa))) continue;
+      if ((f.uf && c.uf !== f.uf) || (f.cidade && c.cidade !== f.cidade) || (f.bairro && c.bairro !== f.bairro) || (f.empresa && (f.empresa === '__sem__' ? c.empresas.length > 0 : !c.empresas.includes(f.empresa)))) continue;
       m[fase] = (m[fase] ?? 0) + 1;
     }
     return m;
@@ -151,9 +157,19 @@ export default function CondominiosPage() {
       <SecaoFiltro titulo={<span className="flex items-center gap-1.5"><span className="text-[#FF385C]"><SinoRecepcao size={13} /></span>Temporada</span>}>
         <Chips opcoes={[{ v: 'sim', l: 'Aceita' }, { v: 'nao', l: 'Não marcado' }]} valor={f.temporada} onChange={(v) => set('temporada', v)} multi />
       </SecaoFiltro>
+      <SecaoFiltro titulo="Tabela de vendas">
+        <Chips
+          opcoes={(['em_dia', 'desatualizada', 'sem_tabela', 'vendido', 'nao_acompanha'] as const).map((v) => ({ v, l: TABELA_LABEL[v], n: (itens ?? []).filter((c) => situacaoTabela(c) === v).length }))}
+          valor={f.tabela}
+          onChange={(v) => set('tabela', v)}
+          multi
+        />
+        <p className="mt-1 text-[11px] text-[var(--text-faint)]">Desatualizada: a última tabela tem mais de 3 meses (as unidades não aparecem mais no site).</p>
+      </SecaoFiltro>
       <SecaoFiltro titulo="Construtora / incorporadora">
         <select className={campoPainel} value={f.empresa} onChange={(e) => set('empresa', e.target.value)}>
           <option value="">Todas</option>
+          <option value="__sem__">Sem incorporadora ligada</option>
           {opcoes.empresas.map((b) => (<option key={b}>{b}</option>))}
         </select>
       </SecaoFiltro>
@@ -165,12 +181,13 @@ export default function CondominiosPage() {
     f.data && { rotulo: marcados(f.data).map((x) => (x === 'com' ? 'Com data' : 'Sem data')).join(', '), tirar: () => set('data', '') },
     (f.anoDe || f.anoAte) && { rotulo: `Entrega ${f.anoDe || '…'}–${f.anoAte || '…'}`, tirar: () => setF((x) => ({ ...x, anoDe: '', anoAte: '' })) },
     f.tipo && { rotulo: marcados(f.tipo).map((x) => (x === 'vertical' ? 'Vertical' : 'Horizontal')).join(', '), tirar: () => set('tipo', '') },
+    f.tabela && { rotulo: `Tabela: ${marcados(f.tabela).map((x) => TABELA_LABEL[x] ?? x).join(', ')}`, tirar: () => set('tabela', '') },
     f.temporada && { rotulo: `Temporada: ${marcados(f.temporada).map((x) => (x === 'sim' ? 'Aceita' : 'Não marcado')).join(', ')}`, tirar: () => set('temporada', '') },
     f.status && { rotulo: marcados(f.status).map((x) => (x === 'publicado' ? 'Publicados' : 'Rascunhos')).join(', '), tirar: () => set('status', '') },
     f.uf && { rotulo: f.uf, tirar: () => set('uf', '') },
     f.cidade && { rotulo: f.cidade, tirar: () => set('cidade', '') },
     f.bairro && { rotulo: f.bairro, tirar: () => set('bairro', '') },
-    f.empresa && { rotulo: f.empresa, tirar: () => set('empresa', '') }
+    f.empresa && { rotulo: f.empresa === '__sem__' ? 'Sem incorporadora' : f.empresa, tirar: () => set('empresa', '') }
   ].filter(Boolean) as { rotulo: string; tirar: () => void }[];
 
   const unificar = async () => {
@@ -297,7 +314,13 @@ export default function CondominiosPage() {
                       {c.empresas.length > 0 && <div className="truncate text-[11px] text-[var(--text-faint)]">{c.empresas.join(' · ')}</div>}
                       <div className="mt-1 flex flex-wrap gap-x-2 text-[11px]">
                         <span className={c.anuncios ? 'font-bold text-[#16A34A]' : 'text-[var(--text-faint)]'}>{c.anuncios} anúncio(s)</span>
-                        {c.disponiveis ? (
+                        {c.vendido100 ? (
+                          <span className="font-bold text-[#E62F2F]">100% vendido</span>
+                        ) : !c.tabelaAcompanhar && c.tabelaReferencia ? (
+                          <span className="text-[var(--text-faint)]" title={c.tabelaMotivo ?? undefined}>
+                            Tabela: não acompanhar{c.tabelaMotivo ? ` (${c.tabelaMotivo.replace(/ \(por .*\)$/, '')})` : ''}
+                          </span>
+                        ) : c.disponiveis ? (
                           tabelaVigente(c.tabelaReferencia) ? (
                             <span className={`font-bold ${c.disponiveis < 10 ? 'text-[#C81E1E]' : 'text-[#1B5FCC]'}`} title={c.tabelaReferencia ? `Tabela de ${c.tabelaReferencia.split('-').reverse().join('/')}` : undefined}>
                               {c.disponiveis} disponíve{c.disponiveis === 1 ? 'l' : 'is'} na tabela
@@ -349,6 +372,35 @@ export default function CondominiosPage() {
                         { rotulo: 'Fazer proposta', href: `/dashboard/propostas/nova?condominio=${c.id}` },
                         ...(gestor
                           ? [
+                              {
+                                rotulo: c.vendido100 ? '● 100% vendido (desmarcar)' : '○ Marcar 100% vendido',
+                                onClick: async () => {
+                                  if (!c.vendido100 && !window.confirm(`Marcar o ${c.nome} como 100% vendido? No site aparece "100% vendido" no lugar das unidades disponíveis (lançamento, obras e entregue há até 12 meses), e a tabela deixa de ser cobrada.`)) return;
+                                  await marcarVendido100(c.id, !c.vendido100);
+                                  setItens((lst) => lst?.map((x) => (x.id === c.id ? { ...x, vendido100: !c.vendido100, tabelaAcompanhar: c.vendido100, disponiveis: !c.vendido100 ? 0 : x.disponiveis } : x)) ?? lst);
+                                }
+                              },
+                              c.tabelaAcompanhar
+                                ? {
+                                    rotulo: 'Parar de acompanhar a tabela',
+                                    onClick: async () => {
+                                      const m = window.prompt(
+                                        `Por que parar de acompanhar a tabela do ${c.nome}?\n\n1 = Esgotado (100% vendido; zera as unidades disponíveis)\n2 = A incorporadora não envia mais\nOu escreva outro motivo.`,
+                                        '1'
+                                      );
+                                      if (m === null) return;
+                                      const motivo = m.trim() === '1' ? 'Esgotado (100% vendido)' : m.trim() === '2' ? 'A incorporadora não envia mais' : m.trim();
+                                      await acompanharTabela(c.id, false, motivo);
+                                      setItens((lst) => lst?.map((x) => (x.id === c.id ? { ...x, tabelaAcompanhar: false, tabelaMotivo: motivo, disponiveis: /esgotad/i.test(motivo) ? 0 : x.disponiveis } : x)) ?? lst);
+                                    }
+                                  }
+                                : {
+                                    rotulo: 'Voltar a acompanhar a tabela',
+                                    onClick: async () => {
+                                      await acompanharTabela(c.id, true);
+                                      setItens((lst) => lst?.map((x) => (x.id === c.id ? { ...x, tabelaAcompanhar: true, tabelaMotivo: null } : x)) ?? lst);
+                                    }
+                                  },
                               {
                                 rotulo: c.aceitaTemporada ? '● Aceita temporada (desmarcar)' : '○ Marcar: aceita temporada',
                                 onClick: async () => {

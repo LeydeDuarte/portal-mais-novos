@@ -5,6 +5,7 @@ import { Caracteristica, IconeCama, IconeMetragem } from './IconesImovel';
 import Visualizacoes from '@/components/Visualizacoes';
 import AnunciosBadge from '@/components/AnunciosBadge';
 import DisponiveisBadge from '@/components/DisponiveisBadge';
+import VendidoBadge from '@/components/VendidoBadge';
 import ImagemCapa from '@/components/ImagemCapa';
 import TemporadaBadge from '@/components/TemporadaBadge';
 import type { DevelopmentCardData } from '@/lib/actions';
@@ -114,7 +115,7 @@ export default function DevelopmentCard({
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">{development.location}</div>
           {empresas && <div className="mt-0.5 line-clamp-1 text-[11px] text-[var(--text-faint)]">{empresas}</div>}
           {icones}
-          <DisponiveisBadge n={development.disponiveis} className="mt-2" />
+          {development.vendido100 ? <VendidoBadge className="mt-2" /> : <DisponiveisBadge n={development.disponiveis} className="mt-2" />}
           {tipos.length > 0 && <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-accent">{tipos.slice(0, 4).join(' · ')}</div>}
           <div className="mt-1 text-xs text-[var(--text-muted)]">
             {development.unitsCount > 0
@@ -176,7 +177,7 @@ export default function DevelopmentCard({
           <div className="font-sans tabular-nums text-[17px] font-bold leading-tight tracking-tight md:text-[17px]">
             {development.minPrice ? `A partir ${formatBRL(development.minPrice)}` : 'Preço sob consulta'}
           </div>
-          <DisponiveisBadge n={development.disponiveis} className="my-0.5" />
+          {development.vendido100 ? <VendidoBadge className="my-0.5" /> : <DisponiveisBadge n={development.disponiveis} className="my-0.5" />}
           <div className="text-xs text-[var(--text-muted)] md:text-[13px]">{development.location}</div>
           {empresas && <div className="mt-0.5 line-clamp-1 text-[11px] text-[var(--text-faint)]">{empresas}</div>}
           {icones}

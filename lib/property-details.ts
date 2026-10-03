@@ -29,6 +29,7 @@ export type Development = {
   disponibilidade?: { area: number; disponiveis: number; aPartirDe: number | null }[] | null;
   disponiveis?: number | null;
   tabelaReferencia?: string | null; // AAAA-MM
+  vendido100?: boolean;
   heroHeight: number;
   videoUrl?: string;
   photos?: string[]; // fachada, área comum — a primeira é a capa

@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { getMercado, getMercadoMensal, getOscilacao, listHistorico, type MercadoBairro, type MercadoMes, type HistoricoLinha, type OscilacaoBairro } from '@/lib/actions';
-import { panoramaEstoque, panoramaLancamentos, type LinhaEstoque, type PanoramaEstoque, type PanoramaLancamentos } from '@/lib/actions-tabelas';
+import { panoramaEstoque, panoramaLancamentos, rankingIncorporadoras, type LinhaEstoque, type PanoramaEstoque, type PanoramaLancamentos, type RankingIncorporadora } from '@/lib/actions-tabelas';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 
 const COR_ANUNCIOS = '#257CFF';
@@ -113,6 +113,8 @@ export default function MercadoPage() {
   const [historico, setHistorico] = useState<HistoricoLinha[]>([]);
   const [aba, setAba] = useState<'bairros' | 'oscilacao' | 'lancamentos' | 'estoque' | 'historico'>('bairros');
   const [estoque, setEstoque] = useState<PanoramaEstoque | null>(null);
+  const [ranking, setRanking] = useState<RankingIncorporadora[] | null>(null);
+  const [rankAberto, setRankAberto] = useState<string | null>(null);
   const [visaoEstoque, setVisaoEstoque] = useState<'empreendimentos' | 'bairros' | 'incorporadoras'>('empreendimentos');
   const [lanc, setLanc] = useState<PanoramaLancamentos | null>(null);
   // oscilação: compara o m² de cada bairro entre dois meses
@@ -565,7 +567,9 @@ export default function MercadoPage() {
                 type="button"
                 onClick={() => {
                   setEstoque(null);
+                  setRanking(null);
                   panoramaEstoque(de, ate).then(setEstoque).catch(() => setEstoque(null));
+                  rankingIncorporadoras(de, ate).then(setRanking).catch(() => setRanking([]));
                 }}
                 className="h-10 rounded-full bg-ink px-5 text-sm font-bold text-white"
               >
@@ -609,6 +613,79 @@ export default function MercadoPage() {
                         ));
                       })()}
                     </div>
+                  </div>
+                )}
+                {ranking && (
+                  <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--border)]">
+                    <h3 className="border-b border-[var(--border)] px-4 py-2.5 text-sm font-bold">Quem mais eliminou estoque (lançamento + revenda)</h3>
+                    {ranking.length === 0 ? (
+                      <p className="p-4 text-sm text-[var(--text-muted)]">Sem fechamentos no período. Suba tabelas de lançamento e planilhas de estoque de revenda das incorporadoras.</p>
+                    ) : (
+                      <table className="w-full min-w-[820px] text-sm">
+                        <thead className="text-left text-xs text-[var(--text-muted)]">
+                          <tr>
+                            <th className="px-4 py-1.5">#</th>
+                            <th className="px-2 py-1.5">Incorporadora</th>
+                            <th className="px-2 py-1.5 text-right">Vendidas lanç.</th>
+                            <th className="px-2 py-1.5 text-right">Vendidas revenda</th>
+                            <th className="px-2 py-1.5 text-right">VGV vendido</th>
+                            <th className="px-2 py-1.5 text-right">Estoque início → fim</th>
+                            <th className="px-4 py-1.5 text-right">Eliminou</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ranking.map((r, i) => (
+                            <Fragment key={r.empresaId}>
+                              <tr className="cursor-pointer border-t border-[var(--border)] tabular-nums hover:bg-[var(--pill-bg)]" onClick={() => setRankAberto(rankAberto === r.empresaId ? null : r.empresaId)}>
+                                <td className="px-4 py-2 font-bold text-[var(--text-muted)]">{i + 1}</td>
+                                <td className="px-2 py-2 font-semibold">
+                                  <span className="mr-1 text-[var(--text-muted)]">{rankAberto === r.empresaId ? '▾' : '▸'}</span>
+                                  {r.nome}
+                                </td>
+                                <td className="px-2 py-2 text-right">{r.vendidasLanc}</td>
+                                <td className="px-2 py-2 text-right">{r.vendidasRev}</td>
+                                <td className="px-2 py-2 text-right">{r.vgvVendido ? brl(r.vgvVendido) : '-'}</td>
+                                <td className="px-2 py-2 text-right">
+                                  {r.estoqueInicio} → {r.estoqueFim}
+                                </td>
+                                <td className="px-4 py-2 text-right font-bold text-[#15803D]">{r.eliminadoPct != null ? `${r.eliminadoPct.toLocaleString('pt-BR')}%` : '-'}</td>
+                              </tr>
+                              {rankAberto === r.empresaId && (
+                                <tr className="bg-[var(--pill-bg)]/50">
+                                  <td colSpan={7} className="px-4 py-2">
+                                    <table className="w-full text-[12.5px]">
+                                      <thead className="text-left text-[11px] text-[var(--text-muted)]">
+                                        <tr>
+                                          <th className="py-1">Mês</th>
+                                          <th className="py-1 text-right">Estoque lançamento</th>
+                                          <th className="py-1 text-right">Estoque revenda</th>
+                                          <th className="py-1 text-right">Vendidas lançamento</th>
+                                          <th className="py-1 text-right">Vendidas revenda</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {r.meses.map((m) => (
+                                          <tr key={m.mes} className="border-t border-[var(--border)] tabular-nums">
+                                            <td className="py-1">{mesLabel(m.mes)}</td>
+                                            <td className="py-1 text-right">{m.estoqueLanc || '-'}</td>
+                                            <td className="py-1 text-right">{m.estoqueRev || '-'}</td>
+                                            <td className="py-1 text-right">{m.vendidasLanc || '-'}</td>
+                                            <td className="py-1 text-right">{m.vendidasRev || '-'}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                    <p className="border-t border-[var(--border)] px-4 py-2 text-xs text-[var(--text-muted)]">
+                      Fechamento mensal gravado a cada tabela recebida. Eliminou = unidades vendidas no período sobre o estoque no início (o primeiro estoque conhecido de lançamento e de revenda). Só entram os empreendimentos ligados à incorporadora no cadastro.
+                    </p>
                   </div>
                 )}
                 <div className="mt-4 flex flex-wrap gap-1.5">

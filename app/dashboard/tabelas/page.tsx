@@ -9,7 +9,7 @@ import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { acharEmpreendimento, expandirArquivos, lerArquivoTabela, type ArquivoTabela } from '@/lib/tabelas-leitura';
-import { gravarTabelas, hashesJaGravados, listarTabelas, nomesEmpreendimentos, recalcularDisponibilidade, unidadesDaTabela, type TabelaResumo, type UnidadeSalva } from '@/lib/actions-tabelas';
+import { acompanharTabela, condominiosParaAtualizar, gravarTabelas, nomesIncorporadoras, hashesJaGravados, type CondoParaAtualizar, listarTabelas, nomesEmpreendimentos, recalcularDisponibilidade, unidadesDaTabela, type TabelaResumo, type UnidadeSalva } from '@/lib/actions-tabelas';
 import type { UnidadeTabela } from '@/lib/pdf-import/parse';
 
 type Linha = {
@@ -37,6 +37,11 @@ export default function TabelasPage() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [recentes, setRecentes] = useState<TabelaResumo[] | null>(null);
   const [filtro, setFiltro] = useState<'todas' | 'pendentes'>('todas');
+  // tipo do lote: tabela de lançamento (por empreendimento) ou estoque de revenda (por incorporadora)
+  const [tipo, setTipo] = useState<'lancamento' | 'revenda'>('lancamento');
+  const [empresaId, setEmpresaId] = useState('');
+  const [empresas, setEmpresas] = useState<{ id: string; nome: string }[]>([]);
+  const [paraAtualizar, setParaAtualizar] = useState<CondoParaAtualizar[] | null>(null);
   const [aberta, setAberta] = useState<{ id: string; unidades: UnidadeSalva[] | null } | null>(null);
   const parar = useRef(false);
   const inputPasta = useRef<HTMLInputElement>(null);
@@ -48,6 +53,8 @@ export default function TabelasPage() {
     if (!staff) return;
     nomesEmpreendimentos().then(setNomes).catch(() => {});
     listarTabelas(100).then(setRecentes).catch(() => setRecentes([]));
+    condominiosParaAtualizar().then(setParaAtualizar).catch(() => setParaAtualizar([]));
+    nomesIncorporadoras().then(setEmpresas).catch(() => {});
   }, [staff]);
   useEffect(() => {
     inputPasta.current?.setAttribute('webkitdirectory', '');
@@ -92,7 +99,7 @@ export default function TabelasPage() {
     setProgresso(null);
   };
 
-  const prontas = linhas.filter((l) => l.status === 'lida' && !l.repetida && l.unidades.length && /^\d{4}-\d{2}$/.test(l.mes));
+  const prontas = linhas.filter((l) => l.status === 'lida' && !l.repetida && l.unidades.length && /^\d{4}-\d{2}$/.test(l.mes) && (tipo === 'lancamento' || !!empresaId));
   const gravar = async () => {
     setGravando(true);
     setAviso(null);
@@ -103,7 +110,7 @@ export default function TabelasPage() {
     for (let i = 0; i < prontas.length; i += 20) {
       const lote = prontas.slice(i, i + 20);
       const r = await gravarTabelas(
-        lote.map((l) => ({ developmentId: l.devId, nome: l.devNome || null, mes: l.mes, arquivo: l.caminho, hash: l.hash, unidades: l.unidades.map((u) => ({ ...u, valor: u.valor ?? null, vagas: u.vagas ?? null })) }))
+        lote.map((l) => ({ tipo, empresaId: tipo === 'revenda' ? empresaId : null, developmentId: tipo === 'revenda' ? null : l.devId, nome: tipo === 'revenda' ? empresas.find((e) => e.id === empresaId)?.nome ?? null : l.devNome || null, mes: l.mes, arquivo: l.caminho, hash: l.hash, unidades: l.unidades.map((u) => ({ ...u, valor: u.valor ?? null, vagas: u.vagas ?? null })) }))
       ).catch((e) => ({ gravadas: 0, repetidas: 0, aplicadas: 0, erros: [e instanceof Error ? e.message : 'Falhou.'] }));
       g += r.gravadas;
       rep += r.repetidas;
@@ -130,6 +137,35 @@ export default function TabelasPage() {
           Suba tabelas de vendas de qualquer época, em qualquer ordem: cada uma fica no histórico com o seu mês. O empreendimento recebe só a mais recente. A leitura é feita no seu computador, sem custo.
         </p>
 
+        {pode && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {(
+              [
+                ['lancamento', 'Tabela de lançamento (por empreendimento)'],
+                ['revenda', 'Estoque de revenda (por incorporadora)']
+              ] as const
+            ).map(([v, l]) => (
+              <button key={v} type="button" disabled={linhas.length > 0} onClick={() => setTipo(v)} className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold disabled:opacity-60 ${tipo === v ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}>
+                {l}
+              </button>
+            ))}
+            {tipo === 'revenda' && (
+              <select value={empresaId} onChange={(e) => setEmpresaId(e.target.value)} className={`h-9 rounded-full border bg-[var(--bg)] px-3 text-[13px] font-semibold ${empresaId ? 'border-[var(--border)]' : 'border-[#E08A00]'}`}>
+                <option value="">Escolha a incorporadora…</option>
+                {empresas.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nome}
+                  </option>
+                ))}
+              </select>
+            )}
+            {tipo === 'revenda' && (
+              <p className="basis-full text-[12px] text-[var(--text-muted)]">
+                Planilha mensal de estoque de revenda (permutas) da incorporadora: uma linha por unidade, com o empreendimento, a unidade, a metragem e o valor. Cada linha é ligada ao condomínio de mesmo nome. Para trocar o tipo, grave ou limpe a lista abaixo.
+              </p>
+            )}
+          </div>
+        )}
         {pode ? (
           <div
             onDragOver={(e) => e.preventDefault()}
@@ -215,6 +251,9 @@ export default function TabelasPage() {
                           </span>
                         </td>
                         <td className="px-2 py-1.5">
+                          {tipo === 'revenda' ? (
+                            <span className={empresaId ? 'font-semibold' : 'text-[#B45F06]'}>{empresas.find((e) => e.id === empresaId)?.nome ?? 'Escolha a incorporadora'}</span>
+                          ) : (
                           <input
                             list="lista-empreendimentos"
                             disabled={l.status === 'gravada'}
@@ -227,6 +266,7 @@ export default function TabelasPage() {
                             placeholder="Escolha o empreendimento"
                             className={`h-8 w-56 rounded-lg border bg-[var(--bg)] px-2 text-[12.5px] ${l.devId ? 'border-[var(--border)]' : 'border-[#E08A00]'}`}
                           />
+                          )}
                         </td>
                         <td className="px-2 py-1.5">
                           <input
@@ -248,7 +288,9 @@ export default function TabelasPage() {
                             <span className="text-red-600">{l.erro}</span>
                           ) : !l.mes ? (
                             <span className="text-[#B45F06]">Falta o mês</span>
-                          ) : !l.devId ? (
+                          ) : tipo === 'revenda' && !empresaId ? (
+                            <span className="text-[#B45F06]">Escolha a incorporadora</span>
+                          ) : tipo === 'lancamento' && !l.devId ? (
                             <span className="text-[#B45F06]">Sem empreendimento (vai só para o histórico)</span>
                           ) : (
                             <span>Pronta</span>
@@ -261,6 +303,69 @@ export default function TabelasPage() {
               </table>
             </div>
             {mostrar.length > 500 && <p className="mt-1 text-[12px] text-[var(--text-muted)]">Mostrando 500 de {mostrar.length}. Todas são gravadas.</p>}
+          </section>
+        )}
+
+        {paraAtualizar && paraAtualizar.length > 0 && (
+          <section className="mt-8">
+            <h2 className="text-[15px] font-bold">Para atualizar ({paraAtualizar.length})</h2>
+            <p className="text-[12px] text-[var(--text-muted)]">
+              Lançamento, obras e pronto novo com a última tabela de mais de 3 meses: as unidades disponíveis não aparecem mais no site. Suba a tabela nova ou, se não houver mais, pare de acompanhar.
+            </p>
+            <div className="mt-2 overflow-x-auto rounded-2xl border border-[var(--border)]">
+              <table className="w-full min-w-[620px] text-[12.5px]">
+                <thead className="bg-[var(--pill-bg)] text-left text-[11.5px] text-[var(--text-muted)]">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Empreendimento</th>
+                    <th className="px-2 py-2 font-semibold">Última tabela</th>
+                    <th className="px-2 py-2 text-right font-semibold">Disponíveis nela</th>
+                    <th className="px-2 py-2 font-semibold">Entrega</th>
+                    <th className="px-3 py-2 text-right font-semibold"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paraAtualizar.map((c) => (
+                    <tr key={c.id} className="border-t border-[var(--border)]">
+                      <td className="px-3 py-1.5">
+                        <span className="font-semibold">{c.nome}</span>
+                        {c.bairro && <span className="text-[var(--text-muted)]"> · {c.bairro}</span>}
+                      </td>
+                      <td className="px-2 py-1.5 text-[#B45F06]">{c.ultimaTabela.split('-').reverse().join('/')}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{c.disponiveis ?? '-'}</td>
+                      <td className="px-2 py-1.5">{c.entrega ? c.entrega.split('-').reverse().join('/') : '-'}</td>
+                      <td className="px-3 py-1.5 text-right">
+                        {pode && (
+                          <span className="inline-flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await acompanharTabela(c.id, false, 'Esgotado (100% vendido)');
+                                setParaAtualizar((l) => l?.filter((x) => x.id !== c.id) ?? l);
+                              }}
+                              className="rounded-full bg-[var(--pill-bg)] px-2.5 py-1 font-semibold hover:bg-[var(--pill-bg-hover)]"
+                            >
+                              Esgotado
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const m = window.prompt('Motivo para parar de acompanhar:', 'A incorporadora não envia mais');
+                                if (m === null) return;
+                                await acompanharTabela(c.id, false, m);
+                                setParaAtualizar((l) => l?.filter((x) => x.id !== c.id) ?? l);
+                              }}
+                              className="rounded-full bg-[var(--pill-bg)] px-2.5 py-1 font-semibold hover:bg-[var(--pill-bg-hover)]"
+                            >
+                              Parar de acompanhar
+                            </button>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
 

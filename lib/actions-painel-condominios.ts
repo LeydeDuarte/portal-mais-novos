@@ -37,12 +37,15 @@ export type CondoPainel = {
   /** unidades disponíveis pela tabela de vendas mais recente */
   disponiveis: number | null;
   tabelaReferencia: string | null;
+  tabelaAcompanhar: boolean;
+  vendido100: boolean;
+  tabelaMotivo: string | null;
 };
 
 export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
   const eu = await exigirEquipe();
   const rows = await query<Record<string, unknown>>(
-    `select d.id, d.slug, d.name, d.status, d.tipo, d.bairro, d.cidade, d.uf, to_char(d.delivery_date, 'YYYY-MM') as entrega, d.disponiveis, to_char(d.tabela_referencia, 'YYYY-MM') as tabela_ref,
+    `select d.id, d.slug, d.name, d.status, d.tipo, d.bairro, d.cidade, d.uf, to_char(d.delivery_date, 'YYYY-MM') as entrega, d.disponiveis, to_char(d.tabela_referencia, 'YYYY-MM') as tabela_ref, d.tabela_acompanhar, d.tabela_parou_motivo, d.vendido_100,
             coalesce(nullif(d.capa_mini, ''), d.photos->>0) as capa, jsonb_array_length(coalesce(d.photos, '[]'::jsonb)) as fotos,
             length(coalesce(d.description, '')) as descricao, coalesce(d.tipos_unidade, '[]'::jsonb) as tipos, coalesce(d.visualizacoes, 0) as visualizacoes,
             coalesce(d.compartilhamentos, 0) as compartilhamentos, d.corretor_email, d.destaque, d.destaque_tamanho, d.video_url, d.aceita_temporada,
@@ -89,7 +92,10 @@ export async function listarCondominiosPainel(): Promise<CondoPainel[]> {
       temVideo: !!r.video_url,
       aceitaTemporada: !!r.aceita_temporada,
       disponiveis: r.disponiveis != null ? Number(r.disponiveis) : null,
-      tabelaReferencia: (r.tabela_ref as string) ?? null
+      tabelaReferencia: (r.tabela_ref as string) ?? null,
+      tabelaAcompanhar: r.tabela_acompanhar !== false,
+      vendido100: !!r.vendido_100,
+      tabelaMotivo: (r.tabela_parou_motivo as string) ?? null
     }))
     .filter((c) => veTudo(eu.role) || c.status === 'publicado' || c.corretorEmail?.toLowerCase() === eu.email.toLowerCase());
 }

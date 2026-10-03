@@ -22,6 +22,8 @@ export type UnidadeTabela = {
   /** número do escaninho (depósito), quando houver */
   escaninho?: string;
   torre?: string;
+  /** planilha de revenda: empreendimento/condomínio de cada linha */
+  empreendimento?: string;
   situacao: 'disponivel' | 'vendida' | 'reservada' | 'outra';
 };
 

@@ -15,3 +15,11 @@ export function tabelaVigente(referencia: string | null | undefined, hoje: Date 
 export function disponiveisParaMostrar(disponiveis: number | null | undefined, referencia: string | null | undefined): number | null {
   return disponiveis && disponiveis > 0 && tabelaVigente(referencia) ? disponiveis : null;
 }
+
+/** "100% vendido" aparece no site só para lançamento, obras e entregue há até 12 meses. */
+export function mostrarVendido100(vendido100: boolean | null | undefined, entrega: string | null | undefined, hoje: Date = new Date()): boolean {
+  if (!vendido100 || !entrega || !/^\d{4}-\d{2}/.test(entrega)) return false;
+  const [a, m] = entrega.slice(0, 7).split('-').map(Number);
+  const mesesDesdeEntrega = (hoje.getFullYear() - a) * 12 + (hoje.getMonth() + 1 - m);
+  return mesesDesdeEntrega <= 12;
+}

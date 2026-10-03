@@ -14,8 +14,27 @@ async function exigirGestorAval() {
 }
 import { veTudo } from './papeis';
 
-export type UnidadeGravar = { unidade: string; area: number; valor?: number | null; vagas?: number | null; garagens?: string | null; escaninho?: string | null; torre?: string | null; situacao: string };
-export type TabelaGravar = { developmentId: string | null; nome: string | null; mes: string; arquivo: string; hash: string; unidades: UnidadeGravar[] };
+export type UnidadeGravar = { unidade: string; area: number; valor?: number | null; vagas?: number | null; garagens?: string | null; escaninho?: string | null; torre?: string | null; empreendimento?: string | null; situacao: string };
+/** tipo 'lancamento' = tabela de um empreendimento; 'revenda' = estoque de revenda (permutas) de uma incorporadora */
+export type TabelaGravar = { developmentId: string | null; nome: string | null; mes: string; arquivo: string; hash: string; unidades: UnidadeGravar[]; tipo?: 'lancamento' | 'revenda'; empresaId?: string | null };
+
+const chaveNome = (n: string) =>
+  String(n ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/^(edificio|residencial|condominio)\s+/, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+/** incorporadoras/construtoras cadastradas (para o estoque de revenda) */
+export async function nomesIncorporadoras(): Promise<{ id: string; nome: string }[]> {
+  await exigirGestorAval();
+  const r = await query<{ id: string; nome: string }>(
+    `select id, coalesce(nullif(nome_perfil, ''), nullif(nome_fantasia, ''), razao_social) nome from empresas order by 2`
+  );
+  return r.filter((x) => x.nome);
+}
 
 export async function nomesEmpreendimentos(): Promise<{ id: string; nome: string }[]> {
   await exigirGestorAval();
@@ -37,9 +56,18 @@ export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: n
   let repetidas = 0;
   const erros: string[] = [];
   const devs = new Set<string>();
+  const await_nomes = new Map<string, string>();
+  if (lote.some((t) => t.tipo === 'revenda')) {
+    for (const d of await query<{ id: string; name: string }>(`select id, name from developments where name is not null`)) await_nomes.set(chaveNome(d.name), d.id);
+  }
   for (const t of lote.slice(0, 50)) {
     if (!/^\d{4}-\d{2}$/.test(t.mes)) {
       erros.push(`${t.arquivo}: falta o mês de referência.`);
+      continue;
+    }
+    const revenda = t.tipo === 'revenda';
+    if (revenda && !(t.empresaId && /^[0-9a-f-]{36}$/i.test(t.empresaId))) {
+      erros.push(`${t.arquivo}: escolha a incorporadora do estoque de revenda.`);
       continue;
     }
     const uns = (t.unidades ?? []).filter((u) => u && Number(u.area) > 0).slice(0, 3000);
@@ -53,10 +81,10 @@ export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: n
     const m2 = base.length ? base.reduce((s, u) => s + Number(u.valor) / Number(u.area), 0) / base.length : null;
     const valores = base.map((u) => Number(u.valor));
     const r = await query<{ id: string }>(
-      `insert into tabelas_precos (development_id, empreendimento_nome, mes_referencia, arquivo, hash, unidades, disponiveis, valor_min, valor_max, m2_medio, criado_por, area_min, area_max)
-       values ($1, $2, ($3 || '-01')::date, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) on conflict (hash) do nothing returning id`,
+      `insert into tabelas_precos (development_id, empreendimento_nome, mes_referencia, arquivo, hash, unidades, disponiveis, valor_min, valor_max, m2_medio, criado_por, area_min, area_max, tipo, empresa_id, vgv_disponivel)
+       values ($1, $2, ($3 || '-01')::date, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) on conflict (hash) do nothing returning id`,
       [
-        t.developmentId,
+        revenda ? null : t.developmentId,
         t.nome?.slice(0, 200) ?? null,
         t.mes,
         t.arquivo.slice(0, 400),
@@ -68,7 +96,10 @@ export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: n
         m2 ? Math.round(m2) : null,
         eu.email,
         Math.min(...uns.map((u) => Number(u.area))),
-        Math.max(...uns.map((u) => Number(u.area)))
+        Math.max(...uns.map((u) => Number(u.area))),
+        revenda ? 'revenda' : 'lancamento',
+        revenda ? t.empresaId : null,
+        disp.reduce((s2, u) => s2 + (Number(u.valor) || 0), 0) || null
       ]
     );
     if (!r[0]) {
@@ -76,8 +107,8 @@ export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: n
       continue;
     }
     await query(
-      `insert into tabelas_precos_unidades (tabela_id, unidade, area, vagas, valor, situacao, garagens, escaninho, torre)
-       select $1, u, a, v, p, s, g, e, t from unnest($2::text[], $3::numeric[], $4::int[], $5::numeric[], $6::text[], $7::text[], $8::text[], $9::text[]) x(u, a, v, p, s, g, e, t)`,
+      `insert into tabelas_precos_unidades (tabela_id, unidade, area, vagas, valor, situacao, garagens, escaninho, torre, empreendimento_nome, development_id)
+       select $1, u, a, v, p, s, g, e, t, en, ed from unnest($2::text[], $3::numeric[], $4::int[], $5::numeric[], $6::text[], $7::text[], $8::text[], $9::text[], $10::text[], $11::text[]) x(u, a, v, p, s, g, e, t, en, ed)`,
       [
         r[0].id,
         uns.map((u) => String(u.unidade).slice(0, 40)),
@@ -87,14 +118,17 @@ export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: n
         uns.map((u) => String(u.situacao ?? 'disponivel').slice(0, 20)),
         uns.map((u) => (u.garagens ? String(u.garagens).slice(0, 120) : null)),
         uns.map((u) => (u.escaninho ? String(u.escaninho).slice(0, 30) : null)),
-        uns.map((u) => (u.torre ? String(u.torre).slice(0, 30) : null))
+        uns.map((u) => (u.torre ? String(u.torre).slice(0, 30) : null)),
+        uns.map((u) => (u.empreendimento ? String(u.empreendimento).slice(0, 160) : null)),
+        uns.map((u) => (revenda && u.empreendimento ? (await_nomes.get(chaveNome(u.empreendimento)) ?? null) : null))
       ]
     );
     gravadas++;
-    if (t.developmentId) devs.add(t.developmentId);
+    if (t.developmentId && !revenda) devs.add(t.developmentId);
   }
   let aplicadas = 0;
   for (const d of Array.from(devs)) if (await aplicarTabelaMaisRecente(d)) aplicadas++;
+  if (gravadas) await atualizarFechamentos().catch(() => {});
   return { gravadas, repetidas, aplicadas, erros };
 }
 
@@ -103,14 +137,14 @@ export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: n
 async function aplicarTabelaMaisRecente(developmentId: string): Promise<boolean> {
   const t = (
     await query<{ id: string; mes: string }>(
-      `select id, to_char(mes_referencia, 'YYYY-MM-DD') mes from tabelas_precos where development_id = $1 order by mes_referencia desc, criado_em desc limit 1`,
+      `select id, to_char(mes_referencia, 'YYYY-MM-DD') mes from tabelas_precos where development_id = $1 and tipo = 'lancamento' order by mes_referencia desc, criado_em desc limit 1`,
       [developmentId]
     )
   )[0];
   if (!t) return false;
   const atual = (await query<{ ref: string | null }>(`select to_char(tabela_referencia, 'YYYY-MM-DD') ref from developments where id = $1`, [developmentId]))[0];
   if (atual?.ref && atual.ref > t.mes) return false; // já tem uma tabela mais nova aplicada
-  await query(`update developments set tabela_referencia = $2::date where id = $1`, [developmentId, t.mes]);
+  await query(`update developments set tabela_referencia = $2::date, tabela_acompanhar = true, tabela_parou_motivo = null, tabela_parou_em = null where id = $1`, [developmentId, t.mes]);
   await gravarDisponibilidade(developmentId, t.id);
   await query(
     `with u as (select area, valor from tabelas_precos_unidades where tabela_id = $2 and valor > 0 and situacao = 'disponivel')
@@ -170,7 +204,7 @@ export async function panoramaLancamentos(de: string, ate: string): Promise<Pano
   await exigirGestorAval();
   const ok = (m: string) => /^\d{4}-\d{2}$/.test(m);
   const p = [ok(de) ? `${de}-01` : '2000-01-01', ok(ate) ? `${ate}-01` : '2100-01-01'];
-  const PER = `t.mes_referencia between $1::date and $2::date and t.m2_medio > 0`;
+  const PER = `t.mes_referencia between $1::date and $2::date and t.m2_medio > 0 and t.tipo = 'lancamento'`;
   const [mensal, bairros, incorp, reaj] = await Promise.all([
     query<{ mes: string; m2: string; n: string }>(`select to_char(t.mes_referencia, 'YYYY-MM') mes, avg(t.m2_medio) m2, count(*) n from tabelas_precos t where ${PER} group by 1 order by 1`, p),
     query<{ nome: string; cidade: string; m2: string; n: string }>(
@@ -411,7 +445,7 @@ async function gravarDisponibilidade(developmentId: string, tabelaId: string) {
       if (v && (!g.aPartirDe || v < g.aPartirDe)) g.aPartirDe = v;
     } else grupos.push({ area: Math.round(a * 100) / 100, disponiveis: 1, aPartirDe: v && v > 0 ? v : null });
   }
-  await query(`update developments set disponibilidade = $2::jsonb, disponiveis = $3 where id = $1`, [
+  await query(`update developments set disponibilidade = $2::jsonb, disponiveis = $3, vendido_100 = case when $3 > 0 then false else vendido_100 end where id = $1`, [
     developmentId,
     JSON.stringify(grupos),
     grupos.reduce((s2, g) => s2 + g.disponiveis, 0)
@@ -426,4 +460,222 @@ export async function recalcularDisponibilidade(): Promise<number> {
   let n = 0;
   for (const d of devs) if (await aplicarTabelaMaisRecente(d.development_id)) n++;
   return n;
+}
+
+// ---------------- acompanhamento das tabelas (o que falta atualizar) ----------------
+/** Para de cobrar a tabela de um condomínio (esgotado, a incorporadora não envia mais...).
+ *  "Esgotado" zera as unidades disponíveis. Uma tabela nova volta a acompanhar sozinha. */
+export async function acompanharTabela(developmentId: string, acompanhar: boolean, motivo?: string): Promise<void> {
+  const eu = await exigirGestorAval();
+  const m = String(motivo ?? '').trim().slice(0, 200) || null;
+  if (acompanhar) {
+    await query(`update developments set tabela_acompanhar = true, tabela_parou_motivo = null, tabela_parou_em = null where id = $1`, [developmentId]);
+    return;
+  }
+  const esgotado = !!m && /esgotad|100%|vendid/i.test(m);
+  await query(
+    `update developments set tabela_acompanhar = false, tabela_parou_motivo = $2, tabela_parou_em = now()${esgotado ? `, disponiveis = 0, disponibilidade = '[]'::jsonb, vendido_100 = true, vendido_100_em = now()` : ''} where id = $1`,
+    [developmentId, m ? `${m} (por ${eu.email})` : `por ${eu.email}`]
+  );
+}
+
+export type CondoParaAtualizar = { id: string; nome: string; bairro: string | null; ultimaTabela: string; disponiveis: number | null; entrega: string | null };
+/** Lançamento, obras e pronto novo com tabela de mais de 3 meses e ainda acompanhados. */
+export async function condominiosParaAtualizar(): Promise<CondoParaAtualizar[]> {
+  await exigirGestorAval();
+  const r = await query<{ id: string; name: string; bairro: string | null; ref: string; disponiveis: number | null; entrega: string | null }>(
+    `select id, name, bairro, to_char(tabela_referencia, 'YYYY-MM') ref, disponiveis, to_char(delivery_date, 'YYYY-MM') entrega
+       from developments
+      where tabela_referencia is not null and tabela_acompanhar
+        and tabela_referencia < date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '2 months'
+        and (delivery_date is null or delivery_date >= (now() - interval '36 months'))
+      order by tabela_referencia asc, name limit 300`
+  );
+  return r.map((x) => ({ id: x.id, nome: x.name, bairro: x.bairro, ultimaTabela: x.ref, disponiveis: x.disponiveis, entrega: x.entrega }));
+}
+
+// ---------------- fechamento mensal por incorporadora (lançamento e revenda) ----------------
+type ParVenda = { chave: string; mes: string; vendidas: number; vgv: number };
+const UNIDADE = `regexp_replace(lower(coalesce(u.empreendimento_nome, '') || '|' || u.unidade), '\\s', '', 'g')`;
+const UNIDADE_V = `regexp_replace(lower(coalesce(v.empreendimento_nome, '') || '|' || v.unidade), '\\s', '', 'g')`;
+
+/** vendidas entre tabelas seguidas do mesmo "dono" (empreendimento no lançamento, incorporadora na revenda) */
+async function paresDeVenda(tipo: 'lancamento' | 'revenda'): Promise<ParVenda[]> {
+  const dono = tipo === 'lancamento' ? 'development_id' : 'empresa_id::text';
+  const r = await query<{ dono: string; mes: string; vendidas: string; vgv: string }>(
+    `with t as (select id, ${dono} dono, mes_referencia mes, lag(id) over (partition by ${dono} order by mes_referencia, criado_em) ant,
+                       lag(mes_referencia) over (partition by ${dono} order by mes_referencia, criado_em) mes_ant
+                  from tabelas_precos where tipo = $1 and ${dono} is not null)
+     select t.dono, to_char(t.mes, 'YYYY-MM') mes, count(u.*) vendidas, coalesce(sum(u.valor), 0) vgv
+       from t join tabelas_precos_unidades u on u.tabela_id = t.ant and u.situacao = 'disponivel'
+      where t.ant is not null and t.mes > t.mes_ant
+        and not exists (select 1 from tabelas_precos_unidades v where v.tabela_id = t.id and v.situacao = 'disponivel' and ${UNIDADE_V} = ${UNIDADE})
+      group by t.dono, t.mes`,
+    [tipo]
+  );
+  return r.map((x) => ({ chave: x.dono, mes: x.mes, vendidas: Number(x.vendidas), vgv: Number(x.vgv) }));
+}
+
+const somarMes = (m: string, n: number) => {
+  const [a, mm] = m.split('-').map(Number);
+  const d = new Date(a, mm - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/** Recalcula e GRAVA o fechamento de cada mês por incorporadora (estoque, VGV, vendidas e VGV
+ *  vendido, separado em lançamento e revenda). Roda a cada tabela gravada. Os dados de origem
+ *  (as tabelas) ficam para sempre; o fechamento é refeito a partir deles. */
+export async function atualizarFechamentos(): Promise<number> {
+  await exigirGestorAval();
+  const lanc = await query<{ dev: string; mes: string; disp: number; vgv: string | null; incs: string[] | null }>(
+    `select t.development_id dev, to_char(t.mes_referencia, 'YYYY-MM') mes, t.disponiveis disp, t.vgv_disponivel vgv,
+            (select array_agg(de.empresa_id::text) from development_empresas de where de.development_id = t.development_id) incs
+       from tabelas_precos t where t.tipo = 'lancamento' and t.development_id is not null order by t.mes_referencia, t.criado_em`
+  );
+  const rev = await query<{ emp: string; mes: string; disp: number; vgv: string | null; emps: string }>(
+    `select t.empresa_id::text emp, to_char(t.mes_referencia, 'YYYY-MM') mes, t.disponiveis disp, t.vgv_disponivel vgv,
+            (select count(distinct coalesce(u.development_id, u.empreendimento_nome)) from tabelas_precos_unidades u where u.tabela_id = t.id and u.situacao = 'disponivel') emps
+       from tabelas_precos t where t.tipo = 'revenda' and t.empresa_id is not null order by t.mes_referencia, t.criado_em`
+  );
+  if (!lanc.length && !rev.length) {
+    await query(`delete from estoque_incorporadoras_mensal`);
+    return 0;
+  }
+  const [paresL, paresR] = await Promise.all([paresDeVenda('lancamento'), paresDeVenda('revenda')]);
+  const incsDoDev = new Map(lanc.map((l) => [l.dev, l.incs ?? []]));
+  const todosMeses = [...lanc.map((l) => l.mes), ...rev.map((r) => r.mes)].sort();
+  const hoje = new Date();
+  const fim = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+  type Linha = { estoque: number; vgv: number; vendidas: number; vgvVendido: number; emps: number };
+  const linhas = new Map<string, Linha>(); // chave: empresa|mes|tipo
+  const pegar = (emp: string, mes: string, tipo: string) => {
+    const k = `${emp}|${mes}|${tipo}`;
+    let l = linhas.get(k);
+    if (!l) linhas.set(k, (l = { estoque: 0, vgv: 0, vendidas: 0, vgvVendido: 0, emps: 0 }));
+    return l;
+  };
+  for (let m = todosMeses[0]; m <= fim; m = somarMes(m, 1)) {
+    const desde = somarMes(m, -2); // tabela vale por 3 meses
+    // lançamento: tabela mais recente de cada empreendimento até o mês m
+    const ultLanc = new Map<string, (typeof lanc)[number]>();
+    for (const l of lanc) if (l.mes <= m && l.mes >= desde) ultLanc.set(l.dev, l);
+    for (const l of Array.from(ultLanc.values()))
+      for (const emp of l.incs ?? []) {
+        const x = pegar(emp, m, 'lancamento');
+        x.estoque += Number(l.disp) || 0;
+        x.vgv += Number(l.vgv) || 0;
+        if (Number(l.disp) > 0) x.emps++;
+      }
+    // revenda: planilha mais recente de cada incorporadora até o mês m
+    const ultRev = new Map<string, (typeof rev)[number]>();
+    for (const r of rev) if (r.mes <= m && r.mes >= desde) ultRev.set(r.emp, r);
+    for (const r of Array.from(ultRev.values())) {
+      const x = pegar(r.emp, m, 'revenda');
+      x.estoque += Number(r.disp) || 0;
+      x.vgv += Number(r.vgv) || 0;
+      x.emps += Number(r.emps) || 0;
+    }
+  }
+  for (const p of paresL) for (const emp of incsDoDev.get(p.chave) ?? []) {
+    const x = pegar(emp, p.mes, 'lancamento');
+    x.vendidas += p.vendidas;
+    x.vgvVendido += p.vgv;
+  }
+  for (const p of paresR) {
+    const x = pegar(p.chave, p.mes, 'revenda');
+    x.vendidas += p.vendidas;
+    x.vgvVendido += p.vgv;
+  }
+  const ent = Array.from(linhas.entries()).filter(([, l]) => l.estoque > 0 || l.vendidas > 0);
+  await query(`delete from estoque_incorporadoras_mensal`);
+  for (let i = 0; i < ent.length; i += 500) {
+    const lote = ent.slice(i, i + 500);
+    await query(
+      `insert into estoque_incorporadoras_mensal (empresa_id, mes, tipo, estoque, vgv, vendidas, vgv_vendido, empreendimentos)
+       select e::uuid, (m || '-01')::date, t, es, vg, ve, vv, ep from unnest($1::text[], $2::text[], $3::text[], $4::int[], $5::numeric[], $6::int[], $7::numeric[], $8::int[]) x(e, m, t, es, vg, ve, vv, ep)`,
+      [
+        lote.map(([k]) => k.split('|')[0]),
+        lote.map(([k]) => k.split('|')[1]),
+        lote.map(([k]) => k.split('|')[2]),
+        lote.map(([, l]) => l.estoque),
+        lote.map(([, l]) => Math.round(l.vgv)),
+        lote.map(([, l]) => l.vendidas),
+        lote.map(([, l]) => Math.round(l.vgvVendido)),
+        lote.map(([, l]) => l.emps)
+      ]
+    );
+  }
+  return ent.length;
+}
+
+export type RankingIncorporadora = {
+  empresaId: string;
+  nome: string;
+  vendidasLanc: number;
+  vendidasRev: number;
+  vgvVendido: number;
+  estoqueInicio: number; // lançamento + revenda no primeiro mês do período
+  estoqueFim: number; // no último mês do período
+  eliminadoPct: number | null; // vendidas / estoque no início
+  meses: { mes: string; estoqueLanc: number; estoqueRev: number; vendidasLanc: number; vendidasRev: number }[];
+};
+
+/** Ranking: quem mais eliminou estoque no período (lançamento + revenda), com a série mensal. */
+export async function rankingIncorporadoras(de: string, ate: string): Promise<RankingIncorporadora[]> {
+  await exigirGestorAval();
+  const ok = (m: string) => /^\d{4}-\d{2}$/.test(m);
+  const r = await query<{ emp: string; nome: string; mes: string; tipo: string; estoque: number; vendidas: number; vgv_vendido: string }>(
+    `select f.empresa_id::text emp, coalesce(nullif(e.nome_perfil, ''), nullif(e.nome_fantasia, ''), e.razao_social) nome,
+            to_char(f.mes, 'YYYY-MM') mes, f.tipo, f.estoque, f.vendidas, f.vgv_vendido
+       from estoque_incorporadoras_mensal f join empresas e on e.id = f.empresa_id
+      where f.mes between $1::date and $2::date order by f.mes`,
+    [ok(de) ? `${de}-01` : '1990-01-01', ok(ate) ? `${ate}-01` : '2100-01-01']
+  );
+  const porEmp = new Map<string, RankingIncorporadora>();
+  for (const x of r) {
+    let e = porEmp.get(x.emp);
+    if (!e) porEmp.set(x.emp, (e = { empresaId: x.emp, nome: x.nome, vendidasLanc: 0, vendidasRev: 0, vgvVendido: 0, estoqueInicio: 0, estoqueFim: 0, eliminadoPct: null, meses: [] }));
+    let m = e.meses.find((y) => y.mes === x.mes);
+    if (!m) e.meses.push((m = { mes: x.mes, estoqueLanc: 0, estoqueRev: 0, vendidasLanc: 0, vendidasRev: 0 }));
+    if (x.tipo === 'revenda') {
+      m.estoqueRev += Number(x.estoque);
+      m.vendidasRev += Number(x.vendidas);
+      e.vendidasRev += Number(x.vendidas);
+    } else {
+      m.estoqueLanc += Number(x.estoque);
+      m.vendidasLanc += Number(x.vendidas);
+      e.vendidasLanc += Number(x.vendidas);
+    }
+    e.vgvVendido += Number(x.vgv_vendido);
+  }
+  for (const e of Array.from(porEmp.values())) {
+    e.meses.sort((a, b) => a.mes.localeCompare(b.mes));
+    // estoque inicial: primeiro estoque conhecido de CADA tipo no período (mais o que foi vendido
+    // naquele mês, que ainda estava no estoque); final: o último estoque conhecido de cada tipo
+    const inicio = (tipo: 'Lanc' | 'Rev') => {
+      const m = e.meses.find((x) => x[`estoque${tipo}`] > 0);
+      return m ? m[`estoque${tipo}`] + m[`vendidas${tipo}`] : 0;
+    };
+    const final = (tipo: 'Lanc' | 'Rev') => {
+      const m = [...e.meses].reverse().find((x) => x[`estoque${tipo}`] > 0);
+      return m ? m[`estoque${tipo}`] : 0;
+    };
+    e.estoqueInicio = inicio('Lanc') + inicio('Rev');
+    e.estoqueFim = final('Lanc') + final('Rev');
+    const vend = e.vendidasLanc + e.vendidasRev;
+    e.eliminadoPct = e.estoqueInicio > 0 ? Math.round((vend / e.estoqueInicio) * 1000) / 10 : null;
+  }
+  return Array.from(porEmp.values()).sort((a, b) => b.vendidasLanc + b.vendidasRev - (a.vendidasLanc + a.vendidasRev) || (b.eliminadoPct ?? 0) - (a.eliminadoPct ?? 0));
+}
+
+/** Marca/desmarca "100% vendido" (só analista e admin). Marcar também para de cobrar a tabela. */
+export async function marcarVendido100(developmentId: string, vendido: boolean): Promise<void> {
+  const eu = await exigirGestorAval();
+  if (vendido)
+    await query(
+      `update developments set vendido_100 = true, vendido_100_em = now(), disponiveis = 0, disponibilidade = '[]'::jsonb,
+              tabela_acompanhar = false, tabela_parou_motivo = $2, tabela_parou_em = now() where id = $1`,
+      [developmentId, `Esgotado (100% vendido) (por ${eu.email})`]
+    );
+  else await query(`update developments set vendido_100 = false, vendido_100_em = null, tabela_acompanhar = true, tabela_parou_motivo = null, tabela_parou_em = null where id = $1`, [developmentId]);
 }

@@ -20,7 +20,7 @@ import { SITE_URL } from './seo';
 import { chaveNome, mesmoCondominio } from './planilha-condominios';
 import { depoimentosAtivos, destaquesAtivos, hashTexto } from './especiais';
 import { MESES, FASES_EXIGEM_CONCEPCAO, getStatusBucket } from './classification';
-import { disponiveisParaMostrar } from './disponibilidade';
+import { disponiveisParaMostrar, mostrarVendido100 } from './disponibilidade';
 import { gravarConcepcao, resolverEmpresaImport, acrescentarConcepcao } from './empresas';
 import { gravarProprietariosDoImovel } from './proprietarios';
 import { corretoresPublicos, comCorretores } from './corretores';
@@ -48,6 +48,8 @@ export type DevelopmentCardData = {
   id: string;
   /** unidades disponíveis pela tabela de vendas mais recente (só lançamento, obras e pronto novo) */
   disponiveis?: number | null;
+  /** 100% vendido (marcado pela equipe), só lançamento, obras e entregue há até 12 meses */
+  vendido100?: boolean;
   slug?: string;
   concepcao?: string | null; // construtoras/incorporadoras, ex.: "Consciente · EBM"
   destaqueTamanho?: 2 | 3;
@@ -594,8 +596,9 @@ async function getDevelopmentCards(ids: string[]): Promise<DevelopmentCardData[]
       visualizacoes: Number(row.visualizacoes) || 0,
       tipo: base.tipo,
       anuncios: Number(row.anuncios) || 0,
+      vendido100: mostrarVendido100((row as { vendido_100?: boolean }).vendido_100, base.deliveryDate),
       // só com tabela recente (até 3 meses) e só lançamento, obras ou pronto novo
-      disponiveis:
+      disponiveis: mostrarVendido100((row as { vendido_100?: boolean }).vendido_100, base.deliveryDate) ? null :
         base.deliveryDate && ['breve_lancamento', 'lancamento', 'obras', 'novo'].includes(getStatusBucket(base.deliveryDate))
           ? disponiveisParaMostrar(
               (row as { disponiveis?: number | null }).disponiveis,

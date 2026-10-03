@@ -9,7 +9,8 @@ import CollapsibleText from '@/components/CollapsibleText';
 import PlantaViewer from '@/components/PlantaViewer';
 import ContatoLateral from '@/components/ContatoLateral';
 import DisponiveisBadge, { LIMITE_ESCASSEZ } from '@/components/DisponiveisBadge';
-import { disponiveisParaMostrar } from '@/lib/disponibilidade';
+import { disponiveisParaMostrar, mostrarVendido100 } from '@/lib/disponibilidade';
+import VendidoBadge from '@/components/VendidoBadge';
 import BotaoWhatsapp from '@/components/BotaoWhatsapp';
 import RelatedListings, { faixaDePreco } from '@/components/RelatedListings';
 import { getRelatedListings, getOcultosDoCondominio, getOcultosPerto, mercadoDoBairro, condominiosProximos, lancamentosProximos } from '@/lib/actions';
@@ -256,8 +257,17 @@ export default async function DevelopmentDetailView({ development }: { developme
               </div>
             )}
 
+            {/* 100% vendido (marcado pela equipe): no lugar das unidades disponíveis */}
+            {mostrarVendido100(development.vendido100, development.deliveryDate) && (
+              <div className="mt-6 flex flex-col gap-2 rounded-[20px] border border-[var(--border)] p-5">
+                <VendidoBadge />
+                <p className="text-[14px]">Todas as unidades do {development.name} foram vendidas pela incorporadora.</p>
+                <p className="text-[13px] text-[var(--text-muted)]">Fale conosco: podemos ter unidades de revenda neste empreendimento.</p>
+              </div>
+            )}
+
             {/* Unidades disponíveis por metragem: tabela de vendas mais recente (lançamento, obras ou pronto novo) */}
-            {lancamentoOuNovo(development.deliveryDate) && disponiveisParaMostrar(development.disponiveis, development.tabelaReferencia) && development.disponibilidade?.length ? (
+            {!mostrarVendido100(development.vendido100, development.deliveryDate) && lancamentoOuNovo(development.deliveryDate) && disponiveisParaMostrar(development.disponiveis, development.tabelaReferencia) && development.disponibilidade?.length ? (
               <div className="mt-6">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-lg font-bold">Unidades disponíveis</h2>
