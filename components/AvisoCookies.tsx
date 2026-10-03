@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 // Aviso de cookies (LGPD). "Aceitar" libera Analytics e pixels de anúncio (Modo de
 // Consentimento do Google); "Só os necessários" mantém o site funcionando sem rastreamento.
@@ -13,6 +14,7 @@ declare global {
 
 export default function AvisoCookies() {
   const [mostrar, setMostrar] = useState(false);
+  const pathname = usePathname() ?? '';
   useEffect(() => {
     if (!/(?:^|; )mn_consent=/.test(document.cookie)) setMostrar(true);
   }, []);
@@ -22,7 +24,8 @@ export default function AvisoCookies() {
     window.gtag?.('consent', 'update', { ad_storage: v, ad_user_data: v, ad_personalization: v, analytics_storage: v });
     setMostrar(false);
   };
-  if (!mostrar) return null;
+  // o painel da equipe não mostra o aviso (área interna, sem rastreamento de visitante)
+  if (!mostrar || pathname.startsWith('/dashboard')) return null;
   return (
     <div role="dialog" aria-label="Aviso de cookies" className="fixed inset-x-3 bottom-3 z-[95] mx-auto flex max-w-[720px] flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4 shadow-2xl md:flex-row md:items-center">
       <p className="flex-1 text-[13px] leading-relaxed text-[var(--text-muted)]">

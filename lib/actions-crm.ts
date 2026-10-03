@@ -810,3 +810,54 @@ export async function salvarConfiguracaoIA(c: import('./crm-config').ConfigIA): 
     instrucoesExtras: String(c.instrucoesExtras ?? '').slice(0, 3000)
   });
 }
+
+// ---------------- Panorama (Início do painel) ----------------
+export type Panorama = {
+  esperando: number;
+  tarefas: number;
+  atrasadas: number;
+  visitas: number;
+  semDono: number;
+  negociosAbertos: number;
+  novos7d: number;
+  ganhosMes: number;
+  valorGanhoMes: number;
+  porEtapa: { etapa: string; n: number }[];
+  todaEquipe: boolean;
+};
+
+/** Visão geral do CRM no nível de cada pessoa: admin e analista veem a equipe toda; corretor, só os dele. */
+export async function crmPanorama(): Promise<Panorama> {
+  const s = await exigirEquipe();
+  const hoje = await crmHoje();
+  const neg = comEscopo(
+    s,
+    `select count(*) filter (where n.etapa not in ('ganho', 'perdido')) abertos,
+            count(*) filter (where n.etapa = 'ganho' and coalesce(n.etapa_desde, n.criado_em) >= date_trunc('month', now() at time zone 'America/Sao_Paulo')) ganhos,
+            coalesce(sum(n.valor) filter (where n.etapa = 'ganho' and coalesce(n.etapa_desde, n.criado_em) >= date_trunc('month', now() at time zone 'America/Sao_Paulo')), 0) valor
+       from crm_negocios n where {ESCOPO}`,
+    [],
+    'n.corretor_email'
+  );
+  const etapas = comEscopo(
+    s,
+    `select n.etapa, count(*) n from crm_negocios n where n.etapa not in ('ganho', 'perdido') and {ESCOPO} group by 1 order by 2 desc limit 6`,
+    [],
+    'n.corretor_email'
+  );
+  const novos = comEscopo(s, `select count(*) n from crm_contatos c where c.criado_em > now() - interval '7 days' and {ESCOPO}`, []);
+  const [a, b, c] = await Promise.all([
+    query<Record<string, string>>(neg.sql, neg.params),
+    query<Record<string, string>>(etapas.sql, etapas.params),
+    query<Record<string, string>>(novos.sql, novos.params)
+  ]);
+  return {
+    ...hoje.numeros,
+    negociosAbertos: Number(a[0]?.abertos) || 0,
+    ganhosMes: Number(a[0]?.ganhos) || 0,
+    valorGanhoMes: Number(a[0]?.valor) || 0,
+    novos7d: Number(c[0]?.n) || 0,
+    porEtapa: b.map((x) => ({ etapa: x.etapa, n: Number(x.n) || 0 })),
+    todaEquipe: veTudo(s.role)
+  };
+}

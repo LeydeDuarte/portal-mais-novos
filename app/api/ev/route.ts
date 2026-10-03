@@ -65,7 +65,22 @@ export async function POST(request: Request) {
       return r;
     }
   }
-  await query('insert into eventos (tipo, pagina, ref, visitante, novo, origem, valor) values ($1, $2, $3, $4, $5, $6, $7)', [b.t, pagina, ref, vid, novo && b.t === 'visita', origem, valor]).catch(() => {});
+  // cidade e estado aproximados pelo IP (a Vercel informa; nunca o bairro nem o endereço)
+  const geo = (k: string) => {
+    const v = h.get(k);
+    if (!v) return null;
+    try {
+      return decodeURIComponent(v).slice(0, 80);
+    } catch {
+      return v.slice(0, 80);
+    }
+  };
+  const cidade = b.t === 'visita' ? geo('x-vercel-ip-city') : null;
+  const uf = b.t === 'visita' ? geo('x-vercel-ip-country-region') : null;
+  const pais = b.t === 'visita' ? geo('x-vercel-ip-country') : null;
+  await query('insert into eventos (tipo, pagina, ref, visitante, novo, origem, valor, cidade, uf, pais) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)', [
+    b.t, pagina, ref, vid, novo && b.t === 'visita', origem, valor, cidade, uf, pais
+  ]).catch(() => {});
   if (b.t === 'banner' && ref) await query('update banners set cliques = cliques + 1 where id = $1', [ref]).catch(() => {});
   const res = new NextResponse(null, { status: 204 });
   if (novo) res.cookies.set('mn_vid', vid, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });

@@ -5,35 +5,15 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { temAcessoFinanceiro } from '@/lib/actions-custos';
-import { veTudo, ROLE_LABEL } from '@/lib/papeis';
+import { ROLE_LABEL } from '@/lib/papeis';
+import { ORDEM_MENU, TODAS, podeVer, rotuloFerramenta, soAdminPrincipal, type Ferramenta } from '@/lib/painel-menu';
 import Logo from './Logo';
 import { SITE_URL } from '@/lib/seo';
 
-const LINKS: { href: string; label: string; admin?: boolean; gestor?: boolean; financeiro?: boolean }[] = [
-  { href: '/dashboard', label: 'Início' },
-  { href: '/dashboard/crm', label: 'CRM' },
-  { href: '/dashboard/resultados', label: 'Resultados', admin: true },
-  { href: '/dashboard/custos', label: 'Custos', financeiro: true },
-  { href: '/dashboard/imoveis', label: 'Imóveis' },
-  { href: '/dashboard/condominios', label: 'Condomínios' },
-  { href: '/dashboard/mapa', label: 'Mapa' },
-  { href: '/dashboard/proprietarios', label: 'Proprietários' },
-  { href: '/dashboard/propostas', label: 'Propostas' },
-  { href: '/dashboard/interessados', label: 'Interessados' },
-  { href: '/dashboard/avisos', label: 'Para avisar' },
-  { href: '/dashboard/vender', label: 'Quero vender' },
-  { href: '/dashboard/empresas', label: 'Construtoras' },
-  { href: '/dashboard/clientes', label: 'Clientes' },
-  { href: '/dashboard/mercado', label: 'Mercado' },
-  { href: '/dashboard/monitoramento', label: 'Monitoramento' },
-  { href: '/dashboard/importar-pdf', label: 'Importar PDFs' },
-  { href: '/dashboard/importar-imagens', label: 'Importar imagens', gestor: true },
-  { href: '/dashboard/cadastro-ia', label: 'Cadastro IA' },
-  { href: '/dashboard/news', label: 'News', gestor: true },
-  { href: '/dashboard/feed-especiais', label: 'Depoimentos e destaques', gestor: true },
-  { href: '/dashboard/jetimob', label: 'Migração Jetimob', admin: true },
-  { href: '/dashboard/equipe', label: 'Equipe', admin: true },
-  { href: '/dashboard/perfil', label: 'Meu perfil' }
+// Itens do menu: lista única em lib/painel-menu.ts (também usada na tela inicial)
+const LINKS = [
+  { href: '/dashboard', label: 'Início', acesso: 'todos' as const },
+  ...ORDEM_MENU.map((h) => TODAS.find((f) => f.href === h)).filter((f): f is Ferramenta => !!f)
 ];
 
 // Topo do painel (fixo): marca + atalhos à esquerda, pessoa e Sair à direita;
@@ -156,18 +136,16 @@ export default function PainelNav() {
           </button>
         )}
         <nav ref={menuRef} className="flex h-12 items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:px-6">
-          {LINKS.filter((l) =>
-            staff.role === 'financeiro'
-              ? l.financeiro
-              : (!l.admin || staff.role === 'admin') && (!l.gestor || veTudo(staff.role)) && (!l.financeiro || financeiro)
-          ).map((l) => (
+          {LINKS.filter((l) => l.href === '/dashboard' ? staff.role !== 'financeiro' : podeVer(l as Ferramenta, staff.role, financeiro)).map((l) => (
             <Link
               key={l.href}
               href={l.href}
               aria-current={ativo(l.href) ? 'page' : undefined}
+              title={l.href !== '/dashboard' && soAdminPrincipal(l as Ferramenta) ? 'Só o administrador principal vê' : undefined}
               className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition ${ativo(l.href) ? 'bg-ink text-white' : 'hover:bg-[var(--pill-bg)]'}`}
             >
-              {l.href === '/dashboard/imoveis' && !veTudo(staff.role) ? 'Meus imóveis' : l.label}
+              {l.href === '/dashboard' ? l.label : rotuloFerramenta(l as Ferramenta, staff.role)}
+              {l.href !== '/dashboard' && soAdminPrincipal(l as Ferramenta) && <span className={ativo(l.href) ? 'ml-0.5' : 'ml-0.5 text-accent'}>*</span>}
             </Link>
           ))}
         </nav>

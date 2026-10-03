@@ -196,3 +196,17 @@ html, body { overflow-x: clip; max-width: 100%; }
 .maplibregl-ctrl-attrib { font-size: 10px; line-height: 1.3; }
 .maplibregl-ctrl-attrib.maplibregl-compact { min-height: 20px; }
 .maplibregl-ctrl-attrib.maplibregl-compact-show { max-width: min(260px, 70vw); }
+
+/* Painel e login da equipe: céu claro e o sol que nasce ao abrir a tela */
+:root { --ceu: #eaf3ff; --ceu-texto: #14161a; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) { --ceu: #0f1d33; --ceu-texto: #f3f4f6; }
+}
+@keyframes mn-sol-sobe {
+  from { transform: translateY(46%); }
+  to { transform: translateY(0); }
+}
+.mn-sol-sobe { transform-box: view-box; animation: mn-sol-sobe 1.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .mn-sol-sobe { animation: none; }
+}

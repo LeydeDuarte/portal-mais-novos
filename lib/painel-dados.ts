@@ -5,6 +5,7 @@
 // contatos (interest_leads). Visitas da equipe logada e de robôs não entram.
 import { query } from './db';
 import { exigirEquipe } from './staff-auth';
+import { veTudo } from './papeis';
 import { sincronizarCRM } from './crm';
 
 export type Periodo = 'hoje' | '7d' | 'mes' | 'mes-passado' | '30d' | 'personalizado';
@@ -44,6 +45,14 @@ export type DadosPainel = {
   /** de onde vêm os CONTATOS (leads) e quanto cada fonte avança no funil do CRM */
   fontes: LinhaFonte[];
   campanhas: LinhaFonte[];
+  /** visitantes novos (primeira visita) nas últimas 24 h, 7 e 30 dias, sem depender do período */
+  novosRecentes: { h24: number; d7: number; d30: number };
+  /** imóveis e condomínios com mais cliques no WhatsApp no período */
+  chamadasWhatsapp: LinhaTop[];
+  /** bairros dos imóveis e condomínios que as pessoas abriram (n = visitas, whatsapp = cliques) */
+  bairros: LinhaTop[];
+  /** cidade aproximada de quem visitou (pelo IP; nunca o bairro) */
+  cidades: LinhaTop[];
 };
 export type LinhaFonte = { canal: string; pago: boolean; campanha?: string | null; leads: number; andamento: number; avancados: number; ganhos: number; perdidos: number; valorGanho: number };
 
@@ -86,7 +95,7 @@ const n = (v: unknown) => Number(v ?? 0) || 0;
 
 export async function dadosDoPainel(periodo: Periodo = 'mes', de?: string, ate?: string): Promise<DadosPainel | null> {
   const eu = await exigirEquipe();
-  if (eu.role !== 'admin') return null; // só o administrador principal
+  if (!veTudo(eu.role)) return null; // administrador e analista (custos ficam de fora: são outra tela)
   const [deSql, ateSql] = intervalo(periodo, de, ate);
   // eventos no período (em horário de Brasília)
   // fora as visitas dos aparelhos da equipe (marcados quando alguém da equipe entra no painel)
@@ -208,6 +217,37 @@ export async function dadosDoPainel(periodo: Periodo = 'mes', de?: string, ate?:
     query<Record<string, string>>(fontesSql('canal, pago, campanha', 'and c.campanha is not null', 15)),
     query<Record<string, string>>(`select to_char(${deSql}, 'YYYY-MM-DD') de, to_char(${ateSql} - 1, 'YYYY-MM-DD') ate`)
   ]);
+  const EVSEMDATA = `coalesce(visitante, '') not in (select visitante from visitantes_equipe)`;
+  const [recentes, chamadas, bairros, cidades] = await Promise.all([
+    query<Record<string, string>>(
+      `select count(*) filter (where created_at > now() - interval '24 hours') h24,
+              count(*) filter (where created_at > now() - interval '7 days') d7,
+              count(*) filter (where created_at > now() - interval '30 days') d30
+         from eventos where tipo = 'visita' and novo and created_at > now() - interval '30 days' and ${EVSEMDATA}`
+    ),
+    query<Record<string, string>>(
+      `with w as (select pagina, ${ultimo} slug, count(*) n from eventos where ${EV} and tipo = 'whatsapp' and (pagina like '/imovel/%' or pagina like '/empreendimento/%') group by 1, 2)
+       select coalesce(d.name, p.titulo, p.condominio, initcap(replace(p.tipo_unidade, '_', ' '))) nome,
+              case when d.id is not null then 'Condomínio' || coalesce(', ' || d.bairro, '') else 'Anúncio' || coalesce(', ' || coalesce(p.condominio, p.bairro), '') end sub,
+              min(w.pagina) url, sum(w.n) n
+         from w left join developments d on w.pagina like '/empreendimento/%' and (d.slug = w.slug or d.id = w.slug)
+                left join properties p on w.pagina like '/imovel/%' and (p.slug = w.slug or p.id = w.slug)
+        where d.id is not null or p.id is not null
+        group by d.id, d.name, d.bairro, p.id, p.titulo, p.condominio, p.tipo_unidade, p.bairro order by n desc limit 10`
+    ),
+    query<Record<string, string>>(
+      `with e as (select pagina, tipo, ${ultimo} slug from eventos where ${EV} and tipo in ('visita', 'whatsapp') and (pagina like '/imovel/%' or pagina like '/empreendimento/%')),
+            b as (select coalesce(d.bairro, p.bairro) bairro, coalesce(d.cidade, p.cidade) cidade, e.tipo
+                    from e left join developments d on e.pagina like '/empreendimento/%' and (d.slug = e.slug or d.id = e.slug)
+                           left join properties p on e.pagina like '/imovel/%' and (p.slug = e.slug or p.id = e.slug))
+       select bairro nome, cidade sub, count(*) filter (where tipo = 'visita') n, count(*) filter (where tipo = 'whatsapp') whatsapp
+         from b where bairro is not null group by bairro, cidade order by n desc limit 15`
+    ),
+    query<Record<string, string>>(
+      `select cidade nome, concat_ws(', ', uf, nullif(pais, 'BR')) sub, count(distinct visitante) n
+         from eventos where ${EV} and tipo = 'visita' and cidade is not null group by cidade, uf, pais order by n desc limit 15`
+    )
+  ]);
   const t = tot[0] ?? {};
   return {
     periodo: { de: datas[0]?.de ?? '', ate: datas[0]?.ate ?? '' },
@@ -242,7 +282,11 @@ export async function dadosDoPainel(periodo: Periodo = 'mes', de?: string, ate?:
     banners: banners.map((p) => ({ nome: p.nome, sub: p.url ? `mais clicado em ${p.url}` : null, url: p.url, n: n(p.n) })),
     origens: origens.map((p) => ({ nome: p.nome, n: n(p.n) })),
     fontes: fontes.map(fonte),
-    campanhas: campanhas.map(fonte)
+    campanhas: campanhas.map(fonte),
+    novosRecentes: { h24: n(recentes[0]?.h24), d7: n(recentes[0]?.d7), d30: n(recentes[0]?.d30) },
+    chamadasWhatsapp: chamadas.map((p) => ({ nome: p.nome, sub: p.sub, url: p.url, n: n(p.n) })),
+    bairros: bairros.map((p) => ({ nome: p.nome, sub: p.sub, n: n(p.n), whatsapp: n(p.whatsapp) })),
+    cidades: cidades.map((p) => ({ nome: p.nome, sub: p.sub || null, n: n(p.n) }))
   };
 }
 
@@ -252,7 +296,7 @@ export type Online = { total: number; paginas: { pagina: string; nome: string; n
 /** Visitantes com a página aberta e visível nos últimos N minutos (5, 10 ou 30) */
 export async function onlineAgora(minutos = 5): Promise<Online | null> {
   const eu = await exigirEquipe();
-  if (eu.role !== 'admin') return null;
+  if (!veTudo(eu.role)) return null;
   const m = [5, 10, 30].includes(minutos) ? minutos : 5;
   const JANELA = `visto_em > now() - interval '${m} minutes'`;
   const nome = `coalesce(
@@ -272,4 +316,71 @@ export async function onlineAgora(minutos = 5): Promise<Online | null> {
     origens: ori.map((x) => ({ nome: x.nome, n: Number(x.n) })),
     atualizadoEm: new Date().toISOString()
   };
+}
+
+// ---------------- comparativo (só o administrador principal) ----------------
+export type Agrupamento = 'mes' | 'trimestre' | 'semestre' | 'ano';
+export type LinhaComparativo = {
+  periodo: string; // "3º tri 2026", "1º sem 2026", "2026", "out/2026"
+  inicio: string;
+  acessos: number;
+  visitantes: number;
+  novos: number;
+  cliquesWhatsapp: number;
+  contatos: number;
+  ganhos: number;
+  valorGanho: number;
+};
+
+/** Números do portal agrupados por mês, trimestre, semestre ou ano (do mais antigo ao mais recente). */
+export async function comparativo(agrupar: Agrupamento = 'trimestre'): Promise<LinhaComparativo[] | null> {
+  const eu = await exigirEquipe();
+  if (eu.role !== 'admin') return null;
+  const g = (['mes', 'trimestre', 'semestre', 'ano'] as const).includes(agrupar) ? agrupar : 'trimestre';
+  const data = (col: string) => `(${col} at time zone 'America/Sao_Paulo')`;
+  // início do período de cada data
+  const inicio = (col: string) =>
+    g === 'mes'
+      ? `date_trunc('month', ${data(col)})::date`
+      : g === 'trimestre'
+        ? `date_trunc('quarter', ${data(col)})::date`
+        : g === 'ano'
+          ? `date_trunc('year', ${data(col)})::date`
+          : `make_date(extract(year from ${data(col)})::int, case when extract(month from ${data(col)}) <= 6 then 1 else 7 end, 1)`;
+  const SEM_EQUIPE = `coalesce(visitante, '') not in (select visitante from visitantes_equipe)`;
+  const [ev, ct, gn] = await Promise.all([
+    query<Record<string, string>>(
+      `select to_char(${inicio('created_at')}, 'YYYY-MM-DD') ini,
+              count(*) filter (where tipo = 'visita') acessos, count(distinct visitante) filter (where tipo = 'visita') visitantes,
+              count(*) filter (where tipo = 'visita' and novo) novos, count(*) filter (where tipo = 'whatsapp') whatsapp
+         from eventos where ${SEM_EQUIPE} group by 1`
+    ),
+    query<Record<string, string>>(`select to_char(${inicio('criado_em')}, 'YYYY-MM-DD') ini, count(*) n from crm_contatos group by 1`).catch(() => []),
+    query<Record<string, string>>(
+      `select to_char(${inicio('coalesce(etapa_desde, criado_em)')}, 'YYYY-MM-DD') ini, count(*) n, coalesce(sum(valor), 0) valor
+         from crm_negocios where etapa = 'ganho' group by 1`
+    ).catch(() => [])
+  ]);
+  const mapa = new Map<string, LinhaComparativo>();
+  const pegar = (ini: string) => {
+    let l = mapa.get(ini);
+    if (!l) {
+      const [a, m] = ini.split('-').map(Number);
+      const nome =
+        g === 'mes'
+          ? `${['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][m - 1]}/${a}`
+          : g === 'trimestre'
+            ? `${Math.floor((m - 1) / 3) + 1}º tri ${a}`
+            : g === 'semestre'
+              ? `${m <= 6 ? 1 : 2}º sem ${a}`
+              : String(a);
+      l = { periodo: nome, inicio: ini, acessos: 0, visitantes: 0, novos: 0, cliquesWhatsapp: 0, contatos: 0, ganhos: 0, valorGanho: 0 };
+      mapa.set(ini, l);
+    }
+    return l;
+  };
+  for (const r of ev) Object.assign(pegar(r.ini), { acessos: n(r.acessos), visitantes: n(r.visitantes), novos: n(r.novos), cliquesWhatsapp: n(r.whatsapp) });
+  for (const r of ct) pegar(r.ini).contatos = n(r.n);
+  for (const r of gn) Object.assign(pegar(r.ini), { ganhos: n(r.n), valorGanho: n(r.valor) });
+  return Array.from(mapa.values()).sort((a, b) => a.inicio.localeCompare(b.inicio));
 }
