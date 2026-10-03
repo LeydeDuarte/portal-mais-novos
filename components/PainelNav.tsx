@@ -27,6 +27,7 @@ const LINKS: { href: string; label: string; admin?: boolean; gestor?: boolean; f
   { href: '/dashboard/mercado', label: 'Mercado' },
   { href: '/dashboard/monitoramento', label: 'Monitoramento' },
   { href: '/dashboard/importar-pdf', label: 'Importar PDFs' },
+  { href: '/dashboard/importar-imagens', label: 'Importar imagens', gestor: true },
   { href: '/dashboard/cadastro-ia', label: 'Cadastro IA' },
   { href: '/dashboard/news', label: 'News', gestor: true },
   { href: '/dashboard/feed-especiais', label: 'Depoimentos e destaques', gestor: true },

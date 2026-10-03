@@ -200,3 +200,12 @@ export async function extrairImagensPdf(arquivo: File, minLado = 480, maxImagens
   }
   return out;
 }
+
+/** Quantas páginas o PDF tem (importação em massa) */
+export async function contarPaginas(arquivo: File): Promise<number> {
+  const pdfjs = await carregarPdfJs();
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await arquivo.arrayBuffer()), isEvalSupported: false }).promise;
+  const n = pdf.numPages;
+  await pdf.destroy();
+  return n;
+}
