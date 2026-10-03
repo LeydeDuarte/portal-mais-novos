@@ -40,7 +40,7 @@ export function BuscaGrande({ value, onChange, placeholder }: { value: string; o
   );
 }
 
-export function SecaoFiltro({ titulo, children }: { titulo: string; children: ReactNode }) {
+export function SecaoFiltro({ titulo, children }: { titulo: ReactNode; children: ReactNode }) {
   return (
     <div>
       <div className="mb-2.5 text-[12px] font-bold uppercase tracking-wide">{titulo}</div>

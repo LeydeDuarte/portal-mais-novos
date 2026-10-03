@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { BUCKET_LABEL } from '@/lib/classification';
 import { DEFAULT_FILTERS, countActiveFilters, localKey, NUMEROS_FILTRO, rotuloNumero, alternarNumero, type FilterState, type LocalFiltro } from '@/lib/filters';
 import { getLocationIndex, type LocalSugestao } from '@/lib/actions';
+import { SinoRecepcao } from '@/components/TemporadaBadge';
 import { TIPO_UNIDADE_GRUPOS, TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 
 // Filtros do feed na LATERAL ESQUERDA (recolhível). No topo ficam só Todos /
@@ -183,7 +184,7 @@ export default function FiltrosLaterais({ filters, onChange, aoEscolherLocal }: 
     ...(filters.banheiros?.length ? [{ k: 'b', rotulo: nums(filters.banheiros, 'banheiros'), tirar: () => set('banheiros', []) }] : []),
     ...(filters.vagas?.length ? [{ k: 'v', rotulo: nums(filters.vagas, 'vagas'), tirar: () => set('vagas', []) }] : []),
     ...(filters.anoMin || filters.anoMax ? [{ k: 'ano', rotulo: `Entrega ${faixa(filters.anoMin, filters.anoMax, String)}`, tirar: () => onChange({ ...filters, anoMin: null, anoMax: null }) }] : []),
-    ...(filters.aceitaTemporada !== 'todas' ? [{ k: 'temp', rotulo: 'Aceita temporada', tirar: () => set('aceitaTemporada', 'todas') }] : [])
+    ...(filters.aceitaTemporada !== 'todas' ? [{ k: 'temp', rotulo: 'Temporada', tirar: () => set('aceitaTemporada', 'todas') }] : [])
   ];
 
   return (
@@ -227,6 +228,24 @@ export default function FiltrosLaterais({ filters, onChange, aoEscolherLocal }: 
       <Secao titulo="Localização">
         <Localizacao filters={filters} onChange={onChange} aoEscolher={aoEscolherLocal} />
       </Secao>
+
+      {/* Temporada logo abaixo da localização: um botão só, com o sininho */}
+      <div>
+        <button
+          type="button"
+          aria-pressed={filters.aceitaTemporada === 'sim'}
+          title="Mostrar só anúncios que aceitam aluguel por temporada"
+          onClick={() => set('aceitaTemporada', filters.aceitaTemporada === 'sim' ? 'todas' : 'sim')}
+          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition ${
+            filters.aceitaTemporada === 'sim' ? 'border-[#FF385C] bg-[#FF385C] text-white' : 'border-[var(--border)] hover:bg-[var(--pill-bg)]'
+          }`}
+        >
+          <span className={filters.aceitaTemporada === 'sim' ? '' : 'text-[#FF385C]'}>
+            <SinoRecepcao size={14} />
+          </span>
+          Temporada
+        </button>
+      </div>
 
       <Secao titulo="Tipo de imóvel">
         <div className="flex flex-col gap-3">
@@ -306,12 +325,6 @@ export default function FiltrosLaterais({ filters, onChange, aoEscolherLocal }: 
             </button>
           ))}
         </div>
-      </Secao>
-
-      <Secao titulo="Temporada">
-        <button type="button" className={chip(filters.aceitaTemporada === 'sim')} onClick={() => set('aceitaTemporada', filters.aceitaTemporada === 'sim' ? 'todas' : 'sim')}>
-          Aceita temporada
-        </button>
       </Secao>
 
       {ativos > 0 && (

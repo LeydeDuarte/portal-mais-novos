@@ -16,6 +16,7 @@ import { deleteProperty, marcarComoVendido, marcarDestaqueFeed } from '@/lib/act
 import { linkParaCorretor, listarImoveisPainel, mudarVisibilidade, type ImovelPainel } from '@/lib/actions-painel-imoveis';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
 import { veTudo } from '@/lib/papeis';
+import { SinoRecepcao } from '@/components/TemporadaBadge';
 
 const sa = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const POR_PAGINA = 48;
@@ -35,8 +36,10 @@ type Filtros = {
   precoMin: string;
   precoMax: string;
   corretor: string;
+  temporada: string;
 };
-const VAZIO: Filtros = { busca: '', condominio: '', proprietario: '', tipo: '', finalidade: '', status: '', quartos: '', banheiros: '', vagas: '', areaMin: '', areaMax: '', precoMin: '', precoMax: '', corretor: '' };
+const VAZIO: Filtros = { busca: '', condominio: '', proprietario: '', tipo: '', finalidade: '', status: '', quartos: '', banheiros: '', vagas: '', areaMin: '', areaMax: '', precoMin: '', precoMax: '', corretor: '', temporada: '' };
+const TEMPORADA: Record<string, string> = { sim: 'Aceita', nao: 'Não aceita', ni: 'Não informado' };
 const STATUS: Record<string, string> = { publico: 'Públicos', privado: 'Privados', vendido: 'Vendidos', sem_prop: 'Sem proprietário', sem_foto: 'Sem foto' };
 
 // Painel → Imóveis: busca grande, filtros na lateral (chips), cards com foto à
@@ -101,6 +104,8 @@ export default function ImoveisPainelPage() {
       if (f.precoMin && (i.preco ?? 0) < num(f.precoMin)) return false;
       if (f.precoMax && (i.preco ?? 0) > num(f.precoMax)) return false;
       if (f.corretor && i.corretorEmail !== f.corretor) return false;
+      const temps = marcados(f.temporada);
+      if (temps.length && !temps.includes(i.aceitaTemporada == null ? 'ni' : i.aceitaTemporada ? 'sim' : 'nao')) return false;
       if (c && !sa(i.condominio ?? '').includes(c)) return false;
       if (pr && !i.proprietarios.some((p) => sa(p.nome).includes(pr) || (prDig.length >= 4 && ((p.documento ?? '').includes(prDig) || (p.whatsapp ?? '').includes(prDig)))))
         return false;
@@ -140,7 +145,8 @@ export default function ImoveisPainelPage() {
     f.proprietario && { rotulo: `Prop.: ${f.proprietario}`, tirar: () => set('proprietario', '') },
     (f.areaMin || f.areaMax) && { rotulo: `${f.areaMin || 0}–${f.areaMax || '∞'} m²`, tirar: () => setF((x) => ({ ...x, areaMin: '', areaMax: '' })) },
     (f.precoMin || f.precoMax) && { rotulo: `R$ ${f.precoMin || 0}–${f.precoMax || '∞'}`, tirar: () => setF((x) => ({ ...x, precoMin: '', precoMax: '' })) },
-    f.corretor && { rotulo: f.corretor, tirar: () => set('corretor', '') }
+    f.corretor && { rotulo: f.corretor, tirar: () => set('corretor', '') },
+    f.temporada && { rotulo: `Temporada: ${marcados(f.temporada).map((x) => TEMPORADA[x] ?? x).join(', ')}`, tirar: () => set('temporada', '') }
   ].filter(Boolean) as { rotulo: string; tirar: () => void }[];
 
   // Link público para o cliente, com a linha do anúncio em cima (tipo, local, quartos, m², preço)
@@ -182,6 +188,9 @@ export default function ImoveisPainelPage() {
     <div className="flex flex-col gap-6">
       <SecaoFiltro titulo="Situação">
         <Chips opcoes={Object.entries(STATUS).map(([v, l]) => ({ v, l }))} valor={f.status} onChange={(v) => set('status', v)} multi />
+      </SecaoFiltro>
+      <SecaoFiltro titulo={<span className="flex items-center gap-1.5"><span className="text-[#FF385C]"><SinoRecepcao size={13} /></span>Temporada</span>}>
+        <Chips opcoes={Object.entries(TEMPORADA).map(([v, l]) => ({ v, l, n: (itens ?? []).filter((i) => (i.aceitaTemporada == null ? 'ni' : i.aceitaTemporada ? 'sim' : 'nao') === v).length }))} valor={f.temporada} onChange={(v) => set('temporada', v)} multi />
       </SecaoFiltro>
       <SecaoFiltro titulo="Tipo">
         <Chips opcoes={porTipo.map(([v, n]) => ({ v, l: TIPO_UNIDADE_LABEL[v as TipoUnidade] ?? v, n }))} valor={f.tipo} onChange={(v) => set('tipo', v)} multi />

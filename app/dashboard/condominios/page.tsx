@@ -1,6 +1,6 @@
 'use client';
 
-import TemporadaBadge from '@/components/TemporadaBadge';
+import TemporadaBadge, { SinoRecepcao } from '@/components/TemporadaBadge';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -29,8 +29,8 @@ const COR: Record<StatusBucket, string> = {
   antigo: '#75787e'
 };
 
-type Filtros = { nome: string; uf: string; cidade: string; bairro: string; empresa: string; anoDe: string; anoAte: string; data: string; status: string; fase: string; tipo: string };
-const VAZIO: Filtros = { nome: '', uf: '', cidade: '', bairro: '', empresa: '', anoDe: '', anoAte: '', data: '', status: '', fase: '', tipo: '' };
+type Filtros = { nome: string; uf: string; cidade: string; bairro: string; empresa: string; anoDe: string; anoAte: string; data: string; status: string; fase: string; tipo: string; temporada: string };
+const VAZIO: Filtros = { nome: '', uf: '', cidade: '', bairro: '', empresa: '', anoDe: '', anoAte: '', data: '', status: '', fase: '', tipo: '', temporada: '' };
 
 // "Mais informações" = mais fotos, texto, data e anúncios (o principal ao unificar)
 const pontos = (c: CondoPainel) => c.fotos * 3 + Math.min(c.descricao, 2000) / 100 + (c.entrega ? 5 : 0) + c.anuncios * 4 + c.empresas.length * 2;
@@ -86,6 +86,7 @@ export default function CondominiosPage() {
       if (f.status && !marcados(f.status).includes(c.status)) return false;
       if (f.tipo && !marcados(f.tipo).includes(c.tipo)) return false;
       if (f.fase && !marcados(f.fase).includes(fase as string)) return false;
+      if (f.temporada && !marcados(f.temporada).includes(c.aceitaTemporada ? 'sim' : 'nao')) return false;
       return true;
     });
   }, [comFase, f]);
@@ -144,6 +145,9 @@ export default function CondominiosPage() {
           </select>
         </div>
       </SecaoFiltro>
+      <SecaoFiltro titulo={<span className="flex items-center gap-1.5"><span className="text-[#FF385C]"><SinoRecepcao size={13} /></span>Temporada</span>}>
+        <Chips opcoes={[{ v: 'sim', l: 'Aceita' }, { v: 'nao', l: 'Não marcado' }]} valor={f.temporada} onChange={(v) => set('temporada', v)} multi />
+      </SecaoFiltro>
       <SecaoFiltro titulo="Construtora / incorporadora">
         <select className={campoPainel} value={f.empresa} onChange={(e) => set('empresa', e.target.value)}>
           <option value="">Todas</option>
@@ -158,6 +162,7 @@ export default function CondominiosPage() {
     f.data && { rotulo: marcados(f.data).map((x) => (x === 'com' ? 'Com data' : 'Sem data')).join(', '), tirar: () => set('data', '') },
     (f.anoDe || f.anoAte) && { rotulo: `Entrega ${f.anoDe || '…'}–${f.anoAte || '…'}`, tirar: () => setF((x) => ({ ...x, anoDe: '', anoAte: '' })) },
     f.tipo && { rotulo: marcados(f.tipo).map((x) => (x === 'vertical' ? 'Vertical' : 'Horizontal')).join(', '), tirar: () => set('tipo', '') },
+    f.temporada && { rotulo: `Temporada: ${marcados(f.temporada).map((x) => (x === 'sim' ? 'Aceita' : 'Não marcado')).join(', ')}`, tirar: () => set('temporada', '') },
     f.status && { rotulo: marcados(f.status).map((x) => (x === 'publicado' ? 'Publicados' : 'Rascunhos')).join(', '), tirar: () => set('status', '') },
     f.uf && { rotulo: f.uf, tirar: () => set('uf', '') },
     f.cidade && { rotulo: f.cidade, tirar: () => set('cidade', '') },

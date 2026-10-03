@@ -30,6 +30,8 @@ export type ImovelPainel = {
   destaque: boolean;
   destaqueTamanho: 2 | 3;
   temVideo: boolean;
+  /** null = não informado no cadastro */
+  aceitaTemporada: boolean | null;
   quartos: number | null;
   banheiros: number | null;
   vagas: number | null;
@@ -80,6 +82,7 @@ function mapear(r: Row): ImovelPainel {
     destaque: !!r.destaque,
     destaqueTamanho: r.destaque_tamanho === 3 ? 3 : 2,
     temVideo: !!r.video && !!r.video_url,
+    aceitaTemporada: r.aceita_temporada == null ? null : !!r.aceita_temporada,
     quartos: n(r.quartos),
     banheiros: n(r.banheiros),
     vagas: n(r.vagas),
