@@ -54,13 +54,13 @@ export default function Footer() {
           </a>
         </span>
         <span>
-          CRECI C17586 · Correspondente bancário 185260817022749
+          CRECI CJ 38746 · Responsável técnica: Leyde Duarte, CRECI CF 17586 · Correspondente bancário 185260817022749
         </span>
       </div>
       {/* informações legais da empresa, das certificações e da Mais Valor Capital */}
       <div className="flex flex-col gap-1.5 text-[11px] leading-relaxed text-[var(--text-faint)]">
         <p>
-          Mais Novos Inteligência Imobiliária, CNPJ 36.006.396/0001-21, CRECI 17586 e Correspondente Bancária 185260817022749, com sede na Rua T-37, Setor Bueno, Goiânia, Goiás.
+          Mais Novos Inteligência Imobiliária, CNPJ 36.006.396/0001-21, CRECI CJ 38746 (responsável técnica: Leyde Duarte, CRECI CF 17586) e Correspondente Bancária 185260817022749, com sede na Rua T-37, Setor Bueno, Goiânia, Goiás.
         </p>
         <p>
           A Mais Novos Inteligência Imobiliária possui certificação pela ANEPS, Associação Nacional das Empresas Promotoras de Crédito e Correspondentes no País, e atende aos requisitos da Resolução nº 4.935/21 do Conselho Monetário Nacional (CMN). Certificação PLDFT nº 0185260819071443. Certificação Crédito Imobiliário nº 0185260817022749. CJ 38746. CF 17586. Representando o setor de crédito e financiamento da Mais Novos, a marca comercial Mais Valor Capital, no endereço{' '}

@@ -118,7 +118,7 @@ function Linha({
               onChange({ ...item, creci: e.target.value });
               if (!imob) setBusca(e.target.value);
             }}
-            placeholder={imob ? 'Ex.: C17586' : 'Ex.: 17586'}
+            placeholder={imob ? 'Ex.: CJ 38746' : 'Ex.: CF 17586'}
           />
         </div>
         {mostrarParte && (

@@ -48,6 +48,9 @@ const mesPorExtenso = (aaaamm: string) => {
 
 export default async function DevelopmentDetailView({ development }: { development: Development }) {
   const badge = getBadgeCondominio(development.deliveryDate, development.tipo);
+  // "Obras retomadas" aparece por 90 dias depois que a equipe desmarca a obra suspensa
+  const obrasRetomadas =
+    !development.obraParalisada && !!development.obraRetomadaEm && Date.now() - new Date(`${development.obraRetomadaEm}T12:00:00`).getTime() <= 90 * 24 * 60 * 60 * 1000;
   const tipologias = development.units.filter((u) => u.isTipologia);
   const related = await getRelatedListings({ developmentId: development.id }).catch(() => ({ mesmoCondominio: [], regiao: [], precoReferencia: null }));
   const futuro = !!development.deliveryDate && ehFutura(badge.bucket);
@@ -189,7 +192,8 @@ export default async function DevelopmentDetailView({ development }: { developme
                     {badge.text}
                   </span>
                   {development.aceitaTemporada && <TemporadaBadge grande />}
-                  {development.obraParalisada && <span className="rounded-md bg-[#B45F06] px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">Obra paralisada</span>}
+                  {development.obraParalisada && <span className="rounded-md bg-[#B45F06] px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">Obras paralisadas</span>}
+                  {obrasRetomadas && <span className="rounded-md bg-[#13874B] px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">Obras retomadas</span>}
                 </div>
               }
             />
@@ -206,10 +210,23 @@ export default async function DevelopmentDetailView({ development }: { developme
                   <path d="M12 9v4M12 17h.01" />
                 </svg>
                 <div>
-                  <div className="text-[15px] font-bold text-[#8A4B00]">Obra paralisada</div>
+                  <div className="text-[15px] font-bold text-[#8A4B00]">Obras paralisadas</div>
                   <p className="mt-0.5 text-[13.5px] text-[#5C3A12]">
-                    Pelas últimas informações que recebemos{development.obraParalisadaEm ? ` (${mesPorExtenso(development.obraParalisadaEm)})` : ''}, a obra deste empreendimento está paralisada. Fale conosco para saber a situação atual.
+                    Até o momento, pelo que sabemos{development.obraParalisadaEm ? ` (atualizado em ${mesPorExtenso(development.obraParalisadaEm)})` : ''}, as obras estão paralisadas. Continue acessando o portal: atualizaremos por aqui.
                   </p>
+                </div>
+              </div>
+            )}
+            {/* obras retomadas: aviso positivo por 90 dias depois de desmarcar */}
+            {obrasRetomadas && development.obraRetomadaEm && (
+              <div className="mb-4 flex gap-3 rounded-2xl border border-[#A7E3BF] bg-[#EEFAF2] p-4" role="note">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#13874B" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0" aria-hidden>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="m8 12 3 3 5-6" />
+                </svg>
+                <div>
+                  <div className="text-[15px] font-bold text-[#0B6B33]">Obras retomadas</div>
+                  <p className="mt-0.5 text-[13.5px] text-[#14532D]">Pelo que sabemos (atualizado em {mesPorExtenso(development.obraRetomadaEm.slice(0, 7))}), as obras foram retomadas.</p>
                 </div>
               </div>
             )}

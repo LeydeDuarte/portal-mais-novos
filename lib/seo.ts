@@ -15,7 +15,9 @@ export const SITE_NAME = 'Mais Novos Imóveis';
 export const EMPRESA = {
   razao: 'Mais Novos Inteligência Imobiliária',
   cnpj: '36.006.396/0001-21',
-  creci: 'CRECI C17586',
+  creci: 'CRECI CJ 38746', // da empresa (pessoa jurídica)
+  responsavelTecnica: 'Leyde Duarte',
+  creciResponsavel: 'CRECI CF 17586', // da responsável técnica (pessoa física)
   instagram: 'https://www.instagram.com/leydeduarte.br',
   cidade: 'Goiânia',
   uf: 'GO'

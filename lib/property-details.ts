@@ -33,6 +33,8 @@ export type Development = {
   /** obra paralisada (marcada pela equipe); a data em AAAA-MM */
   obraParalisada?: boolean;
   obraParalisadaEm?: string | null;
+  /** quando as obras foram retomadas (AAAA-MM-DD); o aviso aparece por 90 dias */
+  obraRetomadaEm?: string | null;
   heroHeight: number;
   videoUrl?: string;
   photos?: string[]; // fachada, área comum — a primeira é a capa

@@ -50,7 +50,7 @@ export default function QuemSomosPage() {
       '@type': 'Person',
       name: 'Leyde Duarte',
       jobTitle: 'Corretora de imóveis e especialista em crédito imobiliário',
-      identifier: EMPRESA.creci,
+      identifier: EMPRESA.creciResponsavel,
       worksFor: { '@id': `${SITE_URL}/#empresa` },
       sameAs: [EMPRESA.instagram]
     }
@@ -82,7 +82,7 @@ export default function QuemSomosPage() {
         <section className="mt-12">
           <h2 className="font-serif text-2xl font-semibold">Quem está por trás</h2>
           <p className="mt-3 text-[16px] leading-relaxed text-[var(--text-muted)]">
-            A Mais Novos Imóveis é conduzida por <strong className="text-[var(--text)]">Leyde Duarte</strong>, corretora de imóveis ({EMPRESA.creci})
+            A Mais Novos Imóveis é conduzida por <strong className="text-[var(--text)]">Leyde Duarte</strong>, corretora de imóveis ({EMPRESA.creciResponsavel}) e responsável técnica da empresa ({EMPRESA.creci})
             e especialista em crédito imobiliário, atuando no mercado desde 2010. Correspondente bancária, Leyde une a leitura do mercado de
             Goiânia ao conhecimento de como os bancos analisam crédito, o que faz diferença na hora de comprar, vender ou usar um imóvel como
             alavanca patrimonial.

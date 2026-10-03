@@ -383,15 +383,16 @@ export default function CondominiosPage() {
                         ...(gestor
                           ? [
                               {
-                                rotulo: c.obraParalisada ? '● Obra paralisada (desmarcar)' : '○ Marcar obra paralisada',
+                                rotulo: c.obraParalisada ? '● Obras paralisadas: marcar como retomadas' : '○ Marcar obras paralisadas',
                                 onClick: async () => {
                                   if (c.obraParalisada) {
+                                    if (!window.confirm(`As obras do ${c.nome} foram retomadas? O site mostra "Obras retomadas" por 90 dias.`)) return;
                                     await marcarObraParalisada(c.id, false);
                                     setItens((lst) => lst?.map((x) => (x.id === c.id ? { ...x, obraParalisada: false, obraParalisadaObs: null } : x)) ?? lst);
                                     return;
                                   }
                                   const obs = window.prompt(
-                                    `Marcar a obra do ${c.nome} como paralisada?\n\nNo site aparece um aviso neutro com o mês da informação.\nObservação INTERNA (opcional, só a equipe vê): motivo, fonte...`,
+                                    `Marcar a obra do ${c.nome} como paralisada?\n\nNo site aparece: "Obras paralisadas. Até o momento, pelo que sabemos, as obras estão paralisadas. Continue acessando o portal: atualizaremos por aqui."\nObservação INTERNA (opcional, só a equipe vê): motivo, fonte...`,
                                     ''
                                   );
                                   if (obs === null) return;

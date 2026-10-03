@@ -73,7 +73,7 @@ export default async function NoticiaView({ n, previa = false }: { n: Noticia; p
               articleSection: nomeTopico(n.topico),
               keywords: [nomeTopico(n.topico), n.bairro, n.cidade, ...n.tags].filter(Boolean).join(', '),
               wordCount: texto.split(/\s+/).length,
-              author: { '@type': 'Person', name: n.autor, jobTitle: LEYDE_CARGO, identifier: n.autor === 'Leyde Duarte' ? 'CRECI 17586' : undefined, url: `${SITE_URL}/quem-somos` },
+              author: { '@type': 'Person', name: n.autor, jobTitle: LEYDE_CARGO, identifier: n.autor === 'Leyde Duarte' ? 'CRECI CF 17586' : undefined, url: `${SITE_URL}/quem-somos` },
               publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL, logo: { '@type': 'ImageObject', url: `${SITE_URL}/icon.png` } },
               mainEntityOfPage: url,
               contentLocation: n.cidade ? { '@type': 'Place', name: [n.bairro, n.cidade, n.uf].filter(Boolean).join(', ') } : undefined,

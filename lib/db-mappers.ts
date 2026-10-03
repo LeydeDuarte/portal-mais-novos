@@ -78,6 +78,7 @@ export type DevelopmentRow = {
   vendido_100?: boolean | null;
   obra_paralisada?: boolean | null;
   obra_paralisada_em?: string | Date | null;
+  obra_retomada_em?: string | Date | null;
   hero_height: number;
   video_url: string | null;
   corretor_email: string | null;
@@ -225,6 +226,7 @@ export function mapDevelopmentRow(row: DevelopmentRow, units: PropertyDetail[]):
     vendido100: !!row.vendido_100,
     obraParalisada: !!row.obra_paralisada,
     obraParalisadaEm: row.obra_paralisada_em ? new Date(row.obra_paralisada_em).toISOString().slice(0, 7) : null,
+    obraRetomadaEm: row.obra_retomada_em ? new Date(row.obra_retomada_em).toISOString().slice(0, 10) : null,
     tabelaReferencia: row.tabela_referencia ? new Date(row.tabela_referencia).toISOString().slice(0, 7) : null,
     heroHeight: row.hero_height,
     videoUrl: row.video_url ?? undefined,

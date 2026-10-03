@@ -152,6 +152,7 @@ export async function marcarObraParalisada(id: string, paralisada: boolean, obse
   if (!veTudo(eu.role)) throw new Error('Só o analista ou o administrador marcam obra paralisada.');
   const obs = String(observacao ?? '').trim().slice(0, 300);
   if (paralisada)
-    await query(`update developments set obra_paralisada = true, obra_paralisada_em = now(), obra_paralisada_obs = $2 where id = $1`, [id, obs ? `${obs} (por ${eu.email})` : `por ${eu.email}`]);
-  else await query(`update developments set obra_paralisada = false, obra_paralisada_em = null, obra_paralisada_obs = null where id = $1`, [id]);
+    await query(`update developments set obra_paralisada = true, obra_paralisada_em = now(), obra_paralisada_obs = $2, obra_retomada_em = null where id = $1`, [id, obs ? `${obs} (por ${eu.email})` : `por ${eu.email}`]);
+  // desmarcar = as obras foram retomadas: o site mostra "Obras retomadas" por 90 dias
+  else await query(`update developments set obra_paralisada = false, obra_paralisada_obs = null, obra_retomada_em = now() where id = $1`, [id]);
 }

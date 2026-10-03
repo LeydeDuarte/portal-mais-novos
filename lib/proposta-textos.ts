@@ -76,7 +76,7 @@ export type Intermediario = {
 
 /** Intermediação padrão: a Mais Novos (assina) e o corretor logado como responsável. */
 export function intermediacaoPadrao(corretor?: { nome: string; creci?: string } | null): Intermediario[] {
-  const lista: Intermediario[] = [{ tipo: 'imobiliaria', nome: 'Mais Novos Inteligência Imobiliária', documento: '36.006.396/0001-21', creci: 'C17586', papel: 'responsavel', assina: true }];
+  const lista: Intermediario[] = [{ tipo: 'imobiliaria', nome: 'Mais Novos Inteligência Imobiliária', documento: '36.006.396/0001-21', creci: 'CJ 38746', papel: 'responsavel', assina: true }];
   if (corretor?.nome) lista.push({ tipo: 'corretor', nome: corretor.nome, creci: corretor.creci, papel: 'responsavel', assina: false });
   return lista;
 }
