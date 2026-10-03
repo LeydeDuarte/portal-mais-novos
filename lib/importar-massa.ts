@@ -11,7 +11,7 @@ import { registrarUsoIA } from './custos';
 import { ehUsadoOuAntigo, limparUmCondominio } from './limpeza-usados';
 
 export type Classificacao = {
-  tipo: 'foto' | 'planta' | 'descartar';
+  tipo: 'foto' | 'planta' | 'tabela' | 'ficha' | 'descartar';
   categoria: 'fachada' | 'externa' | 'lazer' | 'comum' | 'decorado' | 'vista' | 'implantacao' | 'outro';
   qualidade: number; // 1 a 5
   metragem: number | null;
@@ -25,11 +25,13 @@ const MODELO = process.env.ANTHROPIC_MODEL_VISAO || 'claude-haiku-4-5-20251001';
 
 const INSTRUCAO = `Você classifica imagens do material de vendas de empreendimentos imobiliários (Brasil).
 Responda SÓ com um JSON, sem texto antes ou depois:
-{"tipo":"foto|planta|descartar","categoria":"fachada|externa|lazer|comum|decorado|vista|implantacao|outro","qualidade":1-5,"metragem":número ou null,"quartos":número ou null,"suites":número ou null,"nomeTipologia":"texto ou null","legenda":"até 8 palavras em português"}
+{"tipo":"foto|planta|tabela|ficha|descartar","categoria":"fachada|externa|lazer|comum|decorado|vista|implantacao|outro","qualidade":1-5,"metragem":número ou null,"quartos":número ou null,"suites":número ou null,"nomeTipologia":"texto ou null","legenda":"até 8 palavras em português"}
 Regras:
 - planta: desenho técnico visto de cima, com cômodos (planta humanizada também). Leia a metragem PRIVATIVA escrita na imagem (ex.: "145,32 m²" → 145.32). Leia quartos, suítes e o nome da tipologia ("Tipo A", "Final 01") se estiverem escritos. Não invente: se não estiver legível, null.
 - foto: fachada (prédio ou casas visto de fora, inteiro), externa (portaria, acesso, jardim), lazer (piscina, academia, salão, quadra, playground, gourmet), comum (hall, lobby, coworking), decorado (interior de unidade), vista, implantacao (vista aérea ilustrada do terreno).
-- descartar: logotipo, mapa de localização, tabela de preços, página só de texto, capa de book só com título, ficha técnica, imagem muito pequena ou com marca d'água de imobiliária ou portal.
+- tabela: tabela de vendas ou de preços com unidades, metragens e valores.
+- ficha: ficha técnica ou página com dados do empreendimento (endereço, entrega, número de pavimentos ou unidades, lista de lazer, tipologias).
+- descartar: logotipo, mapa de localização, página só de texto institucional, capa de book só com título, imagem muito pequena ou com marca d'água de imobiliária ou portal.
 - qualidade: 5 = imagem de capa de revista; 1 = ruim, cortada ou borrada.`;
 
 /** Pede à IA a classificação (imagem reduzida a 768 px para gastar pouco) */
@@ -69,7 +71,7 @@ export async function classificar(img: Buffer): Promise<Classificacao> {
   const o = JSON.parse(m[0]) as Partial<Classificacao>;
   const num = (v: unknown) => (typeof v === 'number' && isFinite(v) && v > 0 ? v : null);
   return {
-    tipo: o.tipo === 'planta' || o.tipo === 'descartar' ? o.tipo : 'foto',
+    tipo: o.tipo === 'planta' || o.tipo === 'descartar' || o.tipo === 'tabela' || o.tipo === 'ficha' ? o.tipo : 'foto',
     categoria: (['fachada', 'externa', 'lazer', 'comum', 'decorado', 'vista', 'implantacao'] as const).includes(o.categoria as never)
       ? (o.categoria as Classificacao['categoria'])
       : 'outro',
@@ -82,7 +84,7 @@ export async function classificar(img: Buffer): Promise<Classificacao> {
   };
 }
 
-export type ResultadoArquivo = { situacao: 'foto' | 'planta' | 'planta_sem_par' | 'descartada' | 'repetida'; detalhe?: string };
+export type ResultadoArquivo = { situacao: 'foto' | 'planta' | 'planta_sem_par' | 'tabela' | 'ficha' | 'descartada' | 'repetida'; detalhe?: string };
 
 /** Um arquivo (já reduzido no navegador): classifica, guarda e liga ao empreendimento */
 export async function importarArquivo(devId: string, hash: string, arquivo: string, buf: Buffer, tipoMime: string): Promise<ResultadoArquivo> {
@@ -100,6 +102,14 @@ export async function importarArquivo(devId: string, hash: string, arquivo: stri
   if (c.tipo === 'descartar') {
     await reg('descartada', null, null);
     return { situacao: 'descartada', detalhe: c.legenda };
+  }
+  // tabela de vendas e ficha técnica: completam o cadastro (a imagem não é guardada)
+  if (c.tipo === 'tabela' || c.tipo === 'ficha') {
+    const dados = c.tipo === 'tabela' ? await lerComIA<Tabela>(buf, PEDIDO_TABELA) : await lerComIA<Ficha>(buf, PEDIDO_FICHA);
+    const resumo = c.tipo === 'tabela' ? await aplicarTabela(devId, dados as Tabela) : await aplicarFicha(devId, dados as Ficha);
+    await reg(c.tipo, null, null);
+    await query('update imagens_importadas set dados = $2::jsonb where hash = $1', [hash, JSON.stringify(dados)]);
+    return { situacao: c.tipo, detalhe: resumo };
   }
   // usado ou antigo: só a fachada e as plantas (o resto nem é guardado)
   if (c.tipo === 'foto' && c.categoria !== 'fachada' && (await ehUsadoOuAntigo(devId))) {
@@ -123,8 +133,15 @@ export async function importarArquivo(devId: string, hash: string, arquivo: stri
       await reg('planta', url, tip[0].id);
       return { situacao: 'planta', detalhe: c.metragem ? `${c.metragem} m²` : undefined };
     }
+    if (c.metragem) {
+      // sem tipologia dessa área: cria a partir da planta (metragem, quartos e suítes lidos no desenho)
+      const t = await tipologiaDaArea(devId, c.metragem, { quartos: c.quartos, suites: c.suites });
+      await query(`update properties set plantas = coalesce(plantas, '[]'::jsonb) || to_jsonb($2::text) where id = $1`, [t.id, url]);
+      await reg('planta', url, t.id);
+      return { situacao: 'planta', detalhe: `${c.metragem} m²${t.criada ? ' (tipologia criada)' : ''}` };
+    }
     await reg('planta_sem_par', url, null);
-    return { situacao: 'planta_sem_par', detalhe: c.metragem ? `${c.metragem} m² sem tipologia` : 'metragem não legível' };
+    return { situacao: 'planta_sem_par', detalhe: 'metragem não legível' };
   }
   await reg('foto', url, null);
   return { situacao: 'foto', detalhe: c.categoria };
@@ -155,3 +172,177 @@ export async function finalizarPasta(devId: string, maxFotos = 40): Promise<{ fo
   await miniaturaDe('developments', devId).catch(() => {});
   return { fotos: fotos.length, capa: fotos[0] ?? null };
 }
+
+// ---------------- completar o cadastro a partir das imagens ----------------
+const MODELO_LEITURA = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
+const TIPOS_OK = ['studio', 'flat', 'loft', 'apartamento', 'apartamento_garden', 'apartamento_duplex', 'apartamento_triplex', 'cobertura', 'cobertura_duplex', 'penthouse', 'casa', 'casa_condominio', 'sobrado', 'terreno_lote', 'sala_comercial', 'loja_ponto_comercial'];
+const LAZER_OK = ['Piscina', 'Academia', 'Salão de festas', 'Playground', 'Portaria 24h', 'Segurança 24h', 'Bicicletário', 'Quadra poliesportiva', 'Espaço pet', 'Espaço gourmet', 'Churrasqueira', 'Coworking', 'Rooftop', 'Sauna', 'Salão de jogos', 'Área verde', 'Elevador', 'Vaga coberta'];
+
+async function lerComIA<T>(img: Buffer, instrucao: string): Promise<T> {
+  const chave = process.env.ANTHROPIC_API_KEY;
+  if (!chave) throw new Error('ANTHROPIC_API_KEY não configurada');
+  const grande = await sharp(img, { failOn: 'none' }).resize(1600, 1600, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': chave, 'anthropic-version': '2023-06-01' },
+    signal: AbortSignal.timeout(55000),
+    body: JSON.stringify({
+      model: MODELO_LEITURA,
+      max_tokens: 2500,
+      system: `${instrucao}\nResponda SÓ com o JSON pedido. Não invente: o que não estiver legível na imagem fica null ou fora da lista.`,
+      messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: grande.toString('base64') } }, { type: 'text', text: 'Leia esta imagem.' }] }]
+    })
+  });
+  const j = (await r.json().catch(() => ({}))) as { content?: { text?: string }[]; usage?: { input_tokens?: number; output_tokens?: number }; error?: { message?: string } };
+  if (!r.ok) throw new Error(j.error?.message ?? `IA: HTTP ${r.status}`);
+  await registrarUsoIA(MODELO_LEITURA, j.usage, null);
+  const m = (j.content ?? []).map((c) => c.text ?? '').join('').match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('IA sem resposta válida');
+  return JSON.parse(m[0]) as T;
+}
+
+type Linha = { area?: number | null; quartos?: number | null; suites?: number | null; vagas?: number | null; preco?: number | null; tipo?: string | null };
+type Tabela = { entrega?: string | null; linhas?: Linha[] };
+type Ficha = { entrega?: string | null; pavimentos?: number | null; lazer?: string[]; tipos?: string[]; quartos?: number[] };
+
+const n = (v: unknown) => (typeof v === 'number' && isFinite(v) && v > 0 ? v : null);
+const mesAno = (s?: string | null) => (s && /^\d{4}-(0[1-9]|1[0-2])$/.test(s) ? `${s}-01` : null);
+
+type Dev = { id: string; name: string; bairro: string | null; cidade: string | null; uf: string | null; cep: string | null; tipo: string; delivery_date: string | null; amenities: string[] | null; tipos_unidade: string[] | null; corretor_email: string | null };
+
+async function lerDev(devId: string): Promise<Dev | null> {
+  const r = await query<Dev>(
+    `select id, name, bairro, cidade, uf, cep, tipo, to_char(delivery_date, 'YYYY-MM-DD') as delivery_date, amenities, tipos_unidade, corretor_email from developments where id = $1`,
+    [devId]
+  );
+  return r[0] ?? null;
+}
+
+const NOME_TIPO: Record<string, string> = { apartamento: 'Apartamento', cobertura: 'Cobertura', cobertura_duplex: 'Cobertura duplex', apartamento_duplex: 'Apartamento duplex', apartamento_garden: 'Apartamento garden', casa_condominio: 'Casa', sobrado: 'Sobrado', terreno_lote: 'Lote', studio: 'Studio', flat: 'Flat', loft: 'Loft', penthouse: 'Penthouse', casa: 'Casa', sala_comercial: 'Sala comercial', loja_ponto_comercial: 'Loja' };
+
+/** Acha a tipologia de mesma área (±1,5 m²) ou cria uma nova. Devolve o id. */
+export async function tipologiaDaArea(devId: string, area: number, info: { quartos?: number | null; suites?: number | null; vagas?: number | null; preco?: number | null; tipo?: string | null }): Promise<{ id: string; criada: boolean }> {
+  const ja = await query<{ id: string }>(
+    `select id from properties where empreendimento_id = $1 and is_tipologia and abs(area - $2) <= 1.5 order by abs(area - $2) limit 1`,
+    [devId, area]
+  );
+  if (ja[0]) {
+    // completa só o que está vazio; preço: o menor ("a partir de")
+    await query(
+      `update properties set quartos = coalesce(quartos, $2), vagas = coalesce(vagas, $3),
+              price_value = case when $4::numeric > 0 and (price_value = 0 or $4::numeric < price_value) then $4::numeric else price_value end
+        where id = $1`,
+      [ja[0].id, info.quartos ?? null, info.vagas ?? null, info.preco ?? 0]
+    );
+    return { id: ja[0].id, criada: false };
+  }
+  const d = await lerDev(devId);
+  if (!d) throw new Error('empreendimento não encontrado');
+  const tipo = info.tipo && TIPOS_OK.includes(info.tipo) ? info.tipo : d.tipos_unidade?.[0] && TIPOS_OK.includes(d.tipos_unidade[0]) ? d.tipos_unidade[0] : d.tipo === 'horizontal' ? 'casa_condominio' : 'apartamento';
+  const local = [d.bairro, d.cidade ? `${d.cidade}/${d.uf ?? 'GO'}` : null].filter(Boolean).join(', ');
+  const q = info.quartos ? `${info.quartos} ${info.quartos === 1 ? 'quarto' : 'quartos'}${info.suites ? `, sendo ${info.suites} ${info.suites === 1 ? 'suíte' : 'suítes'}` : ''}` : '';
+  const desc = `${NOME_TIPO[tipo] ?? 'Unidade'}${q ? ` de ${q}` : ''}, ${String(Math.round(area * 100) / 100).replace('.', ',')} m² no ${d.name}${local ? `, ${local}` : ''}.`;
+  const id = `${devId}-tip-${Math.round(area * 10)}`;
+  await query(
+    `insert into properties (id, is_tipologia, empreendimento_id, tipo_unidade, area, quartos, vagas, price_value, finalidade, price_period, visibilidade,
+        delivery_date, bairro, cidade, uf, cep, condominio, location, description, amenities, corretor_email)
+     values ($1, true, $2, $3, $4, $5, $6, $7, 'venda', 'unico', 'publico', $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, $17)
+     on conflict (id) do nothing`,
+    [id, devId, tipo, area, info.quartos ?? null, info.vagas ?? null, info.preco ?? 0, d.delivery_date, d.bairro, d.cidade, d.uf ?? 'GO', d.cep, d.name, local || d.name, desc, JSON.stringify(d.amenities ?? []), d.corretor_email ?? 'admin@maisnovos.com']
+  );
+  await query(
+    `update developments set tipos_unidade = (select jsonb_agg(distinct x) from jsonb_array_elements_text(coalesce(tipos_unidade, '[]'::jsonb) || to_jsonb(array[$2::text])) x),
+            quartos_opcoes = case when $3::int is null then quartos_opcoes else (select jsonb_agg(distinct x::int order by x::int) from jsonb_array_elements_text(coalesce(quartos_opcoes, '[]'::jsonb) || to_jsonb(array[$3::int])) x) end
+      where id = $1`,
+    [devId, tipo, info.quartos ?? null]
+  );
+  return { id, criada: true };
+}
+
+/** Tabela de vendas: agrupa por metragem e cria/atualiza as tipologias (preço "a partir de") */
+async function aplicarTabela(devId: string, t: Tabela): Promise<string> {
+  const linhas = (t.linhas ?? []).filter((l) => n(l.area));
+  const grupos: { area: number; linhas: Linha[] }[] = [];
+  for (const l of linhas.sort((a, b) => (a.area ?? 0) - (b.area ?? 0))) {
+    const g = grupos.find((x) => Math.abs(x.area - (l.area as number)) <= 1.5);
+    if (g) g.linhas.push(l);
+    else grupos.push({ area: l.area as number, linhas: [l] });
+  }
+  let criadas = 0;
+  for (const g of grupos) {
+    const precos = g.linhas.map((l) => n(l.preco)).filter((v): v is number => !!v && v > 10000);
+    const moda = (k: keyof Linha) => g.linhas.map((l) => n(l[k] as number)).find((v) => v) ?? null;
+    const r = await tipologiaDaArea(devId, g.area, {
+      quartos: moda('quartos'),
+      suites: moda('suites'),
+      vagas: moda('vagas'),
+      preco: precos.length ? Math.min(...precos) : null,
+      tipo: g.linhas.map((l) => l.tipo).find((x) => x) ?? null
+    });
+    if (r.criada) criadas++;
+  }
+  const entrega = mesAno(t.entrega);
+  if (entrega) await query(`update developments set delivery_date = coalesce(delivery_date, $2::date) where id = $1`, [devId, entrega]);
+  return `${grupos.length} metragens (${criadas} tipologias novas)`;
+}
+
+/** Ficha técnica: completa só o que está vazio (e soma o lazer da lista fechada) */
+async function aplicarFicha(devId: string, f: Ficha): Promise<string> {
+  const lazer = (f.lazer ?? []).filter((x) => LAZER_OK.includes(x));
+  const tipos = (f.tipos ?? []).filter((x) => TIPOS_OK.includes(x));
+  const quartos = (f.quartos ?? []).filter((x) => Number.isInteger(x) && x > 0 && x < 10);
+  await query(
+    `update developments set
+        delivery_date = coalesce(delivery_date, $2::date),
+        pavimentos = coalesce(pavimentos, $3::int),
+        amenities = (select coalesce(jsonb_agg(distinct x), '[]'::jsonb) from jsonb_array_elements_text(coalesce(amenities, '[]'::jsonb) || $4::jsonb) x),
+        tipos_unidade = case when jsonb_array_length(coalesce(tipos_unidade, '[]'::jsonb)) = 0 then $5::jsonb else tipos_unidade end,
+        quartos_opcoes = case when jsonb_array_length(coalesce(quartos_opcoes, '[]'::jsonb)) = 0 then $6::jsonb else quartos_opcoes end
+      where id = $1`,
+    [devId, mesAno(f.entrega), n(f.pavimentos), JSON.stringify(lazer), JSON.stringify(tipos), JSON.stringify(quartos)]
+  );
+  return [lazer.length ? `${lazer.length} itens de lazer` : null, f.entrega ? `entrega ${f.entrega}` : null, f.pavimentos ? `${f.pavimentos} pavimentos` : null].filter(Boolean).join(', ') || 'sem dados novos';
+}
+
+const PEDIDO_TABELA = `Esta é a tabela de vendas de um empreendimento imobiliário brasileiro. Extraia:
+{"entrega":"AAAA-MM ou null","linhas":[{"area":área privativa em m² (número),"quartos":n ou null,"suites":n ou null,"vagas":n ou null,"preco":valor total da unidade em reais (número, sem sinal nem parcelas) ou null,"tipo":"apartamento|cobertura|cobertura_duplex|apartamento_duplex|apartamento_garden|casa_condominio|sobrado|terreno_lote|studio|flat|loft|sala_comercial|loja_ponto_comercial ou null"}]}
+Uma linha por unidade (ou por tipologia, se a tabela for por tipologia). Unidade vendida ou bloqueada: inclua sem preço.`;
+
+const PEDIDO_FICHA = `Esta é uma página de ficha técnica ou de dados de um empreendimento imobiliário brasileiro. Extraia:
+{"entrega":"AAAA-MM ou null","pavimentos":número de pavimentos ou null,"lazer":[itens desta lista que aparecem: ${LAZER_OK.join(', ')}],"tipos":[tipos desta lista: ${TIPOS_OK.join(', ')}],"quartos":[números de quartos das plantas, ex.: [2,3]]}`;
+
+/** Planilha (Excel/CSV) da tabela de vendas, já convertida em texto pelo navegador */
+export async function importarPlanilha(devId: string, hash: string, arquivo: string, texto: string): Promise<ResultadoArquivo> {
+  const ja = await query<{ situacao: string }>('select situacao from imagens_importadas where hash = $1', [hash]);
+  if (ja[0]) return { situacao: 'repetida' };
+  const chave = process.env.ANTHROPIC_API_KEY;
+  if (!chave) throw new Error('ANTHROPIC_API_KEY não configurada');
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': chave, 'anthropic-version': '2023-06-01' },
+    signal: AbortSignal.timeout(55000),
+    body: JSON.stringify({
+      model: MODELO_LEITURA,
+      max_tokens: 4000,
+      system: `Você lê planilhas de empreendimentos imobiliários brasileiros. Se for uma tabela de vendas ou de preços, responda SÓ com o JSON pedido. Se não for (ex.: lista de clientes, controle interno), responda {"linhas":[]}. Não invente.\n${PEDIDO_TABELA.replace('Esta é a tabela de vendas de um empreendimento imobiliário brasileiro. ', '')}`,
+      messages: [{ role: 'user', content: `Arquivo: ${arquivo}\n\n${texto.slice(0, 60000)}` }]
+    })
+  });
+  const j = (await r.json().catch(() => ({}))) as { content?: { text?: string }[]; usage?: { input_tokens?: number; output_tokens?: number }; error?: { message?: string } };
+  if (!r.ok) throw new Error(j.error?.message ?? `IA: HTTP ${r.status}`);
+  await registrarUsoIA(MODELO_LEITURA, j.usage, null);
+  const m = (j.content ?? []).map((c) => c.text ?? '').join('').match(/\{[\s\S]*\}/);
+  const dados = (m ? JSON.parse(m[0]) : { linhas: [] }) as Tabela;
+  if (!dados.linhas?.length) {
+    await query(`insert into imagens_importadas (hash, development_id, arquivo, tipo, situacao) values ($1,$2,$3,'planilha','descartada') on conflict do nothing`, [hash, devId, arquivo.slice(0, 300)]);
+    return { situacao: 'descartada', detalhe: 'planilha sem tabela de vendas' };
+  }
+  const resumo = await aplicarTabela(devId, dados);
+  await query(
+    `insert into imagens_importadas (hash, development_id, arquivo, tipo, situacao, dados) values ($1,$2,$3,'tabela','tabela',$4::jsonb) on conflict do nothing`,
+    [hash, devId, arquivo.slice(0, 300), JSON.stringify(dados)]
+  );
+  return { situacao: 'tabela', detalhe: resumo };
+}
+
+export { aplicarTabela, aplicarFicha, PEDIDO_TABELA, PEDIDO_FICHA, lerComIA, type Tabela, type Ficha };

@@ -14,6 +14,37 @@ import { contarPaginas, renderizarPaginas } from '@/lib/pdf-import/extract';
 type Pasta = Casamento & { arquivos: File[]; destino: string; contagem: Record<string, number>; estado: 'esperando' | 'rodando' | 'feita' | 'pulada' };
 const IMAGEM = /\.(jpe?g|png|webp)$/i;
 const PDF = /\.pdf$/i;
+const PLANILHA = /\.(xlsx|csv)$/i;
+const ZIP = /\.zip$/i;
+const MAX_ZIP = 400 * 1024 * 1024;
+
+/** Abre um .zip no navegador e devolve os arquivos aceitos de dentro dele */
+async function abrirZip(z: File): Promise<File[]> {
+  if (z.size > MAX_ZIP) return [];
+  const { unzipSync } = await import('fflate');
+  const conteudo = unzipSync(new Uint8Array(await z.arrayBuffer()), {
+    filter: (f) => !f.name.startsWith('__MACOSX') && /\.(jpe?g|png|webp|pdf|xlsx|csv)$/i.test(f.name)
+  });
+  const tipo = (n: string) => (/\.pdf$/i.test(n) ? 'application/pdf' : /\.png$/i.test(n) ? 'image/png' : /\.webp$/i.test(n) ? 'image/webp' : /\.(jpe?g)$/i.test(n) ? 'image/jpeg' : 'application/octet-stream');
+  return Object.entries(conteudo).map(([nome, dados]) => new File([dados], nome.split('/').pop() || nome, { type: tipo(nome) }));
+}
+
+/** Planilha → texto (linhas separadas por " | ") para a IA ler a tabela de vendas */
+async function planilhaEmTexto(f: File): Promise<string> {
+  if (/\.csv$/i.test(f.name)) return (await f.text()).slice(0, 80000);
+  const { default: lerXlsx, readSheetNames } = (await import('read-excel-file')) as unknown as {
+    default: (f: File, o?: { sheet?: string }) => Promise<unknown[][]>;
+    readSheetNames: (f: File) => Promise<string[]>;
+  };
+  const abas = await readSheetNames(f).catch(() => [] as string[]);
+  const partes: string[] = [];
+  for (const aba of abas.length ? abas.slice(0, 5) : [undefined]) {
+    const linhas = await lerXlsx(f, aba ? { sheet: aba } : undefined).catch(() => [] as unknown[][]);
+    if (aba) partes.push(`### Aba: ${aba}`);
+    for (const l of linhas.slice(0, 400)) partes.push(l.map((c) => (c == null ? '' : String(c))).join(' | '));
+  }
+  return partes.join('\n').slice(0, 80000);
+}
 const MAX_PAGINAS_PDF = 80;
 
 async function sha1(dados: ArrayBuffer): Promise<string> {
@@ -53,7 +84,7 @@ async function enviar(devId: string, blob: Blob, hash: string, nome: string): Pr
   throw new Error('falhou 3 vezes');
 }
 
-const ROTULO: Record<string, string> = { foto: 'fotos', planta: 'plantas', planta_sem_par: 'plantas sem par', descartada: 'descartadas', repetida: 'já importadas', erro: 'erros' };
+const ROTULO: Record<string, string> = { foto: 'fotos', planta: 'plantas', planta_sem_par: 'plantas sem par', tabela: 'tabelas lidas', ficha: 'fichas lidas', descartada: 'descartadas', repetida: 'já importadas', erro: 'erros' };
 
 export default function ImportarImagensPage() {
   const { staff, loaded } = useStaffSession();
@@ -80,7 +111,7 @@ export default function ImportarImagensPage() {
     const grupos = new Map<string, File[]>();
     let ignorados = 0;
     for (const f of Array.from(lista)) {
-      if (!IMAGEM.test(f.name) && !PDF.test(f.name)) {
+      if (!IMAGEM.test(f.name) && !PDF.test(f.name) && !PLANILHA.test(f.name) && !ZIP.test(f.name)) {
         ignorados++;
         continue;
       }
@@ -103,7 +134,7 @@ export default function ImportarImagensPage() {
       }))
     );
     setLendo(false);
-    if (ignorados) setMsg(`${ignorados} arquivo(s) ignorado(s) (só JPG, PNG, WEBP e PDF).`);
+    if (ignorados) setMsg(`${ignorados} arquivo(s) ignorado(s): vídeos, Word, HEIC do iPhone e outros formatos. Entram JPG, PNG, WEBP, PDF, Excel (.xlsx), CSV e ZIP.`);
   };
 
   const rodar = async () => {
@@ -132,7 +163,36 @@ export default function ImportarImagensPage() {
         setPastas((xs) => xs.map((x, k) => (k === i ? { ...x, contagem: { ...x.contagem, [s]: (x.contagem[s] ?? 0) + 1 } } : x)));
       // tarefas: cada imagem e cada página de PDF
       const tarefas: (() => Promise<void>)[] = [];
+      // .zip: abre no navegador e trata o que tem dentro como arquivos da pasta
+      const arquivos: File[] = [];
       for (const f of p.arquivos) {
+        if (!ZIP.test(f.name)) arquivos.push(f);
+        else {
+          try {
+            const dentro = await abrirZip(f);
+            if (!dentro.length) conta('erro');
+            arquivos.push(...dentro);
+          } catch {
+            conta('erro');
+          }
+        }
+      }
+      for (const f of arquivos) {
+        if (PLANILHA.test(f.name)) {
+          tarefas.push(async () => {
+            const hash = await sha1(await f.arrayBuffer());
+            const texto = await planilhaEmTexto(f);
+            const fd = new FormData();
+            fd.append('texto', texto);
+            fd.append('devId', devId);
+            fd.append('hash', hash);
+            fd.append('nome', f.name);
+            const r = await fetch('/api/importar-massa', { method: 'POST', body: fd });
+            const j = (await r.json().catch(() => ({}))) as { situacao?: string };
+            conta(r.ok && j.situacao ? j.situacao : 'erro');
+          });
+          continue;
+        }
         if (IMAGEM.test(f.name)) {
           tarefas.push(async () => {
             const hash = await sha1(await f.arrayBuffer());
@@ -190,8 +250,8 @@ export default function ImportarImagensPage() {
         <h1 className="text-2xl font-bold">Importar imagens em massa</h1>
         <p className="mt-1 max-w-3xl text-sm text-[var(--text-muted)]">
           Escolha a pasta principal: dentro dela, uma subpasta para cada empreendimento, com o nome dele (pode ter &quot; - Bairro&quot; no fim). Pode
-          misturar fotos, perspectivas, plantas e PDFs (book, caderno de plantas). A IA separa foto de planta, descarta logos, mapas e tabelas, liga
-          cada planta à tipologia de mesma metragem e escolhe a capa. Arquivos já importados são pulados: pode parar e continuar depois.
+          deixar tudo misturado, do jeito que veio: fotos, plantas, PDFs (book, caderno de plantas, ficha técnica, tabela), planilhas Excel e arquivos ZIP. A IA separa foto de planta, descarta logos, mapas e tabelas, liga
+          cada planta à tipologia de mesma metragem (e cria a tipologia se faltar), lê a tabela de vendas e a ficha técnica para completar o cadastro e escolhe a capa. Arquivos já importados são pulados: pode parar e continuar depois.
         </p>
 
         <label className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white">
