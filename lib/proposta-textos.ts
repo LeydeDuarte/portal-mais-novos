@@ -60,3 +60,61 @@ export function porExtenso(valor: number): string {
 /** Número exibido da proposta: a numeração começa em 200 (a 1ª proposta é a nº 0200). */
 export const PRIMEIRO_NUMERO_PROPOSTA = 200;
 export const numeroProposta = (n: number | null | undefined) => (n ? String(n + PRIMEIRO_NUMERO_PROPOSTA - 1).padStart(4, '0') : '');
+
+// ---------------- intermediação e honorários ----------------
+/** Quem intermedeia: imobiliária (CNPJ) ou corretor(a) (CRECI). Só UM assina a proposta. */
+export type Intermediario = {
+  tipo: 'imobiliaria' | 'corretor';
+  nome: string;
+  documento?: string; // CNPJ da imobiliária (ou CPF do corretor, opcional)
+  creci?: string;
+  papel: 'responsavel' | 'parceiro';
+  assina: boolean;
+  /** parte nos honorários (%), opcional: só aparece no PDF se alguém tiver parte */
+  partePct?: number | null;
+};
+
+/** Intermediação padrão: a Mais Novos (assina) e o corretor logado como responsável. */
+export function intermediacaoPadrao(corretor?: { nome: string; creci?: string } | null): Intermediario[] {
+  const lista: Intermediario[] = [{ tipo: 'imobiliaria', nome: 'Mais Novos Inteligência Imobiliária', documento: '36.006.396/0001-21', creci: 'C17586', papel: 'responsavel', assina: true }];
+  if (corretor?.nome) lista.push({ tipo: 'corretor', nome: corretor.nome, creci: corretor.creci, papel: 'responsavel', assina: false });
+  return lista;
+}
+
+const pct = (n: number) => `${n.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
+
+/** "Mais Novos ..., CNPJ x, CRECI y (responsável); Fulano, corretor parceiro, CRECI z" */
+export function textoIntermediacao(lista: Intermediario[]): string {
+  return lista
+    .map((i) => {
+      const partes = [i.nome];
+      if (i.tipo === 'imobiliaria') {
+        if (i.documento) partes.push(`CNPJ ${i.documento}`);
+      } else partes.push(i.papel === 'parceiro' ? 'corretor(a) parceiro(a)' : 'corretor(a)');
+      if (i.creci) partes.push(/^creci/i.test(i.creci) ? i.creci : `CRECI ${i.creci}`);
+      const papel = i.tipo === 'imobiliaria' ? (i.papel === 'parceiro' ? ' (parceira)' : ' (responsável)') : i.papel === 'responsavel' ? ' (responsável)' : '';
+      return `${partes.join(', ')}${papel}`;
+    })
+    .join('; ');
+}
+
+export type Honorarios = { pct: number; valor: number; liquido: number; divisao: { nome: string; pct: number; valor: number }[] };
+
+/** Honorários a partir do percentual (arredondado ao real). Sem percentual → null (o quadro não aparece). */
+export function calcularHonorarios(valorTotal: number, honorariosPct: number | null | undefined, lista: Intermediario[] = []): Honorarios | null {
+  if (!honorariosPct || honorariosPct <= 0 || !valorTotal) return null;
+  const valor = Math.round((valorTotal * honorariosPct) / 100);
+  const divisao = lista
+    .filter((i) => i.partePct && i.partePct > 0)
+    .map((i) => ({ nome: i.nome, pct: i.partePct as number, valor: Math.round((valorTotal * (i.partePct as number)) / 100) }));
+  return { pct: honorariosPct, valor, liquido: valorTotal - valor, divisao };
+}
+
+/** A divisão (se houver) precisa somar o percentual total. */
+export function divisaoConfere(honorariosPct: number | null | undefined, lista: Intermediario[]): boolean {
+  const partes = lista.filter((i) => i.partePct && i.partePct > 0);
+  if (!partes.length || !honorariosPct) return true;
+  const soma = partes.reduce((a, i) => a + (i.partePct as number), 0);
+  return Math.abs(soma - honorariosPct) < 0.005;
+}
+export const textoPct = pct;

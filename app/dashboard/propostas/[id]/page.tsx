@@ -159,6 +159,8 @@ export default function PropostaDetalhe({ params }: { params: { id: string } }) 
                   compradores: p.compradores,
                   vendedores: p.vendedores,
                   corretor: p.corretor,
+                  intermediacao: p.intermediacao,
+                  honorariosPct: p.honorariosPct,
                   valor: p.valor,
                   formas: p.formas,
                   entrada: p.entrada,

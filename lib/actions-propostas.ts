@@ -13,7 +13,8 @@ import { exigirEquipe } from './staff-auth';
 import { veTudo } from './papeis';
 import { cpfValido } from './leitura-documentos-servidor';
 import { completarProprietariosDaProposta, pessoasDaProposta, proprietariosDoImovel } from './proprietarios';
-import { numeroProposta } from './proposta-textos';
+import { divisaoConfere, intermediacaoPadrao, numeroProposta, type Intermediario } from './proposta-textos';
+import { acentuarCidade, consultarReceita, nomeBonito } from './empresas';
 
 export type Pessoa = {
   nome: string;
@@ -56,6 +57,10 @@ export type Proposta = {
   vendedor: Pessoa | null; // 1º vendedor
   vendedores: Pessoa[];
   corretor: Corretor | null;
+  /** quem intermedeia (imobiliárias e corretores); só um assina */
+  intermediacao: Intermediario[];
+  /** honorários de intermediação (% do valor total); null = não informado */
+  honorariosPct: number | null;
   valor: number;
   formas: string[];
   entrada: number | null;
@@ -233,6 +238,8 @@ export type PropostaInput = {
   compradores: Pessoa[];
   vendedores: Pessoa[];
   corretor: Corretor;
+  intermediacao?: Intermediario[];
+  honorariosPct?: number | null;
   valor: number;
   formas?: string[];
   entrada?: number | null;
@@ -262,7 +269,36 @@ export async function salvarProposta(d: PropostaInput): Promise<{ ok: boolean; i
   if (!imovelTexto) return { ok: false, erro: 'Descreva o imóvel da proposta.' };
   const vendedores = (d.vendedores ?? []).map(limparPessoa).filter((p): p is Pessoa => !!p).slice(0, 6);
   const vendedor = vendedores[0] ?? null;
-  const corretor: Corretor = { nome: t(d.corretor?.nome, 120) || eu.nome, creci: t(d.corretor?.creci, 30) || undefined, email: eu.email };
+  let corretor: Corretor = { nome: t(d.corretor?.nome, 120) || eu.nome, creci: t(d.corretor?.creci, 30) || undefined, email: eu.email };
+  // intermediação: imobiliárias e corretores; só UM assina a proposta
+  const num = (v: unknown) => (v == null || v === '' ? null : Math.round(Number(String(v).replace(',', '.')) * 100) / 100);
+  const intermediacao: Intermediario[] = (d.intermediacao ?? [])
+    .map((i) => ({
+      tipo: i?.tipo === 'imobiliaria' ? ('imobiliaria' as const) : ('corretor' as const),
+      nome: t(i?.nome, 160),
+      documento: t(i?.documento, 20) || undefined,
+      creci: t(i?.creci, 30) || undefined,
+      papel: i?.papel === 'parceiro' ? ('parceiro' as const) : ('responsavel' as const),
+      assina: !!i?.assina,
+      partePct: (() => {
+        const n = num(i?.partePct);
+        return n != null && n > 0 && n <= 100 ? n : null;
+      })()
+    }))
+    .filter((i) => i.nome)
+    .slice(0, 8);
+  if (intermediacao.length) {
+    if (intermediacao.filter((i) => i.assina).length > 1) return { ok: false, erro: 'Só um profissional da intermediação assina a proposta. Deixe marcado apenas um.' };
+    if (!intermediacao.some((i) => i.assina)) (intermediacao.find((i) => i.papel === 'responsavel') ?? intermediacao[0]).assina = true;
+    // o corretor responsável continua guardado no campo antigo (lista e histórico)
+    const resp = intermediacao.find((i) => i.tipo === 'corretor' && i.papel === 'responsavel');
+    if (resp) corretor = { nome: resp.nome, creci: resp.creci, email: eu.email };
+  }
+  const hp = num(d.honorariosPct);
+  const honorariosPct = hp != null && hp > 0 && hp <= 30 ? hp : null;
+  if (d.honorariosPct != null && String(d.honorariosPct) !== '' && honorariosPct == null) return { ok: false, erro: 'O percentual de honorários precisa ficar entre 0 e 30%.' };
+  if (!divisaoConfere(honorariosPct, intermediacao))
+    return { ok: false, erro: 'A divisão dos honorários entre os profissionais não soma o percentual total. Ajuste as partes ou deixe todas em branco.' };
 
   let propertyId: string | null = null;
   let developmentId: string | null = null;
@@ -317,6 +353,7 @@ export async function salvarProposta(d: PropostaInput): Promise<{ ok: boolean; i
         where p.id = $${eu.params.length + 1}::uuid and ${eu.cond} returning p.id`,
       [...eu.params, id, ...vals]
     );
+    if (r[0]) await query(`update propostas set intermediacao = $2, honorarios_pct = $3 where id = $1`, [id, intermediacao.length ? JSON.stringify(intermediacao) : null, honorariosPct]);
     if (!r[0]) return { ok: false, erro: 'Proposta não encontrada ou sem permissão para editar.' };
   } else {
     const r = await query<{ id: string }>(
@@ -327,6 +364,7 @@ export async function salvarProposta(d: PropostaInput): Promise<{ ok: boolean; i
       [...vals, eu.email]
     );
     id = r[0].id;
+    await query(`update propostas set intermediacao = $2, honorarios_pct = $3 where id = $1`, [id, intermediacao.length ? JSON.stringify(intermediacao) : null, honorariosPct]);
     if (d.contatoId && /^[0-9a-f-]{36}$/i.test(d.contatoId)) await query(`update propostas set contato_id = $2 where id = $1`, [id, d.contatoId]).catch(() => {});
     // compradores entram em Interessados (base para o futuro CRM), com o histórico da proposta
     const numero = (r[0] as { numero?: number }).numero;
@@ -389,6 +427,11 @@ const mapear = (r: Row): Proposta => fixCompradores({
   vendedor: pessoaDoBanco(r.vendedor),
   vendedores: pessoasDoBanco(r.vendedores).length ? pessoasDoBanco(r.vendedores) : pessoasDoBanco(r.vendedor),
   corretor: r.corretor && typeof r.corretor === 'object' ? (r.corretor as Corretor) : null,
+  // propostas antigas (sem a lista): a Mais Novos e o corretor que constava
+  intermediacao: Array.isArray(r.intermediacao) && r.intermediacao.length
+    ? (r.intermediacao as Intermediario[])
+    : intermediacaoPadrao(r.corretor && typeof r.corretor === 'object' ? (r.corretor as Corretor) : null),
+  honorariosPct: r.honorarios_pct != null ? Number(r.honorarios_pct) : null,
   valor: Number(r.valor_proposta),
   formas: Array.isArray(r.formas_pagamento) ? (r.formas_pagamento as string[]) : [],
   entrada: r.valor_entrada != null ? Number(r.valor_entrada) : null,
@@ -435,4 +478,100 @@ export async function mudarStatusProposta(id: string, status: Proposta['status']
 export async function excluirProposta(id: string): Promise<void> {
   const f = await podeVer();
   await query(`delete from propostas p where p.id = $${f.params.length + 1}::uuid and ${f.cond}`, [...f.params, id]);
+}
+
+// ---------------- buscas do formulário ----------------
+/** CPF ou CNPJ já cadastrado em algum lugar do portal: proprietários, propostas anteriores
+ *  (compradores e vendedores) e contatos do CRM. Devolve os dados e de onde vieram. */
+export async function buscarPessoaPorDocumento(documento: string): Promise<{ pessoa: Pessoa; origem: string } | null> {
+  await exigirEquipe();
+  const dig = soDig(documento, 14);
+  if (dig.length !== 11 && dig.length !== 14) return null;
+  const mesmo = (col: string) => `regexp_replace(coalesce(${col}, ''), '\\D', '', 'g') = $1`;
+  const pr = await query<Row>(`select * from proprietarios where ${mesmo('documento')} order by updated_at desc nulls last limit 1`, [dig]).catch(() => [] as Row[]);
+  if (pr[0]) {
+    const r = pr[0];
+    const pessoa = limparPessoa({
+      nome: r.nome as string,
+      documento: r.documento as string,
+      rg: (r.rg as string) ?? undefined,
+      nascimento: r.nascimento ? new Date(r.nascimento as string).toISOString().slice(0, 10) : undefined,
+      estadoCivil: (r.estado_civil as string) ?? undefined,
+      profissao: (r.profissao as string) ?? undefined,
+      telefone: (r.whatsapp as string) ?? undefined,
+      email: (r.email as string) ?? undefined,
+      cep: (r.cep as string) ?? undefined,
+      endereco: (r.endereco as string) ?? undefined,
+      bairro: (r.bairro as string) ?? undefined,
+      cidade: (r.cidade as string) ?? undefined,
+      uf: (r.uf as string) ?? undefined,
+      representante: (r.representante as string) ?? undefined
+    });
+    if (pessoa) return { pessoa, origem: 'Proprietários' };
+  }
+  // propostas anteriores: procura a pessoa dentro das listas de compradores e vendedores
+  const props = await query<{ lista: unknown }>(
+    `select x.lista from propostas p, lateral (values (p.compradores), (p.vendedores)) x(lista)
+      where x.lista::text like '%' || $2 || '%' or x.lista::text like '%' || $1 || '%'
+      order by p.created_at desc limit 20`,
+    [dig, documento.trim()]
+  ).catch(() => [] as { lista: unknown }[]);
+  for (const r of props) {
+    const achada = pessoasDoBanco(r.lista).find((p) => soDig(p.documento, 14) === dig);
+    if (achada) return { pessoa: achada, origem: 'Propostas anteriores' };
+  }
+  return null;
+}
+
+export type ProfissionalConhecido = { tipo: 'imobiliaria' | 'corretor'; nome: string; creci?: string; documento?: string; origem: string };
+
+/** Busca por nome ou CRECI: equipe, corretores parceiros do CRM e profissionais de propostas anteriores. */
+export async function buscarProfissionais(texto: string): Promise<ProfissionalConhecido[]> {
+  await exigirEquipe();
+  const q = t(texto, 60);
+  if (q.length < 2) return [];
+  const like = `%${q.toLowerCase()}%`;
+  const [equipe, parceiros, usados] = await Promise.all([
+    query<{ nome: string; creci: string | null }>(
+      `select coalesce(nullif(nome_publico, ''), name) nome, creci from staff_users
+        where lower(coalesce(nullif(nome_publico, ''), name)) like $1 or lower(coalesce(creci, '')) like $1 order by 1 limit 8`,
+      [like]
+    ).catch(() => []),
+    query<{ nome: string }>(`select nome from crm_contatos where tipo = 'corretor' and lower(nome) like $1 order by nome limit 6`, [like]).catch(() => []),
+    query<{ item: Intermediario }>(
+      `select distinct on (lower(i->>'nome')) i item from propostas p, jsonb_array_elements(coalesce(p.intermediacao, '[]'::jsonb)) i
+        where lower(i->>'nome') like $1 or lower(coalesce(i->>'creci', '')) like $1 or regexp_replace(coalesce(i->>'documento', ''), '\\D', '', 'g') like $2
+        limit 8`,
+      [like, `%${soDig(q, 14) || '#'}%`]
+    ).catch(() => [])
+  ]);
+  const out: ProfissionalConhecido[] = [
+    ...equipe.map((e) => ({ tipo: 'corretor' as const, nome: e.nome, creci: e.creci ?? undefined, origem: 'Equipe' })),
+    ...usados.map((u) => ({ tipo: u.item.tipo, nome: u.item.nome, creci: u.item.creci, documento: u.item.documento, origem: 'Já usado em proposta' })),
+    ...parceiros.map((p) => ({ tipo: 'corretor' as const, nome: p.nome, origem: 'Corretor parceiro (CRM)' }))
+  ];
+  const vistos = new Set<string>();
+  return out.filter((o) => (vistos.has(o.nome.toLowerCase()) ? false : (vistos.add(o.nome.toLowerCase()), true))).slice(0, 10);
+}
+
+/** CNPJ (empresa compradora, vendedora ou imobiliária): dados públicos da Receita, sem custo. */
+export async function consultarCnpjParaProposta(cnpj: string): Promise<Pessoa | null> {
+  await exigirEquipe();
+  const dig = soDig(cnpj, 14);
+  if (dig.length !== 14) return null;
+  const r = await consultarReceita(dig).catch(() => null);
+  if (!r) return null;
+  const b = (r.bruto ?? {}) as Record<string, unknown>;
+  const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '');
+  const rua = [txt(b.descricao_tipo_de_logradouro), txt(b.logradouro)].filter(Boolean).join(' ');
+  const endereco = [rua, txt(b.numero) && `nº ${txt(b.numero)}`, txt(b.complemento)].filter(Boolean).join(', ');
+  return limparPessoa({
+    nome: nomeBonito(r.razaoSocial) ?? r.razaoSocial,
+    documento: cnpj,
+    cidade: acentuarCidade(nomeBonito(r.municipio)) ?? undefined,
+    uf: r.uf ?? undefined,
+    endereco: nomeBonito(endereco) ?? undefined,
+    bairro: nomeBonito(txt(b.bairro)) ?? undefined,
+    cep: txt(b.cep) || undefined
+  });
 }

@@ -16,7 +16,8 @@ import {
   type Corretor,
   type OpcaoAlvo
 } from '@/lib/actions-propostas';
-import { brl } from '@/lib/proposta-textos';
+import { brl, calcularHonorarios, divisaoConfere, intermediacaoPadrao, textoPct, type Intermediario } from '@/lib/proposta-textos';
+import IntermediacaoCampos from '@/components/forms/IntermediacaoCampos';
 import { CrmNav } from '@/components/crm/comum';
 
 const moeda = (v: string | number) => {
@@ -36,11 +37,14 @@ function NovaProposta() {
   const [opcoes, setOpcoes] = useState<OpcaoAlvo[]>([]);
   const [imovelTexto, setImovelTexto] = useState('');
   const [unidade, setUnidade] = useState('');
-  const [compradores, setCompradores] = useState<PessoaForm[]>([{ nome: '' }]);
+  const [compradores, setCompradores] = useState<(PessoaForm & { pj?: boolean })[]>([{ nome: '' }]);
   const [contatoId, setContatoId] = useState<string | null>(null);
   const [vendedores, setVendedores] = useState<(PessoaForm & { pj?: boolean })[]>([{ nome: '' }]);
   const [guardarVendedor, setGuardarVendedor] = useState(false);
   const [corretor, setCorretor] = useState<Corretor>({ nome: '' });
+  const [intermediacao, setIntermediacao] = useState<Intermediario[]>([]);
+  // honorários: o percentual manda; o valor em R$ também pode ser digitado (ajusta o %)
+  const [honorariosPct, setHonorariosPct] = useState('');
   const [valor, setValor] = useState('');
   const [condicoes, setCondicoes] = useState('');
   const [validade, setValidade] = useState(5);
@@ -67,15 +71,24 @@ function NovaProposta() {
   useEffect(() => {
     if (!staff || iniciou.current) return;
     iniciou.current = true;
-    meuCorretor().then(setCorretor).catch(() => {});
+    meuCorretor()
+      .then((c) => {
+        setCorretor(c);
+        if (!editId) setIntermediacao(intermediacaoPadrao(c));
+      })
+      .catch(() => {
+        if (!editId) setIntermediacao(intermediacaoPadrao(null));
+      });
     if (editId) {
       getProposta(editId).then((p) => {
         if (!p) return;
         setImovelTexto(p.imovelTexto ?? '');
         setUnidade(p.unidade ?? '');
-        setCompradores(p.compradores.length ? p.compradores : [p.comprador]);
+        setCompradores((p.compradores.length ? p.compradores : [p.comprador]).map((c) => ({ ...c, pj: (c.documento ?? '').replace(/\D/g, '').length > 11 })));
         if (p.vendedores.length) setVendedores(p.vendedores.map((v) => ({ ...v, pj: (v.documento ?? '').replace(/\D/g, '').length > 11 })));
         if (p.corretor) setCorretor(p.corretor);
+        setIntermediacao(p.intermediacao);
+        setHonorariosPct(p.honorariosPct != null ? String(p.honorariosPct).replace('.', ',') : '');
         setValor(moeda(p.valor));
         setCondicoes(p.condicoes ?? '');
         setValidade(p.validadeDias);
@@ -111,6 +124,12 @@ function NovaProposta() {
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro(null);
+    const pctNum = honorariosPct.trim() ? Number(honorariosPct.replace(',', '.')) : null;
+    const lista = intermediacao.map((i) => ({ ...i, partePct: i.partePct != null && String(i.partePct) !== '' ? Number(String(i.partePct).replace(',', '.')) : null }));
+    if (!divisaoConfere(pctNum, lista)) {
+      setErro('A divisão dos honorários entre os profissionais não soma o percentual total. Ajuste as partes ou deixe todas em branco.');
+      return;
+    }
     setSalvando(true);
     try {
       const r = await salvarProposta({
@@ -119,10 +138,13 @@ function NovaProposta() {
         alvo: alvo ? { tipo: alvo.tipo, id: alvo.id } : null,
         imovelTexto,
         unidade,
-        compradores: compradores.filter((c) => c.nome.trim()).map(fecharEndereco),
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        compradores: compradores.filter((c) => c.nome.trim()).map(({ pj, ...c }) => fecharEndereco(c)),
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         vendedores: vendedores.filter((v) => v.nome.trim()).map(({ pj, ...v }) => fecharEndereco(v)),
         corretor,
+        intermediacao: lista,
+        honorariosPct: pctNum,
         valor: numero(valor),
         condicoes,
         validadeDias: validade,
@@ -231,7 +253,22 @@ function NovaProposta() {
                         </button>
                       </div>
                     )}
-                    <PessoaCampos valor={c} onChange={(v) => setCompradores((l) => l.map((x, j) => (j === i ? v : x)))} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      {[
+                        [false, 'Pessoa física'],
+                        [true, 'Pessoa jurídica']
+                      ].map(([pj, rot]) => (
+                        <button
+                          key={String(pj)}
+                          type="button"
+                          onClick={() => setCompradores((l) => l.map((x, j) => (j === i ? { ...x, pj: pj as boolean } : x)))}
+                          className={`rounded-full px-3.5 py-2 text-sm font-semibold ${!!c.pj === pj ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}
+                        >
+                          {rot as string}
+                        </button>
+                      ))}
+                    </div>
+                    <PessoaCampos valor={c} empresa={!!c.pj} onChange={(v) => setCompradores((l) => l.map((x, j) => (j === i ? { ...v, pj: x.pj } : x)))} />
                   </div>
                 ))}
                 <button type="button" onClick={() => setCompradores([...compradores, { nome: '' }])} className="w-fit rounded-full border border-dashed border-accent px-4 py-2 text-sm font-bold text-accent">
@@ -255,7 +292,7 @@ function NovaProposta() {
                       {vendedores.length > 1 && <span className="mr-1 text-sm font-bold">Vendedor {i + 1}</span>}
                       {[
                         [false, 'Pessoa física'],
-                        [true, 'Empresa']
+                        [true, 'Pessoa jurídica']
                       ].map(([pj, rot]) => (
                         <button
                           key={String(pj)}
@@ -290,19 +327,9 @@ function NovaProposta() {
 
           {Secao({
             n: 4,
-            titulo: 'Corretor responsável',
-            children: (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <span className={label}>Nome</span>
-                  <input className={input} value={corretor.nome} onChange={(e) => setCorretor({ ...corretor, nome: e.target.value })} />
-                </div>
-                <div>
-                  <span className={label}>CRECI</span>
-                  <input className={input} value={corretor.creci ?? ''} onChange={(e) => setCorretor({ ...corretor, creci: e.target.value })} placeholder="Fica guardado para as próximas" />
-                </div>
-              </div>
-            )
+            titulo: 'Intermediação',
+            dica: 'Imobiliárias e corretores que constam na proposta, responsáveis ou parceiros. Busque pelo nome ou pelo CRECI.',
+            children: <IntermediacaoCampos lista={intermediacao} onChange={setIntermediacao} comHonorarios={!!honorariosPct.trim()} />
           })}
 
           {Secao({
@@ -337,6 +364,50 @@ function NovaProposta() {
                     onChange={(e) => setCondicoes(e.target.value)}
                     placeholder={'Ex.:\nSinal de R$ 50.000 na assinatura do contrato;\nSaldo de R$ 450.000 por financiamento bancário em até 60 dias;\nPosse na entrega das chaves após a quitação.'}
                   />
+                </div>
+                {/* honorários de intermediação: opcional; vazio = não aparece na proposta */}
+                <div className="rounded-2xl bg-[var(--pill-bg)] p-4">
+                  <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">Honorários de intermediação (opcional)</span>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <span className={label}>Percentual (%)</span>
+                      <input className={input} inputMode="decimal" value={honorariosPct} onChange={(e) => setHonorariosPct(e.target.value.replace(/[^\d,.]/g, '').replace('.', ','))} placeholder="Ex.: 6" />
+                    </div>
+                    <div>
+                      <span className={label}>Ou o valor (R$)</span>
+                      <input
+                        className={input}
+                        inputMode="numeric"
+                        value={(() => {
+                          const h = calcularHonorarios(numero(valor), Number(honorariosPct.replace(',', '.')) || null);
+                          return h ? h.valor.toLocaleString('pt-BR') : '';
+                        })()}
+                        onChange={(e) => {
+                          const v = numero(e.target.value);
+                          const total = numero(valor);
+                          setHonorariosPct(v && total ? String(Math.round((v / total) * 10000) / 100).replace('.', ',') : '');
+                        }}
+                        placeholder={numero(valor) ? 'Calculado pelo %' : 'Preencha o valor da proposta'}
+                      />
+                    </div>
+                  </div>
+                  {(() => {
+                    const h = calcularHonorarios(numero(valor), Number(honorariosPct.replace(',', '.')) || null, intermediacao.map((i) => ({ ...i, partePct: Number(String(i.partePct ?? '').replace(',', '.')) || null })));
+                    if (!h) return <p className="mt-2 text-xs text-[var(--text-muted)]">Sem honorários preenchidos, o quadro não aparece na proposta.</p>;
+                    const ok = divisaoConfere(h.pct, intermediacao.map((i) => ({ ...i, partePct: Number(String(i.partePct ?? '').replace(',', '.')) || null })));
+                    return (
+                      <div className="mt-2 text-[13px]">
+                        Honorários: <b>{textoPct(h.pct)} = {brl(h.valor)}</b> · Valor líquido ao vendedor: <b>{brl(h.liquido)}</b>
+                        {h.divisao.length > 0 && (
+                          <span className={`block text-xs ${ok ? 'text-[var(--text-muted)]' : 'font-semibold text-red-600'}`}>
+                            Divisão: {h.divisao.map((x) => `${x.nome || 'sem nome'} ${textoPct(x.pct)} (${brl(x.valor)})`).join('; ')}
+                            {!ok && ' · a soma das partes não bate com o total'}
+                          </span>
+                        )}
+                        {h.divisao.length === 0 && <span className="block text-xs text-[var(--text-muted)]">Para mostrar a divisão, preencha a parte de cada profissional na Intermediação.</span>}
+                      </div>
+                    );
+                  })()}
                 </div>
               </>
             )

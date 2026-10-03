@@ -2,7 +2,7 @@ import { ESTADO_CIVIL, FORMAS_PAGAMENTO, brl, porExtenso } from '@/lib/proposta-
 import { EMPRESA } from '@/lib/seo';
 import type { Corretor, Pessoa } from '@/lib/actions-propostas';
 import CabecalhoDocumento from './CabecalhoDocumento';
-import { numeroProposta } from '@/lib/proposta-textos';
+import { calcularHonorarios, intermediacaoPadrao, numeroProposta, textoIntermediacao, textoPct, type Intermediario } from '@/lib/proposta-textos';
 
 export type DadosDocumento = {
   numero?: number;
@@ -11,6 +11,8 @@ export type DadosDocumento = {
   compradores: Pessoa[];
   vendedores: Pessoa[];
   corretor: Corretor | null;
+  intermediacao?: Intermediario[];
+  honorariosPct?: number | null;
   valor: number;
   formas?: string[];
   entrada?: number | null;
@@ -63,7 +65,7 @@ export const tituloArquivoProposta = (d: { compradores: Pessoa[]; valor: number 
 
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="mt-5 break-inside-avoid print:mt-3">
+    <section className="mt-5 break-inside-avoid print:mt-2">
       <h3 className="mb-1 flex items-baseline gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#1B5FCC] print:text-[10px]">
         {/* a barra "/" da marca Mais Novos no lugar do traço */}
         <span aria-hidden className="text-[14px] font-extrabold leading-none text-[#257CFF] print:text-[13px]">
@@ -92,7 +94,7 @@ function Pessoas({ lista, vazio }: { lista: Pessoa[]; vazio: string }) {
 
 function Assinatura({ nome, papel, extra }: { nome: string; papel: string; extra?: string }) {
   return (
-    <div className="break-inside-avoid pt-[72px] print:pt-[42px]">
+    <div className="break-inside-avoid pt-[72px] print:pt-[34px]">
       <div className="border-t border-[#14161a] pt-1.5 text-center text-[11.5px] leading-snug print:text-[10px]">
         <strong>{nome || '\u00a0'}</strong>
         <br />
@@ -111,11 +113,14 @@ function Assinatura({ nome, papel, extra }: { nome: string; papel: string; extra
 // Documento "Proposta de compra" para salvar em PDF ou imprimir. Uso interno da equipe.
 export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
   const corretorTxt = d.corretor?.nome ? `${d.corretor.nome}${d.corretor.creci ? `, CRECI ${d.corretor.creci}` : ''}` : null;
+  const intermediacao = d.intermediacao?.length ? d.intermediacao : intermediacaoPadrao(d.corretor);
+  const signatario = intermediacao.find((i) => i.assina) ?? intermediacao[0];
+  const hon = calcularHonorarios(d.valor, d.honorariosPct, intermediacao);
   // na folha, todas as assinaturas numa linha só (até 5 lado a lado) para caber em uma página
-  const assinaturas = d.compradores.length + Math.max(1, d.vendedores.length) + 1;
+  const assinaturas = d.compradores.length + Math.max(1, d.vendedores.length) + (signatario ? 1 : 0);
   const colunasAssinatura = assinaturas <= 3 ? 'print:grid-cols-3' : assinaturas === 4 ? 'print:grid-cols-4' : 'print:grid-cols-5';
   return (
-    <article className="documento-proposta mx-auto max-w-[800px] rounded-3xl border border-[var(--border)] bg-white px-10 py-9 text-[13px] leading-relaxed print:text-[11.5px] print:leading-snug text-[#14161a] shadow-sm print:max-w-none print:rounded-none print:border-0 print:shadow-none">
+    <article className="documento-proposta mx-auto max-w-[800px] rounded-3xl border border-[var(--border)] bg-white px-10 py-9 text-[13px] leading-relaxed print:text-[10.5px] print:leading-[1.36] text-[#14161a] shadow-sm print:max-w-none print:rounded-none print:border-0 print:shadow-none">
       <CabecalhoDocumento
         rotulo={`Proposta de compra${d.numero ? ` · nº ${numeroProposta(d.numero)}` : ''}`}
         titulo="Proposta de compra de imóvel"
@@ -126,14 +131,12 @@ export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
         <Pessoas lista={d.compradores} vazio="Proponente não informado." />
       </Secao>
 
-      <Secao titulo={d.vendedores.length > 1 ? 'Vendedores / proprietários' : 'Vendedor(a) / proprietário(a)'}>
+      <Secao titulo={d.vendedores.length > 1 ? 'Vendedores (proprietários ou construtora)' : 'Vendedor(a) (proprietário ou construtora)'}>
         <Pessoas lista={d.vendedores} vazio="Proprietário(a) do imóvel descrito abaixo." />
       </Secao>
 
-      <Secao titulo="Corretor responsável">
-        <p>
-          {corretorTxt ?? 'Mais Novos Imóveis'}. Intermediação: {EMPRESA.razao}, CNPJ {EMPRESA.cnpj}, {EMPRESA.creci}.
-        </p>
+      <Secao titulo="Intermediação">
+        <p>{textoIntermediacao(intermediacao)}.</p>
       </Secao>
 
       <Secao titulo="Imóvel">
@@ -154,15 +157,27 @@ export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
             </span>
             Condições de pagamento
           </div>
-          <div className="whitespace-pre-line text-[13.5px] print:text-[11.5px]">
+          <div className="whitespace-pre-line text-[13.5px] print:text-[10.5px] print:leading-[1.36]">
             {d.condicoes?.trim() ||
               [d.entrada ? `Entrada / sinal de ${brl(d.entrada)}.` : null, ...(d.formas ?? []).map((f) => FORMAS_PAGAMENTO[f] ?? f)].filter(Boolean).join('\n')}
           </div>
         </div>
+              {hon && (
+          <div className="mt-2 rounded-xl bg-[#F1F3F5] px-4 py-2.5 text-[11.5px] leading-snug text-[#3c4043] print:mt-1.5 print:px-3 print:py-1.5 print:text-[9.5px]">
+            Honorários de intermediação imobiliária: {textoPct(hon.pct)} do valor total, <strong>{brl(hon.valor)}</strong> ({porExtenso(hon.valor)}), integrantes do preço global
+            {hon.divisao.length > 0 ? (
+              <>, assim divididos: {hon.divisao.map((x) => `${x.nome}, ${textoPct(x.pct)} (${brl(x.valor)})`).join('; ')}.</>
+            ) : (
+              '.'
+            )}
+            <br />
+            Valor líquido ao vendedor, deduzidos os honorários: <strong>{brl(hon.liquido)}</strong> ({porExtenso(hon.liquido)}).
+          </div>
+        )}
       </Secao>
 
       <Secao titulo="Condições gerais">
-        <ol className="flex list-none flex-col gap-2 text-[12px] text-[#3c4043] print:gap-1 print:text-[9.5px] print:leading-[1.38]">
+        <ol className="flex list-none flex-col gap-2 text-[12px] text-[#3c4043] print:gap-0.5 print:text-[9px] print:leading-[1.3]">
           <li>
             <strong>1.</strong> Esta proposta é válida por {d.validadeDias} dias a contar da emissão e não obriga o(a) vendedor(a) a aceitá-la.
           </li>
@@ -200,23 +215,33 @@ export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
         </ol>
       </Secao>
 
-      <p className="mt-6 break-inside-avoid print:mt-3">
+      <p className="mt-6 break-inside-avoid print:mt-2">
         {EMPRESA.cidade}/{EMPRESA.uf}, {dataExtenso(d.data)}.
       </p>
 
       <div className={`grid grid-cols-1 gap-x-10 sm:grid-cols-2 print:gap-x-4 ${colunasAssinatura}`}>
         {d.compradores.map((c, i) => (
-          <Assinatura key={`c${i}`} nome={c.nome} papel="Proponente comprador(a)" extra={doc(c.documento) || undefined} />
+          <Assinatura key={`c${i}`} nome={c.nome} papel="Proponente comprador(a)" extra={[doc(c.documento), c.representante ? `por: ${c.representante}` : null].filter(Boolean).join(' · ') || undefined} />
         ))}
         {(d.vendedores.length ? d.vendedores : [{ nome: '' } as Pessoa]).map((v, i) => (
           <Assinatura
             key={`v${i}`}
             nome={v.nome}
             papel="Vendedor(a): de acordo"
-            extra={[doc(v.documento), v.representante].filter(Boolean).join(' · ') || undefined}
+            extra={[doc(v.documento), v.representante ? `por: ${v.representante}` : null].filter(Boolean).join(' · ') || undefined}
           />
         ))}
-        <Assinatura nome={d.corretor?.nome ?? ''} papel="Corretor(a) responsável" extra={d.corretor?.creci ? `CRECI ${d.corretor.creci}` : EMPRESA.creci} />
+        {signatario && (
+          <Assinatura
+            nome={signatario.nome}
+            papel={signatario.tipo === 'imobiliaria' ? 'Intermediadora' : signatario.papel === 'parceiro' ? 'Corretor(a) parceiro(a)' : 'Corretor(a) responsável'}
+            extra={
+              [signatario.tipo === 'imobiliaria' && signatario.documento ? `CNPJ ${signatario.documento}` : null, signatario.creci ? (/^creci/i.test(signatario.creci) ? signatario.creci : `CRECI ${signatario.creci}`) : null]
+                .filter(Boolean)
+                .join(' · ') || undefined
+            }
+          />
+        )}
       </div>
 
       <footer className="mt-10 flex items-center justify-between border-t border-[#e6e8eb] pt-3 text-[10.5px] text-[#9aa0a6] print:mt-5 print:pt-2 print:text-[9px]">

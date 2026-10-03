@@ -5,6 +5,7 @@ import CepField, { type Endereco } from '../CepField';
 import { textoDoArquivo, lerIdentidade, lerComprovante, formatarCpf } from '@/lib/leitura-documentos';
 import { ESTADO_CIVIL } from '@/lib/proposta-textos';
 import { buscarEmpresas } from '@/lib/actions-empresas';
+import { buscarPessoaPorDocumento, consultarCnpjParaProposta } from '@/lib/actions-propostas';
 import { formatarCnpj, nomeEmpresa, type Empresa } from '@/lib/empresas-tipos';
 import type { Pessoa } from '@/lib/actions-propostas';
 
@@ -28,10 +29,50 @@ export type PessoaForm = Pessoa & { numero?: string };
 // Campos de uma pessoa (comprador ou vendedor) + leitura automática de documento.
 // Os arquivos escolhidos são lidos SÓ no navegador para preencher os campos: não
 // são enviados nem guardados em lugar nenhum.
+/** CPF possível (dígitos verificadores). */
+function cpfConfere(v: string): boolean {
+  const c = v.replace(/\D/g, '');
+  if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false;
+  const dv = (n: number) => {
+    let s = 0;
+    for (let i = 0; i < n; i++) s += Number(c[i]) * (n + 1 - i);
+    const r = (s * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return dv(9) === Number(c[9]) && dv(10) === Number(c[10]);
+}
+
 export default function PessoaCampos({ valor, onChange, empresa = false }: { valor: PessoaForm; onChange: (p: PessoaForm) => void; empresa?: boolean }) {
   const ref = useRef(valor);
   ref.current = valor;
   const set = (m: Partial<PessoaForm>) => onChange({ ...ref.current, ...m });
+  const [avisoDoc, setAvisoDoc] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+  const ultimoDoc = useRef('');
+  // CPF/CNPJ completo: confere o CPF e procura a pessoa no portal (proprietários e propostas)
+  const conferirDocumento = async (doc: string) => {
+    const dig = doc.replace(/\D/g, '');
+    if (dig === ultimoDoc.current) return;
+    ultimoDoc.current = dig;
+    setAvisoDoc(null);
+    if (dig.length === 11 && !cpfConfere(dig)) {
+      setAvisoDoc({ tipo: 'erro', texto: 'Este CPF não confere. Verifique os números.' });
+      return;
+    }
+    if (dig.length !== 11 && dig.length !== 14) return;
+    let r = await buscarPessoaPorDocumento(dig).catch(() => null);
+    // CNPJ que não está no portal: dados públicos da Receita (sem custo)
+    if (!r && dig.length === 14) {
+      const p = await consultarCnpjParaProposta(doc).catch(() => null);
+      if (p) r = { pessoa: p, origem: 'Receita Federal (dados públicos do CNPJ)' };
+    }
+    if (!r || ultimoDoc.current !== dig) return;
+    // preenche só o que ainda está vazio (não apaga o que a pessoa digitou)
+    const atual = ref.current as Record<string, unknown>;
+    const novo: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(r.pessoa)) if (v && !atual[k]) novo[k] = v;
+    if (Object.keys(novo).length) set(novo as Partial<PessoaForm>);
+    setAvisoDoc({ tipo: 'ok', texto: `Encontrado em ${r.origem}: os campos vazios foram preenchidos.` });
+  };
   const [lendo, setLendo] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [sugestoesEmp, setSugestoesEmp] = useState<Empresa[]>([]);
@@ -141,7 +182,23 @@ export default function PessoaCampos({ valor, onChange, empresa = false }: { val
         </div>
         <div>
           <span className={label}>{pj ? 'CNPJ ou CPF' : 'CPF'}</span>
-          <input className={input} inputMode="numeric" value={valor.documento ?? ''} onChange={(e) => set({ documento: mascaraDoc(e.target.value) })} />
+          <input
+            className={`${input} ${avisoDoc?.tipo === 'erro' ? 'border-red-400' : ''}`}
+            inputMode="numeric"
+            value={valor.documento ?? ''}
+            onChange={(e) => {
+              const v = mascaraDoc(e.target.value);
+              set({ documento: v });
+              const n = v.replace(/\D/g, '').length;
+              // empresa: o CNPJ passa pelos 11 dígitos; só confere no 14º ou ao sair do campo
+              if (n === 14 || (n === 11 && !pj)) conferirDocumento(v);
+              else setAvisoDoc(null);
+            }}
+            onBlur={(e) => {
+              if (e.target.value.replace(/\D/g, '').length === 11) conferirDocumento(e.target.value);
+            }}
+          />
+          {avisoDoc && <p className={`mt-1 text-xs font-semibold ${avisoDoc.tipo === 'erro' ? 'text-red-600' : 'text-[#13874B]'}`}>{avisoDoc.texto}</p>}
         </div>
         {pj ? (
           <div>
