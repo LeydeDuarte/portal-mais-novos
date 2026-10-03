@@ -221,14 +221,14 @@ export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
 
       <div className={`grid grid-cols-1 gap-x-10 sm:grid-cols-2 print:gap-x-4 ${colunasAssinatura}`}>
         {d.compradores.map((c, i) => (
-          <Assinatura key={`c${i}`} nome={c.nome} papel="Proponente comprador(a)" extra={[doc(c.documento), c.representante ? `por: ${c.representante}` : null].filter(Boolean).join(' · ') || undefined} />
+          <Assinatura key={`c${i}`} nome={c.nome} papel="Proponente comprador(a)" extra={doc(c.documento) || undefined} />
         ))}
         {(d.vendedores.length ? d.vendedores : [{ nome: '' } as Pessoa]).map((v, i) => (
           <Assinatura
             key={`v${i}`}
             nome={v.nome}
             papel="Vendedor(a): de acordo"
-            extra={[doc(v.documento), v.representante ? `por: ${v.representante}` : null].filter(Boolean).join(' · ') || undefined}
+            extra={doc(v.documento) || undefined}
           />
         ))}
         {signatario && (

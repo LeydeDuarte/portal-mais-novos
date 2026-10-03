@@ -903,3 +903,109 @@ export async function moverPosVenda(id: string, etapa: 'entrega' | 'depoimento' 
   const nome = etapa === 'entrega' ? 'Entrega do imóvel' : etapa === 'depoimento' ? 'Depoimento do cliente' : 'pós-venda concluído';
   await query(`insert into crm_atividades (contato_id, tipo, texto, autor_email) values ($1, 'sistema', $2, $3)`, [n.contato_id, `Pós-venda: ${nome}`, s.email]);
 }
+
+// ---------------- Avaliação do imóvel do cliente (ficha) ----------------
+export type ImovelAvaliado = {
+  condominio?: string | null;
+  bairro: string;
+  cidade: string;
+  tipo: string;
+  area: number;
+  quartos?: number | null;
+  suites?: number | null;
+  vagas?: number | null;
+  unidade?: string | null;
+  ano?: number | null;
+  conservacao?: string | null;
+  motivo?: string | null; // permuta, venda, captação...
+};
+export type AvaliacaoSalva = {
+  id: string;
+  imovel: ImovelAvaliado;
+  resultado: { valor: number; minimo: number; maximo: number; m2: number; n: number; descartadas: number; grau: string; amplitudePct: number };
+  amostras: Record<string, unknown>[];
+  criadoPor: string | null;
+  criadoEm: string;
+};
+
+export async function listarAvaliacoes(contatoId: string): Promise<AvaliacaoSalva[]> {
+  const s = await exigirEquipe();
+  await podeVerContato(s, contatoId);
+  const r = await query<Record<string, unknown>>(`select * from crm_avaliacoes where contato_id = $1 order by criado_em desc limit 30`, [contatoId]);
+  return r.map((x) => ({
+    id: String(x.id),
+    imovel: x.imovel as ImovelAvaliado,
+    resultado: x.resultado as AvaliacaoSalva['resultado'],
+    amostras: (x.amostras as Record<string, unknown>[]) ?? [],
+    criadoPor: (x.criado_por as string) ?? null,
+    criadoEm: new Date(x.criado_em as string).toISOString()
+  }));
+}
+
+/** Guarda a avaliação no histórico do cliente, com a amostragem do dia (sem fotos). */
+export async function salvarAvaliacao(contatoId: string, imovel: ImovelAvaliado, resultado: AvaliacaoSalva['resultado'], amostras: Record<string, unknown>[]): Promise<{ id: string }> {
+  const s = await exigirEquipe();
+  await podeVerContato(s, contatoId);
+  if (!imovel?.bairro || !imovel?.cidade || !(Number(imovel.area) > 0)) throw new Error('Dados do imóvel incompletos.');
+  if (!(Number(resultado?.valor) > 0)) throw new Error('Calcule a avaliação antes de salvar.');
+  const limpas = (amostras ?? []).slice(0, 60).map((a) => {
+    const o: Record<string, unknown> = {};
+    for (const k of ['titulo', 'condominio', 'bairro', 'area', 'quartos', 'vagas', 'ano', 'preco', 'm2', 'm2Homog', 'distKm', 'slug', 'publico', 'mesmoCondominio', 'peso'])
+      if (a[k] !== undefined) o[k] = a[k];
+    return o;
+  });
+  const r = await query<{ id: string }>(
+    `insert into crm_avaliacoes (contato_id, imovel, resultado, amostras, criado_por) values ($1, $2, $3, $4, $5) returning id`,
+    [contatoId, JSON.stringify(imovel), JSON.stringify(resultado), JSON.stringify(limpas), s.email]
+  );
+  const valor = Number(resultado.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+  await query(`insert into crm_atividades (contato_id, tipo, texto, autor_email) values ($1, 'sistema', $2, $3)`, [
+    contatoId,
+    `Avaliação do imóvel${imovel.motivo ? ` (${imovel.motivo})` : ''}: ${[imovel.condominio, imovel.bairro].filter(Boolean).join(', ')}, ${imovel.area} m², estimado em ${valor}`,
+    s.email
+  ]);
+  return { id: r[0].id };
+}
+
+export async function excluirAvaliacao(id: string): Promise<void> {
+  const s = await exigirEquipe();
+  const r = (await query<{ contato_id: string }>(`select contato_id from crm_avaliacoes where id = $1`, [id]))[0];
+  if (!r) return;
+  await podeVerContato(s, r.contato_id);
+  await query(`delete from crm_avaliacoes where id = $1`, [id]);
+}
+
+// ---------------- VGV (tela Hoje) ----------------
+export type Vgv = { propostas: { n: number; valor: number }; contrato: { n: number; valor: number }; fechadosMes: { n: number; valor: number }; fechadosAno: { n: number; valor: number }; todaEquipe: boolean };
+
+/** VGV em propostas (propostas ativas), em contrato (negócios na etapa Contrato) e contratos
+ *  fechados (ganhos no mês e no ano). Corretor vê só os dele. */
+export async function crmVgv(): Promise<Vgv> {
+  const s = await exigirEquipe();
+  const gestor = veTudo(s.role);
+  const prop = await query<{ n: string; v: string }>(
+    `select count(*) n, coalesce(sum(valor_proposta), 0) v from propostas p
+      where p.status in ('nova', 'em_analise', 'enviada_proprietario', 'aceita')${gestor ? '' : ` and lower(coalesce(p.criado_por, '')) = lower($1)`}`,
+    gestor ? [] : [s.email]
+  );
+  const neg = comEscopo(
+    s,
+    `select count(*) filter (where n.funil = 'comprar' and n.etapa = 'contrato') nc, coalesce(sum(n.valor) filter (where n.funil = 'comprar' and n.etapa = 'contrato'), 0) vc,
+            count(*) filter (where n.etapa = 'ganho' and coalesce(n.fechado_em, n.etapa_desde) >= date_trunc('month', now() at time zone 'America/Sao_Paulo')) nm,
+            coalesce(sum(n.valor) filter (where n.etapa = 'ganho' and coalesce(n.fechado_em, n.etapa_desde) >= date_trunc('month', now() at time zone 'America/Sao_Paulo')), 0) vm,
+            count(*) filter (where n.etapa = 'ganho' and coalesce(n.fechado_em, n.etapa_desde) >= date_trunc('year', now() at time zone 'America/Sao_Paulo')) na,
+            coalesce(sum(n.valor) filter (where n.etapa = 'ganho' and coalesce(n.fechado_em, n.etapa_desde) >= date_trunc('year', now() at time zone 'America/Sao_Paulo')), 0) va
+       from crm_negocios n where n.funil = 'comprar' and {ESCOPO}`,
+    [],
+    'n.corretor_email'
+  );
+  const r = (await query<Record<string, string>>(neg.sql, neg.params))[0] ?? {};
+  const N = (v: unknown) => Number(v) || 0;
+  return {
+    propostas: { n: N(prop[0]?.n), valor: N(prop[0]?.v) },
+    contrato: { n: N(r.nc), valor: N(r.vc) },
+    fechadosMes: { n: N(r.nm), valor: N(r.vm) },
+    fechadosAno: { n: N(r.na), valor: N(r.va) },
+    todaEquipe: gestor
+  };
+}

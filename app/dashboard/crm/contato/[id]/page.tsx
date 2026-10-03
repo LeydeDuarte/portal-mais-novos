@@ -16,6 +16,7 @@ import {
   crmContato,
   enviarMensagemWhatsapp,
   ligarIaNoContato,
+  contratoAssinado,
   marcarTipo,
   moverNegocio,
   registrarAtividade,
@@ -24,6 +25,7 @@ import {
 } from '@/lib/actions-crm';
 import { FUNIS } from '@/lib/crm-tipos';
 import SelecionarImoveis from '@/components/crm/SelecionarImoveis';
+import AvaliacaoImovel from '@/components/crm/AvaliacaoImovel';
 import { numeroProposta } from '@/lib/proposta-textos';
 
 const ICONE_ATV: Record<string, string> = { entrada: '→', whatsapp: 'W', ligacao: 'L', visita: 'V', nota: 'N', simulacao: 'S', sistema: '•', envio: '↗', abriu: '✓' };
@@ -314,7 +316,21 @@ export default function FichaPage() {
                       if (m === null) return;
                       motivo = m;
                     }
-                    moverNegocio(n.id, e.target.value, motivo).then(carregar);
+                    const v = e.target.value;
+                    if (n.funil === 'comprar' && v === 'ganho') {
+                      const hoje = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+                      const data = window.prompt('Contrato assinado: data da assinatura (AAAA-MM-DD)', hoje);
+                      if (!data) return;
+                      const valorTxt = window.prompt('Valor final do negócio (R$)', n.valor ? String(Math.round(n.valor)) : '');
+                      if (valorTxt === null) return;
+                      contratoAssinado(n.id, data.trim(), Number(valorTxt.replace(/\D/g, '')) || null)
+                        .then(carregar)
+                        .catch((err) => window.alert(err instanceof Error ? err.message : 'Não foi possível registrar.'));
+                      return;
+                    }
+                    moverNegocio(n.id, v, motivo)
+                      .then(carregar)
+                      .catch((err) => window.alert(err instanceof Error ? err.message : 'Não foi possível mover.'));
                   }}
                   className="mt-2 h-9 w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-2 text-[13px] font-semibold"
                 >
@@ -323,12 +339,13 @@ export default function FichaPage() {
                       {e.nome}
                     </option>
                   ))}
-                  <option value="ganho">Ganho</option>
+                  <option value="ganho">{n.funil === 'comprar' ? 'Contrato assinado (ganho)' : 'Ganho'}</option>
                   <option value="perdido">Perdido</option>
                 </select>
               </div>
             ))}
           </section>
+          <AvaliacaoImovel contatoId={c.id} />
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--bg)] p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-[14px] font-bold">Propostas ({d.propostas.length})</h2>

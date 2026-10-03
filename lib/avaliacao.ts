@@ -12,6 +12,7 @@ import { query } from './db';
 import { cookies } from 'next/headers';
 import { origemDoNavegador } from './origem-servidor';
 import { getCliente } from './cliente-auth';
+import { exigirEquipe } from './staff-auth';
 // grupos de tipo (mesma divisão usada nos similares)
 const GRUPO_TIPO: Record<string, string> = {
   studio: 'vertical', flat: 'vertical', loft: 'vertical', apartamento: 'vertical', apartamento_garden: 'vertical',
@@ -21,8 +22,8 @@ const GRUPO_TIPO: Record<string, string> = {
   sala_comercial: 'comercial', loja_ponto_comercial: 'comercial', galpao: 'comercial', predio_comercial: 'comercial'
 };
 
-export type EntradaAvaliacao = { cidade: string; bairro: string; tipo: string; area: number; quartos?: number | null; vagas?: number | null; ano?: number | null };
-export type Amostra = { titulo: string; bairro: string; area: number; preco: number; m2: number; m2Homog: number; distKm: number | null; slug: string | null; peso: number; publico: boolean };
+export type EntradaAvaliacao = { cidade: string; bairro: string; tipo: string; area: number; quartos?: number | null; vagas?: number | null; ano?: number | null; condominio?: string | null };
+export type Amostra = { titulo: string; bairro: string; area: number; preco: number; m2: number; m2Homog: number; distKm: number | null; slug: string | null; peso: number; publico: boolean; condominio?: string | null; quartos?: number | null; vagas?: number | null; ano?: number | null; mesmoCondominio?: boolean };
 export type ResultadoAvaliacao =
   | { ok: false; erro: string }
   | {
@@ -38,6 +39,8 @@ export type ResultadoAvaliacao =
       amostras: Amostra[];
     };
 
+const semAcentoMin = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/^(edif[ií]cio|residencial|condom[ií]nio)\s+/, '').trim();
+
 // t de Student bicaudal 80% por graus de liberdade (n-1)
 const T80: Record<number, number> = { 1: 3.078, 2: 1.886, 3: 1.638, 4: 1.533, 5: 1.476, 6: 1.44, 7: 1.415, 8: 1.397, 9: 1.383, 10: 1.372, 12: 1.356, 15: 1.341, 20: 1.325, 30: 1.31 };
 const t80 = (gl: number) => {
@@ -50,14 +53,30 @@ export async function avaliarImovel(e: EntradaAvaliacao): Promise<ResultadoAvali
   const cliente = await getCliente().catch(() => null);
   if (!cliente) return { ok: false, erro: 'Entre com a sua conta para ver a avaliação.' };
   const area = Number(e.area);
-  if (!e.cidade?.trim() || !e.bairro?.trim()) return { ok: false, erro: 'Escolha o bairro na lista.' };
-  if (!(area >= 15 && area <= 5000)) return { ok: false, erro: 'Informe a área privativa em m² (entre 15 e 5.000).' };
   const registrar = (resumo: string) =>
     query(
       `insert into interest_leads (nome, email, condominio, mensagem, finalidade, area_min, quartos, aceita_contato, visitante, origem_web)
        values ($1, $2, 'Avaliação de imóvel', $3, 'venda', $4, $5, true, $6, $7::jsonb)`,
       [cliente.nome || cliente.email, cliente.email, `Avaliação: ${e.tipo} de ${area} m² no ${e.bairro} (${e.cidade}). ${resumo}`, area, e.quartos ? Math.round(e.quartos) : null, cookies().get('mn_vid')?.value?.slice(0, 64) ?? null, JSON.stringify(origemDoNavegador())]
     ).catch(() => {});
+  return calcularAvaliacao({ ...e, condominio: null }, registrar);
+}
+
+/** Avaliação feita pela equipe no CRM (ficha do cliente): mesmo cálculo, sem login de
+ *  cliente e sem criar lead; considera o condomínio informado. */
+export async function avaliarParaEquipe(e: EntradaAvaliacao): Promise<ResultadoAvaliacao> {
+  await exigirEquipe();
+  const r = await calcularAvaliacao(e, async () => {});
+  if (!r.ok && /Recebemos o seu pedido/.test(r.erro)) {
+    return { ok: false, erro: r.erro.replace(/ Recebemos o seu pedido.*$/, ' Tente ampliar a área ou conferir o bairro e o tipo.') };
+  }
+  return r;
+}
+
+async function calcularAvaliacao(e: EntradaAvaliacao, registrar: (resumo: string) => Promise<unknown>): Promise<ResultadoAvaliacao> {
+  const area = Number(e.area);
+  if (!e.cidade?.trim() || !e.bairro?.trim()) return { ok: false, erro: 'Escolha o bairro na lista.' };
+  if (!(area >= 15 && area <= 5000)) return { ok: false, erro: 'Informe a área privativa em m² (entre 15 e 5.000).' };
   const grupo = GRUPO_TIPO[e.tipo] ?? 'vertical';
   const tipos = Object.entries(GRUPO_TIPO).filter(([, g]) => g === grupo).map(([t]) => t);
 
@@ -72,9 +91,9 @@ export async function avaliarImovel(e: EntradaAvaliacao): Promise<ResultadoAvali
     lat != null && lng != null
       ? `111.2 * sqrt(power(coalesce(p.lat, d.lat, bc.lat) - ${lat}, 2) + power((coalesce(p.lng, d.lng, bc.lng) - ${lng}) * cos(radians(${lat})), 2))`
       : 'null::float';
-  const rows = await query<{ titulo: string | null; bairro: string | null; area: string; price_value: string; quartos: number | null; vagas: number | null; delivery_date: Date | string | null; slug: string | null; dist: number | null; mesmo: boolean; visibilidade: string }>(
+  const rows = await query<{ titulo: string | null; bairro: string | null; area: string; price_value: string; quartos: number | null; vagas: number | null; delivery_date: Date | string | null; slug: string | null; dist: number | null; mesmo: boolean; visibilidade: string; condominio: string | null }>(
     `select * from (
-       select p.titulo, p.bairro, p.area, p.price_value, p.quartos, p.vagas, p.delivery_date, p.slug, p.visibilidade,
+       select p.titulo, p.bairro, p.area, p.price_value, p.quartos, p.vagas, coalesce(p.delivery_date, d.delivery_date) delivery_date, p.slug, p.visibilidade, coalesce(d.name, p.condominio) condominio,
               ${dist} as dist, lower(coalesce(p.bairro, '')) = lower($3) as mesmo
          from properties p
          left join developments d on d.id = p.empreendimento_id
@@ -103,8 +122,26 @@ export async function avaliarImovel(e: EntradaAvaliacao): Promise<ResultadoAvali
     const fIdade = anoAval && anoC ? Math.min(1.2, Math.max(0.8, 1 + 0.01 * (anoAval - anoC))) : 1;
     const m2Homog = m2 * fOferta * fArea * fQuartos * fVagas * fIdade;
     const d = r.dist != null ? Number(r.dist) : null;
-    const peso = (r.mesmo ? 1.5 : 1) * (1 / (1 + (d ?? 1.5))) * (1 / (1 + Math.abs(a - area) / area));
-    return { titulo: r.titulo || 'Imóvel', bairro: r.bairro || '', area: a, preco: p, m2, m2Homog, distKm: d, slug: r.slug, peso, publico: r.visibilidade === 'publico' };
+    // mesmo condomínio do imóvel avaliado pesa mais (informado na avaliação pela equipe)
+    const mesmoCondominio = !!e.condominio && !!r.condominio && semAcentoMin(r.condominio) === semAcentoMin(e.condominio);
+    const peso = (mesmoCondominio ? 2 : 1) * (r.mesmo ? 1.5 : 1) * (1 / (1 + (d ?? 1.5))) * (1 / (1 + Math.abs(a - area) / area));
+    return {
+      titulo: r.titulo || 'Imóvel',
+      bairro: r.bairro || '',
+      area: a,
+      preco: p,
+      m2,
+      m2Homog,
+      distKm: d,
+      slug: r.slug,
+      peso,
+      publico: r.visibilidade === 'publico',
+      condominio: r.condominio,
+      quartos: r.quartos,
+      vagas: r.vagas,
+      ano: anoC,
+      mesmoCondominio
+    };
   });
   // saneamento: descarta o que estiver a mais de 35% da mediana homogeneizada
   const ord = [...brutas].map((x) => x.m2Homog).sort((a, b) => a - b);
