@@ -96,14 +96,21 @@ export default function RelatorioAvaliacao() {
           <CabecalhoDocumento rotulo="Avaliação de imóvel" titulo="Relatório de avaliação" linha={`${EMPRESA.cidade}/${EMPRESA.uf}, ${dataExtenso(a.criadoEm)}`} />
 
           <Secao titulo="Imóvel avaliado">
-            <p>
-              {tipo} de <strong>{i.area} m²</strong> de área privativa
-              {i.quartos ? `, ${i.quartos} quarto(s)` : ''}
-              {i.suites ? ` (${i.suites} suíte(s))` : ''}
-              {i.vagas != null ? `, ${i.vagas} vaga(s)` : ''}
-              {i.ano ? `, entregue em ${i.ano}` : ''}
-              {i.unidade ? `, unidade ${i.unidade}` : ''}. {local}.
-            </p>
+            {i.objeto === 'lote' ? (
+              <p>
+                Lote de <strong>{String(i.area).replace('.', ',')} m²</strong> em condomínio horizontal. {local}.
+              </p>
+            ) : (
+              <p>
+                {tipo} de <strong>{String(i.area).replace('.', ',')} m²</strong> {i.horizontal ? 'de área construída' : 'de área privativa'}
+                {i.horizontal && i.areaLote ? <>, em lote de <strong>{String(i.areaLote).replace('.', ',')} m²</strong></> : null}
+                {i.quartos ? `, ${i.quartos} quarto(s)` : ''}
+                {i.suites ? ` (${i.suites} suíte(s))` : ''}
+                {i.vagas != null ? `, ${i.vagas} vaga(s)` : ''}
+                {i.ano ? `, entregue em ${i.ano}` : ''}
+                {i.unidade ? `, unidade ${i.unidade}` : ''}. {local}.
+              </p>
+            )}
           </Secao>
 
           {r && (
@@ -148,6 +155,7 @@ export default function RelatorioAvaliacao() {
                   <th className="py-1 pr-2 font-semibold">Imóvel</th>
                   <th className="px-1 py-1 font-semibold">Fonte</th>
                   <th className="px-1 py-1 text-right font-semibold">m²</th>
+                  {i.horizontal && i.objeto !== 'lote' && <th className="px-1 py-1 text-right font-semibold">Lote m²</th>}
                   <th className="px-1 py-1 text-right font-semibold">Qts/vg</th>
                   <th className="px-1 py-1 text-right font-semibold">Entrega</th>
                   <th className="px-1 py-1 text-right font-semibold">Preço anunciado</th>
@@ -179,6 +187,7 @@ export default function RelatorioAvaliacao() {
                         {x.vistoEm && <span className="block text-[9.5px] text-[#5f6368] print:text-[7.5px]">anúncio ativo em {x.vistoEm.slice(0, 10).split('-').reverse().join('/')}</span>}
                       </td>
                       <td className="px-1 py-1 text-right tabular-nums">{Math.round(x.area)}</td>
+                      {i.horizontal && i.objeto !== 'lote' && <td className="px-1 py-1 text-right tabular-nums">{x.areaLote ? Math.round(x.areaLote) : '-'}</td>}
                       <td className="px-1 py-1 text-right tabular-nums">
                         {x.quartos ?? '-'}/{x.vagas ?? '-'}
                       </td>
@@ -222,7 +231,7 @@ export default function RelatorioAvaliacao() {
             <p className="text-[11.5px] text-[#3c4043] print:text-[9px]">
               Método comparativo direto de dados de mercado (ABNT NBR 14653-2). Amostras de {fontes.join(', ')}
               {i.horizontal ? `; condomínio horizontal: casas do próprio condomínio e dos condomínios vizinhos a até ${String(i.raioKm ?? 2).replace('.', ',')} km` : i.condominio ? `; mesmo condomínio e prédios a até ${String(i.raioKm ?? 1).replace('.', ',')} km` : '; mesmo bairro'}; metragem até {faixaMetragem(i).pct}% maior ou menor que a do imóvel avaliado
-              {i.ano && (i.margemIdade ?? 5) > 0 ? `; prédios entregues até ${i.margemIdade ?? 5} anos antes ou depois de ${i.ano}` : ''}. Cada amostra foi homogeneizada por área, quartos, vagas e idade e, nos anúncios, pelo desconto de negociação estimado
+              {i.ano && (i.margemIdade ?? 5) > 0 ? `; prédios entregues até ${i.margemIdade ?? 5} anos antes ou depois de ${i.ano}` : ''}. Cada amostra foi homogeneizada por {i.objeto === 'lote' ? 'área do lote' : i.horizontal && i.areaLote ? 'área construída, tamanho do lote, quartos, vagas e idade' : 'área, quartos, vagas e idade'} e, nos anúncios, pelo desconto de negociação estimado
               de {r?.descontoPct ?? 10}% (imóveis vendidos entram pelo valor de venda); o mesmo imóvel anunciado em mais de um site foi contado uma única vez, pela fonte mais completa; foram descartadas as amostras a mais de 35% da mediana; o valor é a média ponderada pela semelhança de cada amostra, com intervalo de confiança de 80%.
             </p>
           </Secao>

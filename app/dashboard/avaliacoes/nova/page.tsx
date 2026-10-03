@@ -55,7 +55,7 @@ function Avaliar() {
   const [opcoesCond, setOpcoesCond] = useState<CondominioAval[]>([]);
   const [indice, setIndice] = useState<LocalSugestao[]>([]);
   const [buscaBairro, setBuscaBairro] = useState('');
-  const [f, setF] = useState({ bairro: '', cidade: '', tipo: 'apartamento', area: '', quartos: '', suites: '', vagas: '', ano: '', unidade: '', observacao: '', margem: String(MARGEM_PADRAO), margemIdade: String(MARGEM_IDADE_PADRAO), raio: String(RAIO_PADRAO_KM), validade: String(VALIDADE_PADRAO_MESES), desconto: String(DESCONTO_PADRAO) });
+  const [f, setF] = useState({ bairro: '', cidade: '', tipo: 'apartamento', area: '', quartos: '', suites: '', vagas: '', ano: '', unidade: '', observacao: '', margem: String(MARGEM_PADRAO), margemIdade: String(MARGEM_IDADE_PADRAO), raio: String(RAIO_PADRAO_KM), validade: String(VALIDADE_PADRAO_MESES), desconto: String(DESCONTO_PADRAO), objeto: 'casa_lote', areaLote: '' });
   const [amostras, setAmostras] = useState<AmostraAvaliacao[]>([]);
   const [resultado, setResultado] = useState<ResultadoAvaliacaoInterna | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -80,7 +80,7 @@ function Avaliar() {
         setModo('condominio');
         setCond({ id: i.developmentId, nome: i.condominio ?? '', bairro: i.bairro, cidade: i.cidade, horizontal: !!i.horizontal, ano: i.ano ?? null, lat: null, lng: null });
       } else setModo('regiao');
-      setF({ bairro: i.bairro, cidade: i.cidade, tipo: i.tipo, area: br(i.area), quartos: String(i.quartos ?? ''), suites: String(i.suites ?? ''), vagas: String(i.vagas ?? ''), ano: String(i.ano ?? ''), unidade: i.unidade ?? '', observacao: i.observacao ?? '', margem: String(i.margemPct || MARGEM_PADRAO), margemIdade: String(i.margemIdade ?? MARGEM_IDADE_PADRAO), raio: br(i.raioKm || RAIO_PADRAO_KM), validade: String(i.validadeMeses ?? VALIDADE_PADRAO_MESES), desconto: String(i.descontoPct ?? DESCONTO_PADRAO) });
+      setF({ bairro: i.bairro, cidade: i.cidade, tipo: i.tipo, area: br(i.area), quartos: String(i.quartos ?? ''), suites: String(i.suites ?? ''), vagas: String(i.vagas ?? ''), ano: String(i.ano ?? ''), unidade: i.unidade ?? '', observacao: i.observacao ?? '', margem: String(i.margemPct || MARGEM_PADRAO), margemIdade: String(i.margemIdade ?? MARGEM_IDADE_PADRAO), raio: br(i.raioKm || RAIO_PADRAO_KM), validade: String(i.validadeMeses ?? VALIDADE_PADRAO_MESES), desconto: String(i.descontoPct ?? DESCONTO_PADRAO), objeto: i.objeto ?? 'casa_lote', areaLote: br(i.areaLote ?? null) });
       setAmostras(a.amostras);
       setResultado(a.resultado);
     });
@@ -119,13 +119,15 @@ function Avaliar() {
 
   if (!loaded || !staff) return null;
 
+  const horizontal = modo === 'condominio' && !!cond?.horizontal;
+  const soLote = horizontal && f.objeto === 'lote';
   const imovel = (): ImovelAvaliacao => ({
     developmentId: modo === 'condominio' ? cond?.id ?? null : null,
     condominio: modo === 'condominio' ? cond?.nome ?? null : null,
     horizontal: modo === 'condominio' ? !!cond?.horizontal : false,
     bairro: f.bairro,
     cidade: f.cidade,
-    tipo: f.tipo,
+    tipo: soLote ? 'terreno_lote' : f.tipo,
     area: Number(n(f.area)) || 0,
     quartos: n(f.quartos),
     suites: n(f.suites),
@@ -137,7 +139,9 @@ function Avaliar() {
     margemIdade: n(f.margemIdade) ?? MARGEM_IDADE_PADRAO,
     raioKm: n(f.raio) ?? RAIO_PADRAO_KM,
     validadeMeses: n(f.validade) ?? VALIDADE_PADRAO_MESES,
-    descontoPct: n(f.desconto) ?? DESCONTO_PADRAO
+    descontoPct: n(f.desconto) ?? DESCONTO_PADRAO,
+    objeto: horizontal ? (f.objeto as 'casa_lote' | 'lote') : null,
+    areaLote: horizontal && f.objeto !== 'lote' ? n(f.areaLote) : null
   });
   const pronto = !!f.bairro && !!n(f.area) && (modo === 'regiao' || !!cond);
   const juntar = (novas: AmostraAvaliacao[]) =>
@@ -322,6 +326,24 @@ function Avaliar() {
                 )}
               </label>
             )}
+            {horizontal && (
+              <div className="md:col-span-2">
+                <span className={rot}>O que avaliar</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      ['casa_lote', 'Casa com o lote'],
+                      ['lote', 'Só o lote']
+                    ] as const
+                  ).map(([v, l]) => (
+                    <button key={v} type="button" onClick={() => { mudar('objeto', v); setAmostras([]); }} className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold ${f.objeto === v ? 'bg-ink text-white' : 'bg-[var(--pill-bg)]'}`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!soLote && (
             <label>
               <span className={rot}>Tipo *</span>
               <select className={campo} value={f.tipo} onChange={(e) => mudar('tipo', e.target.value)}>
@@ -332,10 +354,18 @@ function Avaliar() {
                 ))}
               </select>
             </label>
+            )}
             <label>
-              <span className={rot}>Área privativa (m²) *</span>
+              <span className={rot}>{soLote ? 'Área do lote (m²) *' : horizontal ? 'Área construída da casa (m²) *' : 'Área privativa (m²) *'}</span>
               <input className={campo} inputMode="decimal" value={f.area} onChange={(e) => mudar('area', e.target.value.replace(/[^\d,.]/g, ''))} />
             </label>
+            {horizontal && !soLote && (
+              <label>
+                <span className={rot}>Área do lote (m²)</span>
+                <input className={campo} inputMode="decimal" value={f.areaLote} onChange={(e) => mudar('areaLote', e.target.value.replace(/[^\d,.]/g, ''))} placeholder="Ex.: 450" />
+              </label>
+            )}
+            {!soLote && (
             <div className="grid grid-cols-3 gap-2">
               <label>
                 <span className={rot}>Quartos</span>
@@ -350,6 +380,8 @@ function Avaliar() {
                 <input className={campo} inputMode="numeric" value={f.vagas} onChange={(e) => mudar('vagas', e.target.value.replace(/\D/g, '').slice(0, 2))} />
               </label>
             </div>
+            )}
+            {!soLote && (
             <div className="grid grid-cols-2 gap-2">
               <label>
                 <span className={rot}>Ano de entrega (idade)</span>
@@ -360,6 +392,7 @@ function Avaliar() {
                 <input className={campo} value={f.unidade} onChange={(e) => mudar('unidade', e.target.value)} />
               </label>
             </div>
+            )}
             <div className="md:col-span-2">
               <span className={rot}>Margem de metragem das amostras</span>
               <div className="flex flex-wrap items-center gap-1.5">
@@ -379,8 +412,9 @@ function Avaliar() {
                 ) : null}
               </div>
             </div>
+            {!soLote && (
             <div className="md:col-span-2">
-              <span className={rot}>Margem de idade do prédio (ano de entrega)</span>
+              <span className={rot}>{horizontal ? 'Margem de idade da casa (ano de entrega)' : 'Margem de idade do prédio (ano de entrega)'}</span>
               <div className="flex flex-wrap items-center gap-1.5">
                 {(
                   [
@@ -399,11 +433,12 @@ function Avaliar() {
                   {!n(f.ano)
                     ? 'Informe o ano de entrega para usar a margem de idade.'
                     : Number(f.margemIdade) > 0
-                      ? `entram prédios entregues de ${Number(n(f.ano)) - Number(f.margemIdade)} a ${Number(n(f.ano)) + Number(f.margemIdade)}`
+                      ? `entram ${horizontal ? 'casas' : 'prédios'} entregues de ${Number(n(f.ano)) - Number(f.margemIdade)} a ${Number(n(f.ano)) + Number(f.margemIdade)}`
                       : 'amostras de qualquer idade (a idade só ajusta o preço)'}
                 </span>
               </div>
             </div>
+            )}
             {modo === 'condominio' && (
               <div className="md:col-span-2">
                 <span className={rot}>{cond?.horizontal ? 'Raio de busca (condomínios vizinhos)' : 'Raio de busca (prédios em volta)'}</span>
@@ -498,6 +533,7 @@ function Avaliar() {
                     <th className="py-1.5 pr-2 font-semibold">Imóvel</th>
                     <th className="px-2 py-1.5 font-semibold">Fonte</th>
                     <th className="px-2 py-1.5 text-right font-semibold">m²</th>
+                    {horizontal && !soLote && <th className="px-2 py-1.5 text-right font-semibold">Lote m²</th>}
                     <th className="px-2 py-1.5 text-right font-semibold">Qts / vg</th>
                     <th className="px-2 py-1.5 text-right font-semibold">Entrega</th>
                     <th className="px-2 py-1.5 text-right font-semibold">Preço</th>
@@ -553,6 +589,7 @@ function Avaliar() {
                         })()}
                       </td>
                       <td className="px-2 py-1.5 text-right tabular-nums">{Math.round(a.area)}</td>
+                      {horizontal && !soLote && <td className="px-2 py-1.5 text-right tabular-nums">{a.areaLote ? Math.round(a.areaLote) : '-'}</td>}
                       <td className="px-2 py-1.5 text-right tabular-nums">
                         {a.quartos ?? '-'} / {a.vagas ?? '-'}
                       </td>

@@ -72,7 +72,7 @@ export async function amostrasDaBase(e: ImovelAvaliacao): Promise<AmostraAvaliac
   await exigirGestorAval();
   const area = Number(e.area) || 0;
   if (!e.bairro || !e.cidade || !area) return [];
-  const tipos = tiposDoGrupo(e.tipo);
+  const tipos = tiposDoGrupo(e.objeto === 'lote' ? 'terreno_lote' : e.tipo);
   const faixa = faixaMetragem(e);
   // ATENÇÃO: só valores USADOS na consulta (o banco recusa parâmetro sobrando)
   const params: unknown[] = [tipos, faixa.min, faixa.max];
@@ -90,7 +90,7 @@ export async function amostrasDaBase(e: ImovelAvaliacao): Promise<AmostraAvaliac
   }
   const [anuncios, vendidos] = await Promise.all([
     query<Record<string, unknown>>(
-      `select x.id, x.titulo, coalesce(d.name, x.condominio) condominio, x.bairro, x.area, x.quartos, x.vagas, x.price_value preco, x.empreendimento_id, x.visibilidade,
+      `select x.id, x.titulo, coalesce(d.name, x.condominio) condominio, x.bairro, x.area, coalesce(x.area_lote, x.area_total) area_lote, x.quartos, x.vagas, x.price_value preco, x.empreendimento_id, x.visibilidade,
               (select coalesce(nullif(su.nome_publico, ''), su.name) from staff_users su where lower(su.email) = lower(x.corretor_email)) corretor_nome,
               extract(year from coalesce(x.delivery_date, case when coalesce(d.tipo, '') <> 'horizontal' then d.delivery_date end))::int ano, x.slug
          from properties x left join developments d on d.id = x.empreendimento_id
@@ -127,6 +127,7 @@ export async function amostrasDaBase(e: ImovelAvaliacao): Promise<AmostraAvaliac
       condominio: (x.condominio as string) ?? null,
       bairro: (x.bairro as string) ?? null,
       area: Number(x.area),
+      areaLote: num(x.area_lote),
       quartos: num(x.quartos),
       vagas: num(x.vagas),
       ano: num(x.ano),
@@ -167,18 +168,54 @@ function filtrarIdade(_e: ImovelAvaliacao, l: AmostraAvaliacao[]): AmostraAvalia
   return l;
 }
 
-/** Anúncio de portal raramente traz o ano: completa pelo ano de entrega do condomínio de mesmo
- *  nome no nosso cadastro (só prédios; casa em condomínio horizontal tem idade própria). */
-async function completarAnos(l: AmostraAvaliacao[], cidade: string): Promise<AmostraAvaliacao[]> {
-  if (!l.some((a) => !a.ano && a.condominio)) return l;
-  const devs = await query<{ name: string; ano: number }>(
-    `select name, extract(year from delivery_date)::int ano from developments
-      where delivery_date is not null and coalesce(tipo, 'vertical') <> 'horizontal' and lower(coalesce(cidade, '')) = lower($1)`,
-    [cidade]
+/** Nome de condomínio comparável: sem acento, sem "Edifício/Ed./Residencial/Condomínio", com as
+ *  grafias que costumam variar tratadas como iguais (y = i, ph = f, letras dobradas). */
+const nomeComparavel = (t: string) =>
+  String(t ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/['’`´]/g, '')
+    .replace(/\b(edificio|edf|ed|residencial|resid|res|condominio|cond|torre)\b\.?/g, ' ')
+    .replace(/ph/g, 'f')
+    .replace(/y/g, 'i')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/([a-z])\1+/g, '$1')
+    .trim();
+
+/** Anúncios de portal com o nome do condomínio: cruza com o nosso cadastro (mesma cidade) para
+ *  usar o nome do cadastro, calcular a distância até o imóvel avaliado (o raio passa a valer),
+ *  completar o ano de entrega (só prédios) e saber se é o mesmo condomínio. O link continua o do portal. */
+async function enriquecerPeloCadastro(l: AmostraAvaliacao[], e: ImovelAvaliacao): Promise<AmostraAvaliacao[]> {
+  if (!l.some((a) => a.condominio)) return l;
+  const devs = await query<{ id: string; name: string; lat: number | null; lng: number | null; ano: number | null; tipo: string | null }>(
+    `select id, name, lat, lng, extract(year from delivery_date)::int ano, tipo from developments
+      where lower(coalesce(cidade, '')) = lower($1) and name is not null`,
+    [e.cidade]
   ).catch(() => []);
-  const anos = new Map<string, number>();
-  for (const d of devs) anos.set(semAcento(d.name), Number(d.ano));
-  return l.map((a) => (!a.ano && a.condominio && anos.has(semAcento(a.condominio)) ? { ...a, ano: anos.get(semAcento(a.condominio)) ?? null } : a));
+  const porNome = new Map<string, (typeof devs)[number]>();
+  for (const d of devs) {
+    const k = nomeComparavel(d.name);
+    if (k.length >= 3 && !porNome.has(k)) porNome.set(k, d);
+  }
+  const alvo = e.developmentId ? devs.find((d) => d.id === e.developmentId) : undefined;
+  const km = (a: { lat: number | null; lng: number | null }, b: { lat: number | null; lng: number | null }) =>
+    a.lat != null && a.lng != null && b.lat != null && b.lng != null
+      ? 111.2 * Math.sqrt(Math.pow(Number(a.lat) - Number(b.lat), 2) + Math.pow((Number(a.lng) - Number(b.lng)) * Math.cos((Number(b.lat) * Math.PI) / 180), 2))
+      : null;
+  return l.map((a) => {
+    if (!a.condominio) return a;
+    const d = porNome.get(nomeComparavel(a.condominio));
+    if (!d) return a;
+    const dist = alvo ? km(d, alvo) : null;
+    return {
+      ...a,
+      condominio: d.name,
+      ano: a.ano ?? (d.tipo !== 'horizontal' ? d.ano : null) ?? null,
+      distKm: a.distKm ?? (dist != null ? Math.round(dist * 100) / 100 : null),
+      mesmoCondominio: a.mesmoCondominio || (!!e.developmentId && d.id === e.developmentId)
+    };
+  });
 }
 
 const chaveBusca = (e: ImovelAvaliacao) => (e.developmentId ? `cond:${e.developmentId}:${grupoDe(e.tipo)}` : `reg:${semAcento(e.cidade)}|${semAcento(e.bairro)}|${grupoDe(e.tipo)}`);
@@ -209,6 +246,7 @@ export async function buscarNosPortais(e: ImovelAvaliacao, forcar = false): Prom
       condominio: nome,
       bairro: (x.bairro as string) ?? null,
       area: Number(x.area),
+      areaLote: num(x.area_lote),
       quartos: num(x.quartos),
       vagas: num(x.vagas),
       ano: num(x.ano),
@@ -230,7 +268,7 @@ export async function buscarNosPortais(e: ImovelAvaliacao, forcar = false): Prom
     `select * from amostras_portais
       where encontrado_em > now() - ($2 || ' months')::interval
         and (chave = $1 or (lower(bairro) = lower($3) and lower(coalesce(cidade, '')) = lower($4) and tipo = any($5::text[])))`,
-    [chave, Math.min(24, Math.max(1, Number(e.validadeMeses) || VALIDADE_PADRAO_MESES)), e.bairro, e.cidade, tiposDoGrupo(e.tipo)]
+    [chave, Math.min(24, Math.max(1, Number(e.validadeMeses) || VALIDADE_PADRAO_MESES)), e.bairro, e.cidade, tiposDoGrupo(e.objeto === 'lote' ? 'terreno_lote' : e.tipo)]
   ).catch(() => []);
   void eu;
   if (!mem.length)
@@ -257,7 +295,7 @@ export async function buscarNosPortais(e: ImovelAvaliacao, forcar = false): Prom
     if (!ja || (x.vistoEm ?? '') > (ja.vistoEm ?? '')) ultimo.set(k, x);
   }
   const nossos = [...Array.from(ultimo.values()), ...semDono];
-  return { amostras: await completarAnos(filtrar(nossos), e.cidade), daMemoria: true, custoUsd: 0 };
+  return { amostras: await enriquecerPeloCadastro(filtrar(nossos), e), daMemoria: true, custoUsd: 0 };
 }
 
 // ---------------- histórico do mercado (para sempre) ----------------

@@ -45,6 +45,10 @@ export type ImovelAvaliacao = {
   validadeMeses?: number | null;
   /** desconto de negociação estimado sobre os anúncios, em % (padrão 10) */
   descontoPct?: number | null;
+  /** condomínio horizontal: avaliar a casa com o lote, ou só o lote */
+  objeto?: 'casa_lote' | 'lote' | null;
+  /** área do lote (m²) do imóvel avaliado (casa com lote) */
+  areaLote?: number | null;
 };
 
 export const DESCONTO_PADRAO = 10;
@@ -101,6 +105,8 @@ export type AmostraAvaliacao = {
   condominio?: string | null;
   bairro?: string | null;
   area: number;
+  /** área do lote (casas em condomínio) */
+  areaLote?: number | null;
   quartos?: number | null;
   vagas?: number | null;
   ano?: number | null;
@@ -150,7 +156,9 @@ export function calcularAvaliacaoInterna(
       const fQuartos = e.quartos && a.quartos ? 1 + 0.03 * (e.quartos - a.quartos) : 1;
       const fVagas = e.vagas != null && a.vagas != null ? 1 + 0.04 * (e.vagas - a.vagas) : 1;
       const fIdade = anoAval && a.ano ? Math.min(1.2, Math.max(0.8, 1 + 0.01 * (anoAval - a.ano))) : 1;
-      const m2HomogBruto = m2 * fArea * fQuartos * fVagas * fIdade;
+      const fLote =
+        e.objeto !== 'lote' && e.areaLote && a.areaLote ? Math.min(1.25, Math.max(0.8, Math.pow(Number(e.areaLote) / a.areaLote, 0.25))) : 1;
+      const m2HomogBruto = m2 * fArea * fQuartos * fVagas * fIdade * fLote;
       const m2Homog = m2HomogBruto * fOferta;
       const peso = (a.mesmoCondominio ? 2 : 1) * (1 / (1 + (a.distKm ?? 0.8))) * (1 / (1 + Math.abs(a.area - area) / area));
       return { ...a, m2, m2Homog, m2HomogBruto, peso, descartada: false };
