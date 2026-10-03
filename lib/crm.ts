@@ -119,6 +119,32 @@ async function abrirNegocio(contatoId: string, funil: Funil, etapa: string, n: {
   );
 }
 
+/** Marca dos pedidos "Avise-me" que ainda não viraram contato no CRM. */
+export const AVISO_PENDENTE = '00000000-0000-0000-0000-00000000a515';
+
+/** Quando a pessoa chama no WhatsApp, os pedidos de aviso dela (mesmo telefone, e-mail
+ *  ou aparelho) entram no histórico do contato, com a data em que foram feitos. */
+async function juntarAvisosDoContato(contatoId: string, tel: string | null, email: string | null, visitante: string | null) {
+  const avisos = await query<{ id: string; condominio: string | null; mensagem: string | null; created_at: string | Date; property_id: string | null; development_id: string | null }>(
+    `select id, condominio, mensagem, created_at, property_id, development_id from interest_leads
+      where contato_id = $1
+        and (($2::text is not null and regexp_replace(coalesce(telefone, ''), '\\D', '', 'g') like '%' || right($2, 8))
+          or ($3::text is not null and lower(email) = lower($3))
+          or ($4::text is not null and visitante = $4))`,
+    [AVISO_PENDENTE, tel, email, visitante]
+  );
+  for (const a of avisos) {
+    await query(`insert into crm_atividades (contato_id, tipo, texto, dados, criado_em) values ($1, 'entrada', $2, $3::jsonb, $4)`, [
+      contatoId,
+      `Pediu aviso: ${a.condominio ?? ''}${a.mensagem ? ` · ${a.mensagem}` : ''}`.slice(0, 1500),
+      JSON.stringify({ origem: 'avise-me', lead: a.id, property_id: a.property_id, development_id: a.development_id }),
+      new Date(a.created_at)
+    ]);
+    await query(`update interest_leads set contato_id = $2 where id = $1`, [a.id, contatoId]);
+  }
+  if (visitante) await query(`update crm_contatos set visitantes = case when not ($2 = any(visitantes)) then array_append(visitantes, $2) else visitantes end where id = $1`, [contatoId, visitante]).catch(() => {});
+}
+
 /** Traz para o CRM as entradas do site que ainda não viraram contato (rápido quando não há nada novo) */
 export async function sincronizarCRM(limite = 300): Promise<number> {
   const leads = await query<Lead>(
@@ -152,6 +178,12 @@ export async function sincronizarCRM(limite = 300): Promise<number> {
           l.p_titulo = l.p_titulo ?? p.titulo;
         }
       }
+    }
+    // "Avise-me" não vira lead: fica só na lista automática Para avisar (admin principal).
+    // Entra no CRM quando a mesma pessoa chamar no WhatsApp (ver juntarAvisosDoContato).
+    if (o.origem === 'avise-me') {
+      await query(`update interest_leads set contato_id = $2 where id = $1`, [l.id, AVISO_PENDENTE]);
+      continue;
     }
     const quando = new Date(l.created_at);
     const possivel = l.sou_corretor ? null : motivoCorretor(l.nome, l.mensagem);
@@ -196,6 +228,8 @@ export async function sincronizarCRM(limite = 300): Promise<number> {
       quando
     });
     await query(`update interest_leads set contato_id = $2 where id = $1`, [l.id, id]);
+    // chamou no WhatsApp: os avisos que a pessoa pediu antes entram no histórico dela
+    if (o.origem === 'whatsapp') await juntarAvisosDoContato(id, tel, email, l.visitante);
     n++;
   }
   // "Venda seu imóvel"
@@ -216,6 +250,68 @@ export async function sincronizarCRM(limite = 300): Promise<number> {
     await query(`insert into crm_atividades (contato_id, tipo, texto, criado_em) values ($1, 'entrada', $2, $3)`, [id, texto, quando]);
     await abrirNegocio(id, 'vender', 'novo', { titulo: c.condominio || c.bairro || 'Imóvel para vender', valor: c.valor_pretendido ? Number(c.valor_pretendido) : null, property_id: null, development_id: null, corretor: null, quando });
     await query(`update captacoes set contato_id = $2 where id = $1`, [c.id, id]);
+    n++;
+  }
+  n += await sincronizarProprietarios(limite);
+  return n;
+}
+
+/** Proprietários fazem parte do CRM: viram contato (origem "Proprietário") e, quando têm
+ *  anúncio ativo, entram no funil de Captação na etapa "Anunciado". Roda junto da
+ *  sincronização; quem já foi trazido não é repetido. */
+async function sincronizarProprietarios(limite: number): Promise<number> {
+  let n = 0;
+  const novos = await query<{ id: string; nome: string; whatsapp: string | null; email: string | null; criado_por: string | null; created_at: string | Date }>(
+    `select id, nome, whatsapp, email, criado_por, created_at from proprietarios where crm_contato_id is null order by created_at asc limit $1`,
+    [limite]
+  );
+  for (const p of novos) {
+    const tel = normTel(p.whatsapp);
+    const email = p.email?.trim().toLowerCase() || null;
+    if (!tel && !email) {
+      await query(`update proprietarios set crm_contato_id = '00000000-0000-0000-0000-000000000000' where id = $1`, [p.id]);
+      continue;
+    }
+    const quando = new Date(p.created_at);
+    const id = await acharOuCriar({
+      nome: p.nome,
+      telefone: tel,
+      email,
+      origem: 'proprietario',
+      corretor: p.criado_por,
+      visitante: null,
+      quando,
+      tipo: 'cliente',
+      possivel: null,
+      prefs: {},
+      canal: { canal: 'Proprietário cadastrado', pago: false, campanha: null }
+    });
+    await query(`insert into crm_atividades (contato_id, tipo, texto, criado_em) values ($1, 'entrada', $2, $3)`, [id, 'Cadastrado como proprietário', quando]);
+    await query(`update proprietarios set crm_contato_id = $2 where id = $1`, [p.id, id]);
+    n++;
+  }
+  // proprietário com anúncio ativo → Captação, etapa "Anunciado" (um negócio por pessoa)
+  const comAnuncio = await query<{ contato_id: string; property_id: string; titulo: string | null; preco: string | null; corretor: string | null }>(
+    `select distinct on (pr.crm_contato_id) pr.crm_contato_id contato_id, p.id property_id, coalesce(p.titulo, p.condominio) titulo, p.price_value preco, p.corretor_email corretor
+       from property_proprietarios pp
+       join proprietarios pr on pr.id = pp.proprietario_id
+       join properties p on p.id = pp.property_id
+      where pr.crm_contato_id is not null and pr.crm_contato_id <> '00000000-0000-0000-0000-000000000000'
+        and p.vendido_em is null and coalesce(p.is_tipologia, false) = false
+        and not exists (select 1 from crm_negocios n where n.contato_id = pr.crm_contato_id and n.funil = 'vender')
+      order by pr.crm_contato_id, pp.principal desc nulls last
+      limit $1`,
+    [limite]
+  );
+  for (const a of comAnuncio) {
+    await abrirNegocio(a.contato_id, 'vender', 'anunciado', {
+      titulo: a.titulo?.slice(0, 160) ?? 'Imóvel anunciado',
+      valor: a.preco ? Number(a.preco) : null,
+      property_id: a.property_id,
+      development_id: null,
+      corretor: a.corretor,
+      quando: new Date()
+    });
     n++;
   }
   return n;

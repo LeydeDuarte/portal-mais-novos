@@ -24,6 +24,31 @@ export type FeedInicial = { items: FeedItem[]; hasMore: boolean; totalAVenda: nu
 const chaveItem = (i: FeedItem) =>
   i.kind === 'empreendimento' ? `d-${i.development.id}` : i.kind === 'imovel' ? `p-${i.property.id}` : i.chave;
 
+// Destaques continuam na rolagem: cada anúncio ou condomínio marcado como destaque também
+// entra como card normal (tamanho original) nas primeiras páginas do feed, numa posição
+// fixa por item (a mesma no servidor e no navegador), longe dos espaços de destaque.
+// Se ele já veio numa página normal, nada é acrescentado (sem repetição).
+function posicaoDoDestaque(chave: string): number {
+  let h = 0;
+  for (let i = 0; i < chave.length; i++) h = (h * 31 + chave.charCodeAt(i)) >>> 0;
+  let pos = 8 + (h % 40);
+  // longe dos espaços de destaque (3º lugar e a cada 20 itens)
+  while ((pos - 2) % 20 <= 1 || (pos - 2) % 20 >= 18) pos += 1;
+  return pos;
+}
+function comDestaquesNaRolagem(lista: FeedItem[], destaques: FeedItem[]): FeedItem[] {
+  if (!destaques.length) return lista;
+  const ja = new Set(lista.map(chaveItem));
+  const faltam = destaques.filter((d) => (d.kind === 'imovel' || d.kind === 'empreendimento') && !ja.has(chaveItem(d)));
+  if (!faltam.length) return lista;
+  const out = lista.slice();
+  faltam
+    .map((d) => ({ d, pos: posicaoDoDestaque(chaveItem(d)) }))
+    .sort((a, b) => a.pos - b.pos)
+    .forEach(({ d, pos }) => out.splice(Math.min(pos, out.length), 0, d));
+  return out;
+}
+
 export default function MasonryFeed({ filters, inicial }: { filters: FilterState; inicial?: FeedInicial }) {
   // destaques da equipe que combinam com esta busca (espaço de 2 colunas que se reveza)
   const filtrosJson = JSON.stringify(filters);
@@ -35,6 +60,9 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
       return;
     }
     destaquesDoServidor.current = null;
+    // a busca mudou: os destaques antigos saem até chegarem os desta busca
+    destaquesRef.current = [];
+    setDestaques([]);
     let vivo = true;
     getDestaquesFeed(JSON.parse(filtrosJson))
       .then((d) => vivo && setDestaques(d))
@@ -45,10 +73,16 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
   }, [filtrosJson]);
   // 1ª página já vem pronta do servidor (aparece na hora e o Google enxerga os links)
   const usarInicial = useRef(!!inicial);
-  const [items, setItems] = useState<FeedItem[]>(inicial?.items ?? []);
+  const [items, setItems] = useState<FeedItem[]>(() => comDestaquesNaRolagem(inicial?.items ?? [], inicial?.destaques ?? []));
   const [modoFeed, setModoFeed] = useState<'masonry' | 'alinhado'>(inicial?.modoFeed ?? 'masonry');
   const [escolheuFeed, setEscolheuFeed] = useState(!!inicial?.escolheuFeed);
   const [destaques, setDestaques] = useState<FeedItem[]>(inicial?.destaques ?? []);
+  const destaquesRef = useRef(destaques);
+  useEffect(() => {
+    destaquesRef.current = destaques;
+    // destaques que chegaram depois da 1ª página também entram na rolagem
+    setItems((prev) => (prev.length ? comDestaquesNaRolagem(prev, destaques) : prev));
+  }, [destaques]);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -87,7 +121,7 @@ export default function MasonryFeed({ filters, inicial }: { filters: FilterState
         // a contagem do cabeçalho acompanha os filtros (vem junto da 1ª página)
         if (pageToLoad === 0 && typeof total === 'number') setTotalAVenda(total);
         setItems((prev) => {
-          if (reset) return newItems;
+          if (reset) return comDestaquesNaRolagem(newItems, destaquesRef.current);
           const vistos = new Set(prev.map(chaveItem));
           return [...prev, ...newItems.filter((i) => !vistos.has(chaveItem(i)))];
         });

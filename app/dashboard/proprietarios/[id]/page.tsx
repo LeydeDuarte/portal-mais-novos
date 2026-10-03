@@ -18,6 +18,7 @@ import {
 import { listarImoveisPainel, type ImovelPainel } from '@/lib/actions-painel-imoveis';
 import { ESTADOS_CIVIS, REGIMES_BENS, faltandoNoCadastro, temConjuge, type Conjuge } from '@/lib/proprietarios-tipos';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
+import { CrmNav } from '@/components/crm/comum';
 
 // Cadastro completo do proprietário. Tudo o que estiver aqui já sai preenchido na
 // proposta; e o que for preenchido na proposta volta para cá (só campos vazios).
@@ -163,6 +164,7 @@ export default function ProprietarioPage() {
   return (
     <div className="min-h-screen">
       <PainelNav />
+      <CrmNav />
       <div className="mx-auto max-w-4xl px-4 pb-28 pt-8 md:px-6">
         <TituloPainel titulo={novo ? 'Novo proprietário' : f.nome || 'Proprietário'} contagem={novo ? 'Só o nome é obrigatório. O resto pode ser completado depois ou na proposta.' : undefined}>
           <Link href="/dashboard/proprietarios" className="flex h-11 items-center rounded-full bg-[var(--pill-bg)] px-4 text-[13px] font-semibold">

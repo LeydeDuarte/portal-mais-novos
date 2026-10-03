@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import DocumentoProposta, { tituloArquivoProposta } from '@/components/DocumentoProposta';
 import { useStaffSession } from '@/lib/use-staff-session';
@@ -13,6 +12,7 @@ import { imprimirProposta } from '@/lib/imprimir-proposta';
 import { lerProprietariosDoImovel } from '@/lib/actions-proprietarios';
 import type { ProprietarioDoImovel } from '@/lib/proprietarios';
 import { brl } from '@/lib/proposta-textos';
+import { CrmNav } from '@/components/crm/comum';
 
 export default function PropostaDetalhe({ params }: { params: { id: string } }) {
   const { staff, loaded } = useStaffSession();
@@ -43,8 +43,8 @@ export default function PropostaDetalhe({ params }: { params: { id: string } }) 
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
       <PainelNav />
+      <CrmNav />
       <main className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8">
         <Link href="/dashboard/propostas" className="text-sm font-semibold text-[var(--text-muted)] hover:underline">
           ← Propostas

@@ -9,6 +9,7 @@ import { useStaffSession } from '@/lib/use-staff-session';
 import { excluirProprietario, listarProprietarios } from '@/lib/actions-proprietarios';
 import { faltandoNoCadastro, type Proprietario } from '@/lib/proprietarios-tipos';
 import { formatarDocumento, formatarTelefone } from '@/lib/formatos';
+import { CrmNav } from '@/components/crm/comum';
 
 // Painel → Proprietários: lista, busca, cadastro completo, exclusão e importação por planilha.
 const sa = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -67,6 +68,7 @@ export default function ProprietariosPage() {
   return (
     <div className="min-h-screen">
       <PainelNav />
+      <CrmNav />
       <div className="mx-auto max-w-6xl px-4 pb-24 pt-8 md:px-6">
         <TituloPainel titulo="Proprietários" contagem={lista ? `${lista.length} cadastrado(s)` : 'Carregando…'}>
           <Link href="/dashboard/proprietarios/importar" className="flex h-11 items-center rounded-full bg-[var(--pill-bg)] px-4 text-[13px] font-semibold">

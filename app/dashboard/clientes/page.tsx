@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { listClientes, type ClienteLinha } from '@/lib/cliente-auth';
+import { CrmNav } from '@/components/crm/comum';
 
 // Pessoas que entraram com o Google (um registro por e-mail, sem repetição).
 // Para marketing, usar só quem marcou "quero receber oportunidades".
@@ -42,8 +42,8 @@ export default function ClientesPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
       <PainelNav />
+      <CrmNav />
       <main className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

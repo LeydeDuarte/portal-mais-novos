@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import MolduraCrm from '@/components/crm/MolduraCrm';
 
 // Área da equipe — nunca deve ser indexada, além do disallow em robots.ts.
 export const metadata: Metadata = {
@@ -7,5 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default function PainelLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  // telas de relacionamento (CRM, propostas, proprietários...) ganham o menu lateral do CRM
+  return (
+    <Suspense fallback={children}>
+      <MolduraCrm>{children}</MolduraCrm>
+    </Suspense>
+  );
 }

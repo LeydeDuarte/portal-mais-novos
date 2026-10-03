@@ -30,12 +30,12 @@ export const GRUPOS: Grupo[] = [
   {
     titulo: 'Clientes e negócios',
     itens: [
-      { href: '/dashboard/crm', label: 'CRM', descricao: 'Contatos, funis, tarefas e conversas.', icone: 'funil', acesso: 'todos' },
+      { href: '/dashboard/crm', label: 'CRM', descricao: 'Hoje, funis de vendas e captação, contatos.', icone: 'funil', acesso: 'todos' },
       { href: '/dashboard/interessados', label: 'Interessados', descricao: 'Quem pediu contato pelo site e pelo WhatsApp.', icone: 'pessoa', acesso: 'todos' },
       { href: '/dashboard/propostas', label: 'Propostas', descricao: 'Propostas em andamento.', icone: 'proposta', acesso: 'todos' },
       { href: '/dashboard/proprietarios', label: 'Proprietários', descricao: 'Donos dos imóveis anunciados.', icone: 'chave', acesso: 'todos' },
-      { href: '/dashboard/avisos', label: 'Para avisar', descricao: 'Quem pediu aviso e já tem um imóvel que combina.', icone: 'sino', acesso: 'todos' },
-      { href: '/dashboard/vender', label: 'Quero vender', descricao: 'Proprietários que cadastraram o imóvel no site.', icone: 'placa', acesso: 'todos' },
+      { href: '/dashboard/avisos', label: 'Para avisar', descricao: 'Lista automática de quem pediu aviso de imóvel.', icone: 'sino', acesso: 'admin' },
+      { href: '/dashboard/crm/funil?f=vender', label: 'Captação', descricao: 'Proprietários e quem quer vender pelo site.', icone: 'placa', acesso: 'todos' },
       { href: '/dashboard/clientes', label: 'Clientes', descricao: 'Quem entrou no site com o Google.', icone: 'google', acesso: 'todos' }
     ]
   },
@@ -64,8 +64,7 @@ export const GRUPOS: Grupo[] = [
 /** Ordem do menu do topo (mesma de antes). */
 export const ORDEM_MENU = [
   '/dashboard/crm', '/dashboard/resultados', '/dashboard/custos', '/dashboard/imoveis', '/dashboard/condominios', '/dashboard/mapa',
-  '/dashboard/proprietarios', '/dashboard/propostas', '/dashboard/interessados', '/dashboard/avisos', '/dashboard/vender',
-  '/dashboard/empresas', '/dashboard/clientes', '/dashboard/mercado', '/dashboard/monitoramento', '/dashboard/importar-pdf',
+  '/dashboard/empresas', '/dashboard/mercado', '/dashboard/monitoramento', '/dashboard/importar-pdf',
   '/dashboard/importar-imagens', '/dashboard/cadastro-ia', '/dashboard/news', '/dashboard/feed-especiais', '/dashboard/jetimob',
   '/dashboard/equipe', '/dashboard/perfil'
 ];

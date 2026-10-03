@@ -7,7 +7,7 @@ import { query } from './db';
 import { exigirEquipe } from './staff-auth';
 import { veTudo } from './session';
 import { ETAPAS, FUNIS, calcularNota, etapaValida, jornada, normTel, sincronizarCRM, type Funil, type Nota, type PassoJornada, type ResumoPortal } from './crm';
-import { CANAIS_MANUAIS } from './crm-tipos';
+import { CANAIS_MANUAIS, POS_VENDA } from './crm-tipos';
 
 type Staff = Awaited<ReturnType<typeof exigirEquipe>>;
 const escopo = (s: Staff, col = 'c.corretor_email') => (veTudo(s.role) ? { sql: 'true', params: [] as unknown[] } : { sql: `lower(coalesce(${col}, '')) = lower($X)`, params: [s.email] });
@@ -112,6 +112,8 @@ export async function crmHoje(): Promise<Hoje> {
 // ---------------- Funil ----------------
 export type CardNegocio = {
   id: string;
+  /** só no funil de Vendas, depois do contrato assinado: 'entrega' ou 'depoimento' */
+  posVenda?: string | null;
   contatoId: string;
   nome: string;
   titulo: string | null;
@@ -171,7 +173,7 @@ async function statsDe(contatos: { id: string; visitantes: string[]; telefone: s
   return out;
 }
 
-export async function crmFunil(funil: Funil, corretor?: string): Promise<{ etapas: { id: string; nome: string }[]; cards: CardNegocio[]; corretores: { email: string; nome: string }[]; podeVerTodos: boolean }> {
+export async function crmFunil(funil: Funil, corretor?: string): Promise<{ etapas: { id: string; nome: string }[]; posVenda: { id: string; nome: string }[]; cards: CardNegocio[]; corretores: { email: string; nome: string }[]; podeVerTodos: boolean }> {
   const s = await exigirEquipe();
   await sincronizarCRM().catch(() => 0);
   const f = (FUNIS.find((x) => x.id === funil)?.id ?? 'comprar') as Funil;
@@ -183,11 +185,11 @@ export async function crmFunil(funil: Funil, corretor?: string): Promise<{ etapa
   }
   const r = comEscopo(
     s,
-    `select n.id, n.contato_id, n.titulo, n.valor, n.etapa, n.etapa_desde, coalesce(n.corretor_email, c.corretor_email) corretor, c.nome, c.origem, c.visitantes, c.telefone, c.email,
+    `select n.id, n.contato_id, n.titulo, n.valor, n.etapa, n.etapa_desde, n.pos_venda, coalesce(n.corretor_email, c.corretor_email) corretor, c.nome, c.origem, c.visitantes, c.telefone, c.email,
             c.ultimo_contato_em, c.preferencias, c.canal, c.canal_pago, c.campanha,
             (select json_build_object('titulo', t.titulo, 'vence', t.vence_em) from crm_tarefas t where t.negocio_id = n.id and t.feita_em is null order by t.vence_em asc nulls last limit 1) prox
        from crm_negocios n join crm_contatos c on c.id = n.contato_id
-      where n.funil = $1 and n.etapa not in ('ganho', 'perdido') and {ESCOPO}${filtroCorretor}
+      where n.funil = $1 and (n.etapa not in ('ganho', 'perdido') or (n.funil = 'comprar' and n.etapa = 'ganho' and n.pos_venda in ('entrega', 'depoimento'))) and {ESCOPO}${filtroCorretor}
       order by n.etapa_desde asc limit 400`,
     params
   );
@@ -205,6 +207,7 @@ export async function crmFunil(funil: Funil, corretor?: string): Promise<{ etapa
       titulo: (x.titulo as string) ?? null,
       valor: x.valor == null ? null : Number(x.valor),
       etapa: String(x.etapa),
+      posVenda: (x.pos_venda as string) ?? null,
       origem: (x.origem as string) ?? null,
       canal: { nome: (x.canal as string) ?? null, pago: !!x.canal_pago, campanha: (x.campanha as string) ?? null },
       corretor: (x.corretor as string) ?? null,
@@ -225,7 +228,7 @@ export async function crmFunil(funil: Funil, corretor?: string): Promise<{ etapa
   const corretores = veTudo(s.role)
     ? (await query<{ email: string; nome: string }>(`select email, coalesce(nullif(nome_publico, ''), name) nome from staff_users order by 2`)).map((c) => ({ email: c.email, nome: c.nome }))
     : [];
-  return { etapas: ETAPAS[f], cards, corretores, podeVerTodos: veTudo(s.role) };
+  return { etapas: ETAPAS[f], posVenda: f === 'comprar' ? [...POS_VENDA] : [], cards, corretores, podeVerTodos: veTudo(s.role) };
 }
 
 export async function moverNegocio(id: string, etapa: string, motivo?: string): Promise<void> {
@@ -235,6 +238,8 @@ export async function moverNegocio(id: string, etapa: string, motivo?: string): 
   await podeVerContato(s, n.contato_id);
   if (!etapaValida(n.funil, etapa)) throw new Error('Etapa inválida.');
   if (n.etapa === etapa) return;
+  if (n.etapa === 'ganho') throw new Error('Este negócio já foi ganho (contrato assinado). Use as etapas do pós-venda.');
+  if (n.funil === 'comprar' && etapa === 'ganho') throw new Error('No funil de Vendas, o ganho é registrado em "Contrato assinado", com a data e o valor.');
   await query(`update crm_negocios set etapa = $2, etapa_desde = now(), fechado_em = case when $2 in ('ganho', 'perdido') then now() else null end, motivo = coalesce($3, motivo) where id = $1`, [id, etapa, motivo?.slice(0, 300) ?? null]);
   const nome = etapa === 'ganho' ? 'Ganho' : etapa === 'perdido' ? 'Perdido' : ETAPAS[n.funil as Funil]?.find((e) => e.id === etapa)?.nome ?? etapa;
   await query(`insert into crm_atividades (contato_id, tipo, texto, autor_email) values ($1, 'sistema', $2, $3)`, [n.contato_id, `Negócio movido para ${nome}${motivo ? `: ${motivo}` : ''}`, s.email]);
@@ -860,4 +865,41 @@ export async function crmPanorama(): Promise<Panorama> {
     porEtapa: b.map((x) => ({ etapa: x.etapa, n: Number(x.n) || 0 })),
     todaEquipe: veTudo(s.role)
   };
+}
+
+/** Funil de Vendas: contrato assinado = GANHO (com a data da assinatura e o valor final).
+ *  O cartão continua no quadro, no pós-venda (Entrega do imóvel → Depoimento do cliente). */
+export async function contratoAssinado(id: string, dataAssinatura: string, valor: number | null): Promise<void> {
+  const s = await exigirEquipe();
+  const n = (await query<{ contato_id: string; funil: string; etapa: string }>(`select contato_id, funil, etapa from crm_negocios where id = $1`, [id]))[0];
+  if (!n) throw new Error('Negócio não encontrado.');
+  await podeVerContato(s, n.contato_id);
+  if (n.funil !== 'comprar') throw new Error('Contrato assinado é do funil de Vendas.');
+  if (n.etapa === 'ganho') return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataAssinatura) || Number.isNaN(Date.parse(dataAssinatura))) throw new Error('Data da assinatura inválida.');
+  const v = valor != null && Number.isFinite(valor) && valor > 0 ? Math.round(valor) : null;
+  await query(
+    `update crm_negocios set etapa = 'ganho', pos_venda = 'entrega', etapa_desde = $2::date + time '12:00', fechado_em = $2::date + time '12:00', valor = coalesce($3, valor) where id = $1`,
+    [id, dataAssinatura, v]
+  );
+  const dataBr = dataAssinatura.split('-').reverse().join('/');
+  await query(`insert into crm_atividades (contato_id, tipo, texto, autor_email) values ($1, 'sistema', $2, $3)`, [
+    n.contato_id,
+    `Contrato assinado em ${dataBr}${v ? `, valor de ${v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}` : ''}: negócio ganho. Segue para a entrega do imóvel.`,
+    s.email
+  ]);
+  await respondeu(n.contato_id);
+}
+
+/** Pós-venda: Entrega do imóvel → Depoimento do cliente → concluído (sai do quadro). */
+export async function moverPosVenda(id: string, etapa: 'entrega' | 'depoimento' | 'concluido'): Promise<void> {
+  const s = await exigirEquipe();
+  if (!['entrega', 'depoimento', 'concluido'].includes(etapa)) throw new Error('Etapa inválida.');
+  const n = (await query<{ contato_id: string; etapa: string }>(`select contato_id, etapa from crm_negocios where id = $1`, [id]))[0];
+  if (!n) throw new Error('Negócio não encontrado.');
+  await podeVerContato(s, n.contato_id);
+  if (n.etapa !== 'ganho') throw new Error('O pós-venda começa depois do contrato assinado.');
+  await query(`update crm_negocios set pos_venda = $2 where id = $1`, [id, etapa]);
+  const nome = etapa === 'entrega' ? 'Entrega do imóvel' : etapa === 'depoimento' ? 'Depoimento do cliente' : 'pós-venda concluído';
+  await query(`insert into crm_atividades (contato_id, tipo, texto, autor_email) values ($1, 'sistema', $2, $3)`, [n.contato_id, `Pós-venda: ${nome}`, s.email]);
 }

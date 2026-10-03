@@ -3,9 +3,14 @@
 // Peças comuns das telas do CRM.
 import Link from 'next/link';
 import type { Nota } from '@/lib/crm-tipos';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useStaffSession } from '@/lib/use-staff-session';
+import { itemAtivo } from '@/lib/crm-menu';
+import { itensVisiveis } from './MolduraCrm';
 
 export const ORIGEM: Record<string, { nome: string; bg: string; tx: string }> = {
   whatsapp: { nome: 'WhatsApp do anúncio', bg: '#E7F9EE', tx: '#0B6B33' },
+  proprietario: { nome: 'Proprietário', bg: '#FFF4E5', tx: '#8A4B00' },
   'avise-me': { nome: 'Avise-me', bg: '#EAF2FF', tx: '#1A5FD0' },
   avaliador: { nome: 'Avaliador', bg: '#FFF4E5', tx: '#8A4B00' },
   vender: { nome: 'Venda seu imóvel', bg: '#FFF4E5', tx: '#8A4B00' },
@@ -19,7 +24,7 @@ export const ORIGEM: Record<string, { nome: string; bg: string; tx: string }> = 
 export function OrigemChip({ origem }: { origem: string | null }) {
   const o = ORIGEM[origem ?? ''] ?? { nome: origem ?? 'Outro', bg: '#F2F3F5', tx: '#14161A' };
   return (
-    <span className="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold" style={{ background: o.bg, color: o.tx }}>
+    <span className="inline-flex items-center whitespace-nowrap rounded-full px-1.5 py-px text-[10.5px] font-medium" style={{ background: o.bg, color: o.tx }}>
       {o.nome}
     </span>
   );
@@ -28,7 +33,7 @@ export function OrigemChip({ origem }: { origem: string | null }) {
 export function NotaChip({ nota, comMotivo = false }: { nota: Nota; comMotivo?: boolean }) {
   const cor = nota.faixa === 'quente' ? { bg: '#FDECEC', tx: '#B42318' } : nota.faixa === 'morno' ? { bg: '#FFF4E5', tx: '#8A4B00' } : { bg: '#F2F3F5', tx: '#5B6068' };
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-bold" style={{ background: cor.bg, color: cor.tx }} title={nota.motivos.join(' · ')}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-px text-[10.5px] font-medium" style={{ background: cor.bg, color: cor.tx }} title={nota.motivos.join(' · ')}>
       {nota.faixa === 'quente' ? 'Quente' : nota.faixa === 'morno' ? 'Morno' : 'Frio'} · {nota.valor}
       {comMotivo && nota.motivos.length > 0 && <span className="font-medium">: {nota.motivos.slice(0, 3).join(', ')}</span>}
     </span>
@@ -71,23 +76,23 @@ export function Iniciais({ nome, tam = 36 }: { nome: string; tam?: number }) {
   );
 }
 
-const ABAS = [
-  { href: '/dashboard/crm', nome: 'Hoje' },
-  { href: '/dashboard/crm/funil', nome: 'Funil' },
-  { href: '/dashboard/crm/contatos', nome: 'Contatos' },
-  { href: '/dashboard/avisos', nome: 'Para avisar' }
-];
-export function CrmNav({ ativo, gestor }: { ativo: string; gestor: boolean }) {
-  const abas = gestor ? [...ABAS, { href: '/dashboard/crm/equipe', nome: 'Equipe e distribuição' }, { href: '/dashboard/crm/ia', nome: 'IA e WhatsApp' }] : ABAS;
+/** Abas do CRM no celular (no computador, o menu lateral da MolduraCrm faz esse papel). */
+export function CrmNav({ ativo: _ativo }: { ativo?: string; gestor?: boolean }) {
+  const pathname = usePathname() ?? '';
+  const busca = useSearchParams();
+  const { staff } = useStaffSession();
+  const ativo = itemAtivo(pathname, busca?.get('f') ?? null);
+  const itens = itensVisiveis(staff?.role).flatMap((g) => g.itens);
   return (
-    <nav aria-label="CRM" className="flex gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--bg)] px-5 md:px-8">
-      {abas.map((a) => (
+    <nav aria-label="CRM" className="flex gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--bg)] px-4 [scrollbar-width:none] md:hidden">
+      {itens.map((a) => (
         <Link
           key={a.href}
           href={a.href}
-          className={`whitespace-nowrap border-b-[3px] px-3 py-3 text-[13.5px] ${a.href === ativo ? 'border-accent font-bold' : 'border-transparent font-semibold text-[var(--text-muted)] hover:text-[var(--text)]'}`}
+          className={`whitespace-nowrap border-b-[3px] px-2.5 py-2.5 text-[13px] ${a.href === ativo ? 'border-accent font-bold' : 'border-transparent font-semibold text-[var(--text-muted)]'}`}
         >
           {a.nome}
+          {a.acesso === 'admin' && <span className="text-accent">*</span>}
         </Link>
       ))}
     </nav>
@@ -100,7 +105,7 @@ export function CanalChip({ canal }: { canal: { nome: string | null; pago: boole
   const cor = canal.pago ? { bg: '#14161A', tx: '#FFFFFF' } : { bg: '#FFFFFF', tx: '#14161A' };
   return (
     <span
-      className="inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded-full border border-[#C9CDD3] px-2 py-0.5 text-[11.5px] font-semibold"
+      className="inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded-full border border-[#C9CDD3] px-1.5 py-px text-[10.5px] font-medium"
       style={{ background: cor.bg, color: cor.tx, borderColor: canal.pago ? '#14161A' : '#C9CDD3' }}
       title={canal.campanha ? `Campanha: ${canal.campanha}` : undefined}
     >

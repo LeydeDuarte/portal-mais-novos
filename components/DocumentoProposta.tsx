@@ -2,6 +2,7 @@ import { ESTADO_CIVIL, FORMAS_PAGAMENTO, brl, porExtenso } from '@/lib/proposta-
 import { EMPRESA } from '@/lib/seo';
 import type { Corretor, Pessoa } from '@/lib/actions-propostas';
 import CabecalhoDocumento from './CabecalhoDocumento';
+import { numeroProposta } from '@/lib/proposta-textos';
 
 export type DadosDocumento = {
   numero?: number;
@@ -62,9 +63,12 @@ export const tituloArquivoProposta = (d: { compradores: Pessoa[]; valor: number 
 
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="mt-6 break-inside-avoid">
-      <h3 className="mb-1.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#1B5FCC]">
-        <span className="h-px w-5 bg-[#1B5FCC]" />
+    <section className="mt-5 break-inside-avoid print:mt-3">
+      <h3 className="mb-1 flex items-baseline gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#1B5FCC] print:text-[10px]">
+        {/* a barra "/" da marca Mais Novos no lugar do traço */}
+        <span aria-hidden className="text-[14px] font-extrabold leading-none text-[#257CFF] print:text-[13px]">
+          /
+        </span>
         {titulo}
       </h3>
       {children}
@@ -88,8 +92,8 @@ function Pessoas({ lista, vazio }: { lista: Pessoa[]; vazio: string }) {
 
 function Assinatura({ nome, papel, extra }: { nome: string; papel: string; extra?: string }) {
   return (
-    <div className="break-inside-avoid pt-[88px]">
-      <div className="border-t border-[#14161a] pt-1.5 text-center text-[11.5px] leading-snug">
+    <div className="break-inside-avoid pt-[72px] print:pt-[42px]">
+      <div className="border-t border-[#14161a] pt-1.5 text-center text-[11.5px] leading-snug print:text-[10px]">
         <strong>{nome || '\u00a0'}</strong>
         <br />
         {papel}
@@ -107,10 +111,13 @@ function Assinatura({ nome, papel, extra }: { nome: string; papel: string; extra
 // Documento "Proposta de compra" para salvar em PDF ou imprimir. Uso interno da equipe.
 export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
   const corretorTxt = d.corretor?.nome ? `${d.corretor.nome}${d.corretor.creci ? `, CRECI ${d.corretor.creci}` : ''}` : null;
+  // na folha, todas as assinaturas numa linha só (até 5 lado a lado) para caber em uma página
+  const assinaturas = d.compradores.length + Math.max(1, d.vendedores.length) + 1;
+  const colunasAssinatura = assinaturas <= 3 ? 'print:grid-cols-3' : assinaturas === 4 ? 'print:grid-cols-4' : 'print:grid-cols-5';
   return (
-    <article className="documento-proposta mx-auto max-w-[800px] rounded-3xl border border-[var(--border)] bg-white px-10 py-9 text-[13px] leading-relaxed text-[#14161a] shadow-sm print:max-w-none print:rounded-none print:border-0 print:shadow-none">
+    <article className="documento-proposta mx-auto max-w-[800px] rounded-3xl border border-[var(--border)] bg-white px-10 py-9 text-[13px] leading-relaxed print:text-[11.5px] print:leading-snug text-[#14161a] shadow-sm print:max-w-none print:rounded-none print:border-0 print:shadow-none">
       <CabecalhoDocumento
-        rotulo={`Proposta de compra${d.numero ? ` · nº ${String(d.numero).padStart(4, '0')}` : ''}`}
+        rotulo={`Proposta de compra${d.numero ? ` · nº ${numeroProposta(d.numero)}` : ''}`}
         titulo="Proposta de compra de imóvel"
         linha={`${EMPRESA.cidade}/${EMPRESA.uf}, ${dataExtenso(d.data)} · válida por ${d.validadeDias} dias`}
       />
@@ -140,9 +147,14 @@ export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
         <p>
           O(a) proponente oferece pelo imóvel o valor total de <strong>{brl(d.valor)}</strong> ({porExtenso(d.valor)}), a ser pago da seguinte forma:
         </p>
-        <div className="mt-3 rounded-2xl border-l-4 border-[#257CFF] bg-[#F2F7FF] px-5 py-4">
-          <div className="mb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#1B5FCC]">Condições de pagamento</div>
-          <div className="whitespace-pre-line text-[13.5px]">
+        <div className="mt-2 rounded-2xl border-l-4 border-[#257CFF] bg-[#F2F7FF] px-5 py-3 print:mt-1.5 print:px-4 print:py-2">
+          <div className="mb-0.5 flex items-baseline gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#1B5FCC] print:text-[10px]">
+            <span aria-hidden className="text-[14px] font-extrabold leading-none text-[#257CFF] print:text-[13px]">
+              /
+            </span>
+            Condições de pagamento
+          </div>
+          <div className="whitespace-pre-line text-[13.5px] print:text-[11.5px]">
             {d.condicoes?.trim() ||
               [d.entrada ? `Entrada / sinal de ${brl(d.entrada)}.` : null, ...(d.formas ?? []).map((f) => FORMAS_PAGAMENTO[f] ?? f)].filter(Boolean).join('\n')}
           </div>
@@ -150,7 +162,7 @@ export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
       </Secao>
 
       <Secao titulo="Condições gerais">
-        <ol className="flex list-none flex-col gap-2 text-[12px] text-[#3c4043]">
+        <ol className="flex list-none flex-col gap-2 text-[12px] text-[#3c4043] print:gap-1 print:text-[9.5px] print:leading-[1.38]">
           <li>
             <strong>1.</strong> Esta proposta é válida por {d.validadeDias} dias a contar da emissão e não obriga o(a) vendedor(a) a aceitá-la.
           </li>
@@ -188,11 +200,11 @@ export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
         </ol>
       </Secao>
 
-      <p className="mt-8 break-inside-avoid">
+      <p className="mt-6 break-inside-avoid print:mt-3">
         {EMPRESA.cidade}/{EMPRESA.uf}, {dataExtenso(d.data)}.
       </p>
 
-      <div className="grid grid-cols-1 gap-x-10 sm:grid-cols-2 print:grid-cols-2">
+      <div className={`grid grid-cols-1 gap-x-10 sm:grid-cols-2 print:gap-x-4 ${colunasAssinatura}`}>
         {d.compradores.map((c, i) => (
           <Assinatura key={`c${i}`} nome={c.nome} papel="Proponente comprador(a)" extra={doc(c.documento) || undefined} />
         ))}
@@ -207,7 +219,7 @@ export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
         <Assinatura nome={d.corretor?.nome ?? ''} papel="Corretor(a) responsável" extra={d.corretor?.creci ? `CRECI ${d.corretor.creci}` : EMPRESA.creci} />
       </div>
 
-      <footer className="mt-10 flex items-center justify-between border-t border-[#e6e8eb] pt-3 text-[10.5px] text-[#9aa0a6]">
+      <footer className="mt-10 flex items-center justify-between border-t border-[#e6e8eb] pt-3 text-[10.5px] text-[#9aa0a6] print:mt-5 print:pt-2 print:text-[9px]">
         <span>
           {EMPRESA.razao} · CNPJ {EMPRESA.cnpj} · {EMPRESA.creci}
         </span>

@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { listarCaptacoes, mudarStatusCaptacao, type Captacao } from '@/lib/actions-captacao';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from '@/lib/tipologias';
+import { CrmNav } from '@/components/crm/comum';
 
 const STATUS: Record<Captacao['status'], string> = { novo: 'Novo', contatado: 'Contatado', captado: 'Captado', descartado: 'Descartado' };
 const FINALIDADE: Record<string, string> = { venda: 'Vender', aluguel: 'Alugar', venda_aluguel: 'Vender ou alugar' };
@@ -37,8 +37,8 @@ export default function QueroVenderPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
       <PainelNav />
+      <CrmNav />
       <main className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8">
         <h1 className="font-serif text-2xl font-semibold">Quero vender</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">Proprietários que cadastraram o imóvel na página &quot;Venda seu imóvel&quot; do site.</p>

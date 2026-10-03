@@ -1,8 +1,8 @@
 // Tipos e listas do CRM que também servem no navegador (sem acesso ao banco).
 export type Funil = 'comprar' | 'vender' | 'credito' | 'alugar' | 'parceiros';
 export const FUNIS: { id: Funil; nome: string }[] = [
-  { id: 'comprar', nome: 'Comprar' },
-  { id: 'vender', nome: 'Vender (captação)' },
+  { id: 'comprar', nome: 'Vendas' },
+  { id: 'vender', nome: 'Captação' },
   { id: 'credito', nome: 'Crédito (Mais Valor)' },
   { id: 'alugar', nome: 'Alugar' },
   { id: 'parceiros', nome: 'Corretores parceiros' }
@@ -13,7 +13,8 @@ export const ETAPAS: Record<Funil, { id: string; nome: string }[]> = {
     { id: 'atendimento', nome: 'Em atendimento' },
     { id: 'visita', nome: 'Visita' },
     { id: 'proposta', nome: 'Proposta' },
-    { id: 'negociacao', nome: 'Negociação e crédito' }
+    { id: 'negociacao', nome: 'Negociação e crédito' },
+    { id: 'contrato', nome: 'Contrato' }
   ],
   vender: [
     { id: 'novo', nome: 'Novo' },
@@ -51,3 +52,14 @@ export type Nota = { valor: number; faixa: 'quente' | 'morno' | 'frio'; motivos:
 
 /** como chegou, para contatos cadastrados à mão */
 export const CANAIS_MANUAIS = ['Indicação', 'Ligação', 'Plantão', 'Instagram (direct)', 'WhatsApp da empresa', 'Facebook', 'TikTok', 'Placa ou panfleto', 'Outro'];
+
+/** Funis principais (os outros ficam em "Outros funis"). */
+export const FUNIS_PRINCIPAIS: Funil[] = ['comprar', 'vender'];
+
+/** Pós-venda do funil de Vendas: o negócio já conta como ganho (contrato assinado)
+ *  e segue até a entrega do imóvel e o depoimento do cliente. */
+export const POS_VENDA = [
+  { id: 'entrega', nome: 'Entrega do imóvel' },
+  { id: 'depoimento', nome: 'Depoimento do cliente' }
+] as const;
+export type PosVenda = (typeof POS_VENDA)[number]['id'] | 'concluido';

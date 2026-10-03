@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { veTudo } from '@/lib/papeis';
 import { listarPropostas, mudarStatusProposta, type Proposta } from '@/lib/actions-propostas';
 import { STATUS_PROPOSTA, brl } from '@/lib/proposta-textos';
+import { numeroProposta } from '@/lib/proposta-textos';
+import { CrmNav } from '@/components/crm/comum';
 
 // Propostas feitas pela equipe (uso interno). Corretor vê só as dele.
 export default function PropostasPage() {
@@ -58,8 +59,8 @@ export default function PropostasPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
       <PainelNav />
+      <CrmNav />
       <main className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="font-serif text-2xl font-semibold">Propostas</h1>
@@ -120,7 +121,7 @@ export default function PropostasPage() {
                 <div key={p.id} className="rounded-xl border border-[var(--border)] p-4 hover:border-accent">
                   <Link href={`/dashboard/propostas/${p.id}`} className="block">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold text-[var(--text-faint)]">Nº {String(p.numero).padStart(4, '0')}</span>
+                    <span className="text-xs font-bold text-[var(--text-faint)]">Nº {numeroProposta(p.numero)}</span>
                     <span className="text-lg font-bold">{brl(p.valor)}</span>
                     <span className="rounded-md bg-[var(--pill-bg)] px-2 py-0.5 text-[11px] font-bold uppercase">{STATUS_PROPOSTA[p.status]}</span>
                     {n > 1 && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900">{n} propostas neste imóvel</span>}

@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { listInteresses, updateInteresseStatus, type InteresseLead } from '@/lib/actions';
 import { GRUPO_LABEL, textoAlcance, textoArea } from '@/lib/interesse-regras';
+import { CrmNav } from '@/components/crm/comum';
 
 const STATUS_LABEL = { novo: 'Novo', contatado: 'Contatado', descartado: 'Descartado' } as const;
 const brl = (n: number | null) => (n ? n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : null);
@@ -47,8 +47,8 @@ export default function InteressadosPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
       <PainelNav />
+      <CrmNav />
       <main className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8">
         <h1 className="font-serif text-2xl font-semibold">Interessados</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">

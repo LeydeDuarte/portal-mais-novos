@@ -56,3 +56,7 @@ export function porExtenso(valor: number): string {
   if (n % 1e6 === 0 && n >= 1e6) frase += ' de';
   return `${frase} ${n === 1 ? 'real' : 'reais'}`;
 }
+
+/** Número exibido da proposta: a numeração começa em 200 (a 1ª proposta é a nº 0200). */
+export const PRIMEIRO_NUMERO_PROPOSTA = 200;
+export const numeroProposta = (n: number | null | undefined) => (n ? String(n + PRIMEIRO_NUMERO_PROPOSTA - 1).padStart(4, '0') : '');

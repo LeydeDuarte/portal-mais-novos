@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { contatoParaProposta } from '@/lib/actions-crm';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import PessoaCampos, { input, label, fecharEndereco, type PessoaForm } from '@/components/forms/PessoaCampos';
 import { useStaffSession } from '@/lib/use-staff-session';
@@ -18,6 +17,7 @@ import {
   type OpcaoAlvo
 } from '@/lib/actions-propostas';
 import { brl } from '@/lib/proposta-textos';
+import { CrmNav } from '@/components/crm/comum';
 
 const moeda = (v: string | number) => {
   const d = String(v).replace(/\D/g, '').slice(0, 12);
@@ -153,8 +153,8 @@ function NovaProposta() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
       <PainelNav />
+      <CrmNav />
       <main className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8">
         <h1 className="font-serif text-2xl font-semibold">{editId ? 'Editar proposta' : 'Nova proposta'}</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">

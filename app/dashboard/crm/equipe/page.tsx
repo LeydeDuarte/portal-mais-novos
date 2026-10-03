@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { CanalChip, CrmNav, Iniciais, OrigemChip, tempoDesde } from '@/components/crm/comum';
 import { useStaffSession } from '@/lib/use-staff-session';
@@ -33,7 +32,6 @@ export default function CrmEquipePage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
       <PainelNav />
       <CrmNav ativo="/dashboard/crm/equipe" gestor />
       <main className="mx-auto w-full max-w-6xl px-5 py-6 md:px-8">

@@ -9,6 +9,7 @@ import './globals.css';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
 import ProtecaoImagens from '@/components/ProtecaoImagens';
 import AtualizarVersao from '@/components/AtualizarVersao';
+import VoltarAoTopo from '@/components/VoltarAoTopo';
 import SurgirAoRolar from '@/components/SurgirAoRolar';
 import { GtmHead, GtmBody } from '@/components/GoogleTagManager';
 import Rastreador from '@/components/Rastreador';
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {!equipe && <AvisoCookies />}
         <ProtecaoImagens />
         <AtualizarVersao />
+        <VoltarAoTopo />
         <SurgirAoRolar />
         {equipe && <RegistrarApp />}
         {equipe && <MarcarAparelhoEquipe />}

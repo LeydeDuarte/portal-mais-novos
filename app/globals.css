@@ -66,7 +66,7 @@ img {
   body.imprimindo-proposta .documento-proposta * { visibility: visible !important; }
   body.imprimindo-proposta .documento-proposta { position: absolute; left: 0; top: 0; width: 100%; max-width: none; padding: 0 !important; }
   /* margens do PDF: brancas dos dois lados, em todas as páginas */
-  @page { size: A4; margin: 18mm 17mm 16mm 17mm; }
+  @page { size: A4; margin: 11mm 14mm 10mm 14mm; }
   body.imprimindo-proposta { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 

@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { CanalChip, CrmNav, Iniciais, OrigemChip, dataHora, linkWhats, tempoDesde } from '@/components/crm/comum';
 import { useStaffSession } from '@/lib/use-staff-session';
@@ -47,7 +46,6 @@ export default function CrmHojePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--pill-bg)]/40">
-      <Header />
       <PainelNav />
       <CrmNav ativo="/dashboard/crm" gestor={gestor} />
       <main className="mx-auto w-full max-w-6xl px-5 py-6 md:px-8">

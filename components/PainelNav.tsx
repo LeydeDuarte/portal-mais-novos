@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStaffSession } from '@/lib/use-staff-session';
 import { temAcessoFinanceiro } from '@/lib/actions-custos';
 import { ROLE_LABEL } from '@/lib/papeis';
+import { noCrm } from '@/lib/crm-menu';
 import { ORDEM_MENU, TODAS, podeVer, rotuloFerramenta, soAdminPrincipal, type Ferramenta } from '@/lib/painel-menu';
 import Logo from './Logo';
 import { SITE_URL } from '@/lib/seo';
@@ -65,7 +66,8 @@ export default function PainelNav() {
     await logout();
     router.push('/dashboard/login');
   };
-  const ativo = (href: string) => (href === '/dashboard' ? pathname === '/dashboard' : pathname === href || pathname.startsWith(`${href}/`));
+  const ativo = (href: string) =>
+    href === '/dashboard' ? pathname === '/dashboard' : href === '/dashboard/crm' ? noCrm(pathname) : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <div className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--bg)]/85">

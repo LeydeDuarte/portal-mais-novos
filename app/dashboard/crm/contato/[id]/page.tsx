@@ -5,7 +5,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { CanalChip, CrmNav, Iniciais, NotaChip, OrigemChip, brl, dataHora, linkWhats, tempoDesde } from '@/components/crm/comum';
 import { useStaffSession } from '@/lib/use-staff-session';
@@ -25,6 +24,7 @@ import {
 } from '@/lib/actions-crm';
 import { FUNIS } from '@/lib/crm-tipos';
 import SelecionarImoveis from '@/components/crm/SelecionarImoveis';
+import { numeroProposta } from '@/lib/proposta-textos';
 
 const ICONE_ATV: Record<string, string> = { entrada: '→', whatsapp: 'W', ligacao: 'L', visita: 'V', nota: 'N', simulacao: 'S', sistema: '•', envio: '↗', abriu: '✓' };
 const NOME_ATV: Record<string, string> = {
@@ -106,7 +106,6 @@ export default function FichaPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
       <PainelNav />
       <CrmNav ativo="/dashboard/crm/contatos" gestor={gestor} />
       {/* cabeçalho do contato */}
@@ -341,7 +340,7 @@ export default function FichaPage() {
             {d.propostas.map((p) => (
               <Link key={p.id} href={`/dashboard/propostas/${p.id}`} className="mt-2 block rounded-xl border border-[var(--border)] p-2.5 hover:border-accent">
                 <span className="flex items-center justify-between gap-2">
-                  <b className="text-[13px]">{p.numero ? `Nº ${String(p.numero).padStart(4, '0')}` : 'Proposta'}</b>
+                  <b className="text-[13px]">{p.numero ? `Nº ${numeroProposta(p.numero)}` : 'Proposta'}</b>
                   <span className="rounded-full bg-[var(--pill-bg)] px-2 py-0.5 text-[11px] font-semibold">{p.status ?? 'rascunho'}</span>
                 </span>
                 <span className="block truncate text-[12.5px] text-[var(--text-muted)]">{p.imovel}</span>

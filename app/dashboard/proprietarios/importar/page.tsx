@@ -9,6 +9,7 @@ import { useStaffSession } from '@/lib/use-staff-session';
 import { lerCsv } from '@/lib/planilha-condominios';
 import { importarProprietariosPlanilha, type ProprietarioPlanilhaLinha } from '@/lib/actions-proprietarios';
 import { formatarDocumento, formatarTelefone } from '@/lib/formatos';
+import { CrmNav } from '@/components/crm/comum';
 
 // Importar proprietários por planilha (.xlsx ou .csv). Colunas reconhecidas pelo
 // cabeçalho: Nome (obrigatória), CPF/CNPJ, Telefone/Celular/WhatsApp, E-mail.
@@ -92,6 +93,7 @@ export default function ImportarProprietarios() {
   return (
     <div className="min-h-screen">
       <PainelNav />
+      <CrmNav />
       <div className="mx-auto max-w-4xl px-4 pb-24 pt-8 md:px-6">
         <TituloPainel titulo="Importar proprietários" contagem="Nome, CPF/CNPJ, telefone e e-mail. Só o nome é obrigatório.">
           <Link href="/dashboard/proprietarios" className="flex h-11 items-center rounded-full bg-[var(--pill-bg)] px-4 text-[13px] font-semibold">

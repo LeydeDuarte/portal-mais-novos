@@ -13,6 +13,7 @@ import { exigirEquipe } from './staff-auth';
 import { veTudo } from './papeis';
 import { cpfValido } from './leitura-documentos-servidor';
 import { completarProprietariosDaProposta, pessoasDaProposta, proprietariosDoImovel } from './proprietarios';
+import { numeroProposta } from './proposta-textos';
 
 export type Pessoa = {
   nome: string;
@@ -339,7 +340,7 @@ export async function salvarProposta(d: PropostaInput): Promise<{ ok: boolean; i
           c.nome,
           c.email ?? null,
           c.telefone ?? null,
-          `Proposta${numero ? ` nº ${String(numero).padStart(4, '0')}` : ''} de ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}${c.documento ? ` · CPF/CNPJ ${c.documento}` : ''} · ${imovelTexto.slice(0, 160)} · feita por ${corretor.nome}`
+          `Proposta${numero ? ` nº ${numeroProposta(numero)}` : ''} de ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}${c.documento ? ` · CPF/CNPJ ${c.documento}` : ''} · ${imovelTexto.slice(0, 160)} · feita por ${corretor.nome}`
         ]
       ).catch(() => {});
     }

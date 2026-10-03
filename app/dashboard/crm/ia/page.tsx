@@ -3,7 +3,6 @@
 // CRM · IA e WhatsApp (só admin): liga a IA, modo teste, parâmetros da simulação e instruções.
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
 import PainelNav from '@/components/PainelNav';
 import { CrmNav } from '@/components/crm/comum';
 import { useStaffSession } from '@/lib/use-staff-session';
@@ -64,7 +63,6 @@ export default function CrmIaPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
       <PainelNav />
       <CrmNav ativo="/dashboard/crm/ia" gestor />
       <main className="mx-auto w-full max-w-3xl px-5 py-6 md:px-8">

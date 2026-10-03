@@ -3,6 +3,13 @@
 // Painel → Para avisar: combinações entre pedidos de aviso e anúncios publicados.
 import { query } from './db';
 import { exigirEquipe } from './staff-auth';
+
+// Lista automática "Para avisar": só o administrador principal (corretor e analista não veem).
+async function exigirAdminPrincipal() {
+  const eu = await exigirEquipe();
+  if (eu.role !== 'admin') throw new Error('Só o administrador principal vê a lista Para avisar.');
+  return eu;
+}
 import { gerarAvisos } from './avisos';
 import { urlImovel } from './urls';
 import { TIPO_UNIDADE_LABEL, type TipoUnidade } from './tipologias';
@@ -30,7 +37,7 @@ export type AvisoPendente = {
 };
 
 export async function listAvisos(): Promise<AvisoPendente[]> {
-  await exigirEquipe();
+  await exigirAdminPrincipal();
   const rows = await query<Record<string, unknown>>(
     `select a.id, a.criado_em, a.metros, a.mesmo_condominio,
             l.nome, l.telefone, l.email, l.condominio as l_condominio, l.raio, l.quartos_opcoes,
@@ -80,7 +87,7 @@ export async function listAvisos(): Promise<AvisoPendente[]> {
 
 /** Marca como avisado (pelo WhatsApp, por quem clicou) ou descarta */
 export async function marcarAviso(id: string, acao: 'avisado' | 'descartado'): Promise<void> {
-  const staff = await exigirEquipe();
+  const staff = await exigirAdminPrincipal();
   if (!/^[0-9a-f-]{36}$/i.test(id)) return;
   if (acao === 'avisado') await query(`update avisos_pendentes set avisado_em = now(), avisado_por = $2, canal = 'whatsapp' where id = $1::uuid`, [id, staff.email]);
   else await query(`update avisos_pendentes set descartado_em = now(), avisado_por = $2 where id = $1::uuid`, [id, staff.email]);
@@ -91,7 +98,7 @@ export async function marcarAviso(id: string, acao: 'avisado' | 'descartado'): P
  * de importar anúncios ou para quem acabou de pedir aviso). Não dispara e-mail.
  */
 export async function procurarAvisosRecentes(): Promise<{ anuncios: number; novos: number }> {
-  await exigirEquipe();
+  await exigirAdminPrincipal();
   const ids = await query<{ id: string }>(
     `select id from properties
       where not is_tipologia and coalesce(visibilidade, 'publico') = 'publico' and vendido_em is null
