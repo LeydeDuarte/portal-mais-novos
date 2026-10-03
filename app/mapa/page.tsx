@@ -4,6 +4,7 @@ import MapaPublico from '@/components/mapa/MapaPublico';
 import JsonLd from '@/components/JsonLd';
 import { listarRegioes } from '@/lib/landing';
 import { SITE_NAME, SITE_URL, urlRegiao } from '@/lib/seo';
+import { imagemCartao } from '@/lib/cartao-og';
 
 const TITULO = 'Mapa de imóveis e lançamentos em Goiânia';
 const DESCRICAO =
@@ -13,7 +14,8 @@ export const metadata: Metadata = {
   title: TITULO,
   description: DESCRICAO,
   alternates: { canonical: '/mapa' },
-  openGraph: { title: `${TITULO} | ${SITE_NAME}`, description: DESCRICAO, url: `${SITE_URL}/mapa`, type: 'website' }
+  openGraph: { title: `${TITULO} | ${SITE_NAME}`, description: DESCRICAO, url: `${SITE_URL}/mapa`, type: 'website', images: imagemCartao({ titulo: 'Imóveis e condomínios no mapa', sub: 'Goiânia e região, com a posição do sol em cada condomínio' }).images },
+  twitter: imagemCartao({ titulo: 'Imóveis e condomínios no mapa', sub: 'Goiânia e região, com a posição do sol em cada condomínio' }).twitter
 };
 
 export default async function MapaPage() {

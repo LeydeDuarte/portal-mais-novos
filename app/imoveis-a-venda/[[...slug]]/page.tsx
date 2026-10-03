@@ -11,6 +11,7 @@ import { CATEGORIAS, MIN_QUARTOS, acharRegiao, anunciosDaRegiao, condominiosDaRe
 import { SITE_NAME, SITE_URL, trilhaDoImovel, urlRegiao } from '@/lib/seo';
 import { urlImovel, urlCondominio } from '@/lib/urls';
 import { tituloRegiao } from '@/lib/titulos';
+import { imagemCartao } from '@/lib/cartao-og';
 
 // Páginas de região para o Google e para buscadores de IA, em silos (estado na URL):
 //   /imoveis-a-venda                                   → todas as cidades
@@ -111,11 +112,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       est.n
     );
   }
+  let subCartao = 'Apartamentos, casas em condomínio, coberturas e lançamentos';
+  if (r.regiao) {
+    const { est } = await anunciosDaRegiao(r.regiao.cidade, r.regiao.bairro, r.categoria, 1, r.quartos);
+    subCartao = [est.n ? `${est.n} ${est.n === 1 ? 'anúncio' : 'anúncios'}` : null, est.min ? `a partir de ${brl(est.min)}` : null].filter(Boolean).join(', ') || r.regiao.cidade;
+  }
+  const cartao = imagemCartao({ titulo, sub: subCartao });
   return {
     title: { absolute: tituloGoogle },
     description: description.slice(0, 160),
     alternates: { canonical: url },
-    openGraph: { title: `${titulo} | ${SITE_NAME}`, description, url, siteName: SITE_NAME, locale: 'pt_BR', type: 'website' }
+    openGraph: { title: `${titulo} | ${SITE_NAME}`, description, url, siteName: SITE_NAME, locale: 'pt_BR', type: 'website', images: cartao.images },
+    twitter: cartao.twitter
   };
 }
 

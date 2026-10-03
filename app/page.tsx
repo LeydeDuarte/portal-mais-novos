@@ -5,6 +5,7 @@ import { buildAgentJsonLd, SITE_NAME, SITE_URL } from '@/lib/seo';
 import { montarFeedInicial } from '@/lib/feed-inicial';
 import { preloadPrimeirasFotos } from '@/lib/preload-feed';
 import { TITULO_HOME } from '@/lib/titulos';
+import { imagemCartao, CARTAO_PADRAO } from '@/lib/cartao-og';
 
 export const metadata: Metadata = {
   title: { absolute: TITULO_HOME },
@@ -17,9 +18,8 @@ export const metadata: Metadata = {
     url: SITE_URL,
     siteName: SITE_NAME,
     locale: 'pt_BR',
-    type: 'website',
-    images: [{ url: `${SITE_URL}/icons/icon-512.png`, width: 512, height: 512, alt: SITE_NAME }]
-  }
+    type: 'website', images: imagemCartao(CARTAO_PADRAO).images },
+  twitter: imagemCartao(CARTAO_PADRAO).twitter
 };
 
 export default async function Page({ searchParams }: { searchParams: { q?: string } }) {

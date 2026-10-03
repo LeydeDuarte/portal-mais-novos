@@ -1,6 +1,7 @@
 import { ESTADO_CIVIL, FORMAS_PAGAMENTO, brl, porExtenso } from '@/lib/proposta-textos';
 import { EMPRESA } from '@/lib/seo';
 import type { Corretor, Pessoa } from '@/lib/actions-propostas';
+import CabecalhoDocumento from './CabecalhoDocumento';
 
 export type DadosDocumento = {
   numero?: number;
@@ -108,19 +109,11 @@ export default function DocumentoProposta({ d }: { d: DadosDocumento }) {
   const corretorTxt = d.corretor?.nome ? `${d.corretor.nome}${d.corretor.creci ? `, CRECI ${d.corretor.creci}` : ''}` : null;
   return (
     <article className="documento-proposta mx-auto max-w-[800px] rounded-3xl border border-[var(--border)] bg-white px-10 py-9 text-[13px] leading-relaxed text-[#14161a] shadow-sm print:max-w-none print:rounded-none print:border-0 print:shadow-none">
-      <header className="flex items-center justify-between gap-6 border-b border-[#e6e8eb] pb-5">
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#1B5FCC]">
-            Proposta de compra{d.numero ? ` · nº ${String(d.numero).padStart(4, '0')}` : ''}
-          </div>
-          <div className="mt-1 font-serif text-[24px] font-semibold leading-tight">Proposta de compra de imóvel</div>
-          <div className="mt-0.5 text-[12px] text-[#5f6368]">
-            {EMPRESA.cidade}/{EMPRESA.uf}, {dataExtenso(d.data)} · válida por {d.validadeDias} dias
-          </div>
-        </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/marca/logotipo-preto.png" alt="Mais Novos Imóveis" className="h-12 w-auto shrink-0" />
-      </header>
+      <CabecalhoDocumento
+        rotulo={`Proposta de compra${d.numero ? ` · nº ${String(d.numero).padStart(4, '0')}` : ''}`}
+        titulo="Proposta de compra de imóvel"
+        linha={`${EMPRESA.cidade}/${EMPRESA.uf}, ${dataExtenso(d.data)} · válida por ${d.validadeDias} dias`}
+      />
 
       <Secao titulo={d.compradores.length > 1 ? 'Proponentes compradores' : 'Proponente comprador(a)'}>
         <Pessoas lista={d.compradores} vazio="Proponente não informado." />

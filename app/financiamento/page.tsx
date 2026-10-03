@@ -4,12 +4,15 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { SITE_URL } from '@/lib/seo';
 import { MAIS_VALOR_URL } from '@/lib/marca';
+import { imagemCartao } from '@/lib/cartao-og';
 
 export const metadata: Metadata = {
   title: 'Financiamento imobiliário e home equity em Goiânia',
   description:
     'Financiamento imobiliário, crédito com garantia de imóvel (home equity) e estruturação de crédito com a Mais Valor Capital: mais de 15 bancos e fundos parceiros e prazos de até 420 meses.',
-  alternates: { canonical: `${SITE_URL}/financiamento` }
+  alternates: { canonical: `${SITE_URL}/financiamento` },
+  openGraph: { siteName: 'Mais Novos Imóveis', locale: 'pt_BR', type: 'website', images: imagemCartao({ titulo: 'Financiamento imobiliário e home equity', sub: 'Mais de 15 bancos e fundos parceiros, com a Mais Valor Capital', selo: 'Crédito' }).images },
+  twitter: imagemCartao({ titulo: 'Financiamento imobiliário e home equity', sub: 'Mais de 15 bancos e fundos parceiros, com a Mais Valor Capital', selo: 'Crédito' }).twitter
 };
 
 const ITENS = [

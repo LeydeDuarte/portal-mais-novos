@@ -16,6 +16,7 @@ import GraficoIncorporadorasRegiao from '@/components/news/GraficoIncorporadoras
 import { TOPICOS, urlNoticia, type Noticia } from '@/lib/news/base';
 
 import { SITE_URL, SITE_NAME, urlRegiao as urlRegiaoImoveis } from '@/lib/seo';
+import { imagemCartao } from '@/lib/cartao-og';
 
 // Capa do Mais Novos News. Guardada por 5 minutos (menos consulta ao banco).
 export const revalidate = 300;
@@ -24,7 +25,8 @@ export const metadata: Metadata = {
   title: { absolute: 'Mais Novos News: Mercado Imobiliário de Goiânia e Região' },
   description: 'Notícias do mercado imobiliário de Goiânia e região: preço do m² por bairro, lançamentos, financiamento, Selic, INCC e o que muda no bolso de quem compra ou vende.',
   alternates: { canonical: `${SITE_URL}/news`, types: { 'application/rss+xml': `${SITE_URL}/news/rss.xml` } },
-  openGraph: { title: 'Mais Novos News', description: 'O mercado imobiliário de Goiânia sem enrolação.', url: `${SITE_URL}/news`, siteName: SITE_NAME, locale: 'pt_BR', type: 'website' }
+  openGraph: { title: 'Mais Novos News', description: 'O mercado imobiliário de Goiânia sem enrolação.', url: `${SITE_URL}/news`, siteName: SITE_NAME, locale: 'pt_BR', type: 'website', images: imagemCartao({ titulo: 'Mais Novos News', sub: 'O mercado imobiliário de Goiânia sem enrolação', selo: 'News' }).images },
+  twitter: imagemCartao({ titulo: 'Mais Novos News', sub: 'O mercado imobiliário de Goiânia sem enrolação', selo: 'News' }).twitter
 };
 
 const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR')}`;

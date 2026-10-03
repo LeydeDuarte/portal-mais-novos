@@ -5,12 +5,15 @@ import Footer from '@/components/Footer';
 import JsonLd from '@/components/JsonLd';
 import { EMPRESA, SITE_NAME, SITE_URL } from '@/lib/seo';
 import { MAIS_VALOR_URL } from '@/lib/marca';
+import { imagemCartao } from '@/lib/cartao-og';
 
 export const metadata: Metadata = {
   title: 'Quem somos',
   description:
     'Mais Novos Imóveis: portal e imobiliária em Goiânia que une imóveis selecionados, vídeos e estratégia de crédito. Conheça a Leyde Duarte e a Mais Valor Capital.',
-  alternates: { canonical: `${SITE_URL}/quem-somos` }
+  alternates: { canonical: `${SITE_URL}/quem-somos` },
+  openGraph: { siteName: 'Mais Novos Imóveis', locale: 'pt_BR', type: 'website', images: imagemCartao({ titulo: 'Quem somos', sub: 'Imóveis selecionados, vídeos e estratégia de crédito em Goiânia' }).images },
+  twitter: imagemCartao({ titulo: 'Quem somos', sub: 'Imóveis selecionados, vídeos e estratégia de crédito em Goiânia' }).twitter
 };
 
 const PILARES = [

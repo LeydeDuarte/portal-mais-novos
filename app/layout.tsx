@@ -13,6 +13,7 @@ import SurgirAoRolar from '@/components/SurgirAoRolar';
 import { GtmHead, GtmBody } from '@/components/GoogleTagManager';
 import Rastreador from '@/components/Rastreador';
 import AvisoCookies from '@/components/AvisoCookies';
+import { imagemCartao, CARTAO_PADRAO } from '@/lib/cartao-og';
 
 // Nunca reaproveitar respostas antigas do banco em nenhuma página
 export const fetchCache = 'default-no-store';
@@ -39,11 +40,14 @@ export const metadata: Metadata = {
   },
   description:
     'Os Mais Novos Imóveis à venda em Goiânia: lançamentos, apartamentos e casas em condomínio. Atendimento especializado em financiamento e crédito imobiliário.',
+  // páginas sem imagem própria usam o cartão padrão (logo completa + chamada do portal)
   openGraph: {
     siteName: SITE_NAME,
     type: 'website',
-    locale: 'pt_BR'
+    locale: 'pt_BR',
+    images: imagemCartao(CARTAO_PADRAO).images
   },
+  twitter: imagemCartao(CARTAO_PADRAO).twitter,
   robots: {
     index: true,
     follow: true

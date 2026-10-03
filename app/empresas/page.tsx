@@ -6,12 +6,14 @@ import { query } from '@/lib/db';
 import { mapEmpresa, type EmpresaRow } from '@/lib/empresas';
 import { empresaAtiva, idadeEmpresa, nomeEmpresa, situacaoPublica } from '@/lib/empresas-tipos';
 import { SITE_NAME, SITE_URL } from '@/lib/seo';
+import { imagemCartao } from '@/lib/cartao-og';
 
 export const metadata: Metadata = {
   title: 'Construtoras e incorporadoras de Goiânia',
   description: 'Perfil informativo das construtoras e incorporadoras: situação cadastral, idade da empresa e todos os empreendimentos de cada uma.',
   alternates: { canonical: `${SITE_URL}/empresas` },
-  openGraph: { title: `Construtoras e incorporadoras | ${SITE_NAME}`, url: `${SITE_URL}/empresas`, siteName: SITE_NAME, locale: 'pt_BR', type: 'website' }
+  openGraph: { title: `Construtoras e incorporadoras | ${SITE_NAME}`, url: `${SITE_URL}/empresas`, siteName: SITE_NAME, locale: 'pt_BR', type: 'website', images: imagemCartao({ titulo: 'Construtoras e incorporadoras de Goiânia', sub: 'Situação cadastral, idade da empresa e todos os empreendimentos' }).images },
+  twitter: imagemCartao({ titulo: 'Construtoras e incorporadoras de Goiânia', sub: 'Situação cadastral, idade da empresa e todos os empreendimentos' }).twitter
 };
 
 export default async function EmpresasPage({ searchParams }: { searchParams: { q?: string } }) {

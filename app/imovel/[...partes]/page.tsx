@@ -22,9 +22,11 @@ const getResumoOculto = cache(async (param: string) => {
   return r ? buscarResumo(r.id) : null;
 });
 import { verificarLinkPrivado } from '@/lib/links-privados';
-import { buildPropertyMetadata, buildPropertyJsonLd, SITE_URL } from '@/lib/seo';
+import { buildPropertyMetadata, buildPropertyJsonLd, SITE_NAME, SITE_URL } from '@/lib/seo';
 import { tituloOculto, brlCurto } from '@/lib/ocultos';
 import JsonLd from '@/components/JsonLd';
+import { imagemCartao } from '@/lib/cartao-og';
+import { TIPO_UNIDADE_LABEL } from '@/lib/tipologias';
 
 // Sempre busca os dados na hora: assim uma edição feita no painel aparece
 // imediatamente (sem isso, o Next guardava a primeira versão da página).
@@ -44,7 +46,17 @@ export async function generateMetadata({ params: { partes }, searchParams }: Pro
   const params = { id: ultimo(partes) };
   const property = await getPropertyById(params.id);
   if (property) {
-    const meta = buildPropertyMetadata(property);
+    let meta = buildPropertyMetadata(property);
+    if (!(property.photos ?? []).length) {
+      // sem foto: cartão com a logo completa (WhatsApp e redes)
+      const tipo = TIPO_UNIDADE_LABEL[property.tipoUnidade] ?? 'Imóvel';
+      const c = imagemCartao({
+        titulo: property.condominio ? `${tipo} no ${property.condominio}` : `${tipo} à venda`,
+        sub: [[property.bairro, property.cidade].filter(Boolean).join(', '), property.priceValue ? brlCurto(property.priceValue) : null].filter(Boolean).join(' · ') || null,
+        selo: property.visibilidade === 'privado' ? 'Anúncio privado' : 'À venda'
+      });
+      meta = { ...meta, openGraph: { ...meta.openGraph, images: c.images }, twitter: { ...meta.twitter, ...c.twitter } };
+    }
     return property.visibilidade === 'privado' ? { ...meta, robots: { index: false, follow: false } } : meta;
   }
   const a = await getResumoOculto(params.id);
@@ -54,7 +66,12 @@ export async function generateMetadata({ params: { partes }, searchParams }: Pro
     title: `${t}, anúncio privado | Mais Novos Imóveis`,
     description: (a.descricao ? `${t}. ${a.descricao.replace(/\s+/g, ' ')}` : `${t}${a.preco ? `, ${brlCurto(a.preco)}` : ''}. Anúncio privado: solicite as fotos e o endereço com a Mais Novos Imóveis.`).slice(0, 160),
     alternates: { canonical: `${SITE_URL}/imovel/${(await resolver(params.id))?.id ?? params.id}` },
-    ...(searchParams.l ? { robots: { index: false, follow: false } } : {})
+    ...(searchParams.l ? { robots: { index: false, follow: false } } : {}),
+    // anúncio privado para o público: só o cartão, sem foto nem endereço
+    ...(() => {
+      const c = imagemCartao({ titulo: t, sub: a.preco ? brlCurto(a.preco) : null, selo: 'Anúncio privado' });
+      return { openGraph: { siteName: SITE_NAME, locale: 'pt_BR', type: 'website' as const, images: c.images }, twitter: c.twitter };
+    })()
   };
 }
 

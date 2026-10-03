@@ -3,13 +3,15 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import FormVender from '@/components/FormVender';
 import { SITE_NAME, SITE_URL } from '@/lib/seo';
+import { imagemCartao } from '@/lib/cartao-og';
 
 export const metadata: Metadata = {
   title: 'Venda seu imóvel em Goiânia',
   description:
     'Quer vender seu imóvel em Goiânia? Informe o CEP, as características básicas e seu contato. A equipe da Mais Novos Imóveis avalia e divulga com fotos, vídeo e atendimento especializado em crédito.',
   alternates: { canonical: `${SITE_URL}/vender` },
-  openGraph: { title: `Venda seu imóvel | ${SITE_NAME}`, url: `${SITE_URL}/vender`, siteName: SITE_NAME, locale: 'pt_BR', type: 'website' }
+  openGraph: { title: `Venda seu imóvel | ${SITE_NAME}`, url: `${SITE_URL}/vender`, siteName: SITE_NAME, locale: 'pt_BR', type: 'website', images: imagemCartao({ titulo: 'Venda seu imóvel com a Mais Novos', sub: 'Avaliação, fotos, vídeo e atendimento especializado em crédito' }).images },
+  twitter: imagemCartao({ titulo: 'Venda seu imóvel com a Mais Novos', sub: 'Avaliação, fotos, vídeo e atendimento especializado em crédito' }).twitter
 };
 
 const PASSOS = [

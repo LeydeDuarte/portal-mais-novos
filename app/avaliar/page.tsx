@@ -4,11 +4,14 @@ import Footer from '@/components/Footer';
 import FormAvaliacao from '@/components/FormAvaliacao';
 import { SITE_URL, SITE_NAME } from '@/lib/seo';
 import JsonLd from '@/components/JsonLd';
+import { imagemCartao } from '@/lib/cartao-og';
 
 export const metadata: Metadata = {
   title: { absolute: 'Quanto Vale Meu Imóvel? Avaliação Grátis em Goiânia' },
   description: 'Descubra quanto vale o seu imóvel com a avaliação pelo método comparativo da NBR 14653-2, usando anúncios parecidos da sua região. Grátis e na hora.',
-  alternates: { canonical: `${SITE_URL}/avaliar` }
+  alternates: { canonical: `${SITE_URL}/avaliar` },
+  openGraph: { siteName: 'Mais Novos Imóveis', locale: 'pt_BR', type: 'website', images: imagemCartao({ titulo: 'Quanto vale o seu imóvel?', sub: 'Avaliação grátis pelo método comparativo, na hora', selo: 'Avaliação' }).images },
+  twitter: imagemCartao({ titulo: 'Quanto vale o seu imóvel?', sub: 'Avaliação grátis pelo método comparativo, na hora', selo: 'Avaliação' }).twitter
 };
 
 export default function AvaliarPage() {

@@ -17,6 +17,7 @@ import { empreendimentosDaEmpresa } from '@/lib/actions';
 import { dataBRCompleta, empresaAtiva, idadeEmpresa, nomeEmpresa, situacaoPublica, type Empresa } from '@/lib/empresas-tipos';
 import { BUCKET_LABEL, FASES } from '@/lib/classification';
 import { SITE_NAME, SITE_URL } from '@/lib/seo';
+import { imagemCartao } from '@/lib/cartao-og';
 
 // Perfil INFORMATIVO da construtora/incorporadora: dados públicos da Receita (situação,
 // idade), breve histórico e todos os empreendimentos em que ela participou da
@@ -67,6 +68,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }. Veja lançamentos, obras e prontos do portfólio.`;
   // Padrão de busca: "Imóveis à venda da Incorporadora X"
   const titulo = imoveisDaEmpresa(nome);
+  const total = e.totalEmpreendimentos ?? 0;
+  const cartaoEmpresa = {
+    titulo: nome,
+    sub: total ? `${total} ${total === 1 ? 'empreendimento' : 'empreendimentos'}${e.municipio ? `, sede em ${e.municipio}/${e.uf}` : ''}` : e.municipio ? `Sede em ${e.municipio}/${e.uf}` : null,
+    selo: 'Construtora'
+  };
   return {
     title: { absolute: tituloEmpresa(titulo) },
     // a frase que as pessoas buscam vem primeiro: "conheça todos os empreendimentos da X"
@@ -75,7 +82,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       : `Conheça todos os empreendimentos da ${nome}, com plantas, preços e fotos.`
     ).slice(0, 160),
     alternates: { canonical: `${SITE_URL}/empresa/${e.slug}` },
-    openGraph: { title: `${nome} | ${SITE_NAME}`, description: desc.slice(0, 200), url: `${SITE_URL}/empresa/${e.slug}`, siteName: SITE_NAME, locale: 'pt_BR', type: 'website' }
+    openGraph: {
+      title: `${nome} | ${SITE_NAME}`,
+      description: desc.slice(0, 200),
+      url: `${SITE_URL}/empresa/${e.slug}`,
+      siteName: SITE_NAME,
+      locale: 'pt_BR',
+      type: 'website',
+      images: imagemCartao(cartaoEmpresa).images
+    },
+    twitter: imagemCartao(cartaoEmpresa).twitter
   };
 }
 

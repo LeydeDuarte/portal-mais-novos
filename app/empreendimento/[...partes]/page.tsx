@@ -16,6 +16,7 @@ const getDevelopmentById = cache(async (param: string) => {
 });
 import { buildDevelopmentMetadata, buildDevelopmentJsonLd } from '@/lib/seo';
 import JsonLd from '@/components/JsonLd';
+import { imagemCartao } from '@/lib/cartao-og';
 
 // Sempre busca os dados na hora: assim uma edição feita no painel aparece
 // imediatamente (sem isso, o Next guardava a primeira versão da página).
@@ -25,7 +26,15 @@ export async function generateMetadata({ params: { partes } }: { params: { parte
   const params = { id: partes[partes.length - 1] ?? '' };
   const development = await getDevelopmentById(params.id);
   if (!development) return { title: 'Empreendimento | Mais Novos Imóveis' };
-  return buildDevelopmentMetadata(development);
+  const meta = buildDevelopmentMetadata(development);
+  if ((development.photos ?? []).length) return meta;
+  // sem foto: cartão com a logo completa, selo, nome, bairro e entrega (WhatsApp e redes)
+  const ano = /^\d{4}/.test(development.deliveryDate ?? '') ? Number(development.deliveryDate.slice(0, 4)) : null;
+  const futuro = !!ano && development.deliveryDate > new Date().toISOString().slice(0, 7);
+  const onde = [development.bairro, development.cidade].filter(Boolean).join(', ');
+  const entrega = ano ? (futuro ? `Entrega em ${ano}` : development.tipo === 'horizontal' ? `Casas desde ${ano}` : `Entregue em ${ano}`) : null;
+  const c = imagemCartao({ titulo: development.name, sub: [onde, entrega].filter(Boolean).join(' · ') || null, selo: futuro ? 'Lançamento' : 'Condomínio' });
+  return { ...meta, openGraph: { ...meta.openGraph, images: c.images }, twitter: { ...meta.twitter, ...c.twitter } };
 }
 
 export default async function EmpreendimentoPage({ params: { partes } }: { params: { partes: string[] } }) {
