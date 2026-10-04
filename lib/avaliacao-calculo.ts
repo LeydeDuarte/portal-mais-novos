@@ -210,6 +210,7 @@ export function nomeFonte(a: Pick<AmostraAvaliacao, 'origem' | 'portal' | 'url'>
   if (/62imoveis/.test(p)) return '62 Imóveis';
   if (/61imoveis/.test(p)) return '61 Imóveis';
   if (/dfimoveis/.test(p)) return 'DF Imóveis';
+  if (/wimoveis/.test(p)) return 'Wimóveis';
   if (a.portal) return a.portal.replace(/^www\./, '');
   return a.origem === 'manual' ? 'Informado pelo avaliador' : 'Portal';
 }

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import PainelNav from '@/components/PainelNav';
+import AnunciosMercado from '@/components/painel/AnunciosMercado';
 import ImovelCardPainel from '@/components/painel/ImovelCardPainel';
 import LinkPrivadoModal from '@/components/LinkPrivadoModal';
 import { BarraSelecao, BuscaGrande, Chips, marcados, FiltrosAtivos, SecaoFiltro, TituloPainel, Vazio, botaoBarra, botaoBarraSec, campoPainel } from '@/components/painel/ui';
@@ -374,6 +375,8 @@ export default function ImoveisPainelPage() {
                 </span>
               </div>
             )}
+            {/* anúncios de outros anunciantes, com os mesmos filtros (para o atendimento) */}
+            <AnunciosMercado filtros={{ busca: f.condominio || f.busca, tipo: f.tipo, quartos: f.quartos, vagas: f.vagas, areaMin: f.areaMin, areaMax: f.areaMax, precoMin: f.precoMin, precoMax: f.precoMax }} />
           </main>
         </div>
       </div>
