@@ -24,6 +24,8 @@ export type UnidadeTabela = {
   torre?: string;
   /** planilha de revenda: empreendimento/condomínio de cada linha */
   empreendimento?: string;
+  /** valores das parcelas da linha (na ordem do cabeçalho), quando a tabela traz */
+  parcelas?: number[];
   situacao: 'disponivel' | 'vendida' | 'reservada' | 'outra';
 };
 

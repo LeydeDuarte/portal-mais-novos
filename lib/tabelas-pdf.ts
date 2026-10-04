@@ -102,7 +102,14 @@ export function lerLinhaUnidade(linha: string): Omit<UnidadeTabela, 'empreendime
   const s = semAcento(linha).toLowerCase();
   const situacao: UnidadeTabela['situacao'] = /\bvendid/.test(s) ? 'vendida' : /\breservad/.test(s) ? 'reservada' : 'disponivel';
   const area = /^\d{1,2}\.\d{3}$/.test(toks[iArea]) ? Number(toks[iArea].replace('.', '')) : numArea(toks[iArea]);
-  return { unidade, area, valor, situacao, ...(torre ? { torre } : {}) };
+  // valores das parcelas: os valores em reais depois do valor total (sem repetir o total e sem zeros)
+  const parcelas = toks
+    .slice(iValor + 1)
+    .filter((t) => /^\d{1,3}(?:\.\d{3})*,\d{2}$/.test(t))
+    .map(num)
+    .filter((v) => v > 0 && Math.abs(v - valor) > valor * 0.005)
+    .slice(0, 20);
+  return { unidade, area, valor, situacao, ...(torre ? { torre } : {}), ...(parcelas.length ? { parcelas } : {}) };
 }
 
 /** Todas as unidades do PDF (com o empreendimento de cada seção, quando houver títulos). */

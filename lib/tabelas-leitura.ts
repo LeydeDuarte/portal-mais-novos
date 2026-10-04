@@ -4,6 +4,7 @@
 // "Importar PDFs", planilha (xlsx/csv) pelo cabeçalho, ZIP aberto na hora.
 // Descobre o mês de referência e o empreendimento (pelo nome no arquivo, na pasta ou no texto).
 import { lerTabelaGenerica, mesDaTabela } from './tabelas-pdf';
+import { lerPagamento, type PagamentoTabela } from './tabelas-pagamento';
 import { lerPdf } from './pdf-import/extract';
 import { lerTabela, parseMesAno, semAcento, type UnidadeTabela } from './pdf-import/parse';
 
@@ -11,6 +12,8 @@ export type ArquivoTabela = { caminho: string; nome: string; dados: Blob };
 export type TabelaLida = {
   caminho: string;
   unidades: UnidadeTabela[];
+  /** fluxo de pagamento do cabeçalho da tabela (PDF) */
+  pagamento?: PagamentoTabela | null;
   mes: string | null; // AAAA-MM
   texto: string; // começo do arquivo (para achar o nome do empreendimento)
   hash: string;
@@ -110,7 +113,8 @@ export async function lerArquivoTabela(a: ArquivoTabela): Promise<TabelaLida> {
       const antiga = generica.length ? [] : lerTabela(doc);
       const unidades = generica.length >= antiga.length ? generica : antiga;
       const mes = mesDaTabela(a.caminho, texto) ?? parseMesAno(texto) ?? null;
-      return { ...base, unidades, mes, texto, erro: unidades.length ? undefined : 'Não reconheci as linhas de unidade deste PDF.' };
+      const pagamento = unidades === generica ? lerPagamento(doc) : null;
+      return { ...base, unidades, mes, texto, pagamento, erro: unidades.length ? undefined : 'Não reconheci as linhas de unidade deste PDF.' };
     }
     let linhas: unknown[][];
     if (/\.csv$/i.test(a.nome)) {

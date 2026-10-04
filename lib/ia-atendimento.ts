@@ -3,6 +3,7 @@
 // ferramentas: simular financiamento, buscar e enviar imóveis (link rastreado), guardar
 // o que a pessoa procura, marcar corretor e passar para a equipe.
 // Precisa de ANTHROPIC_API_KEY na Vercel (modelo: ANTHROPIC_MODEL, padrão claude-sonnet-5-5).
+import { montarFormaDePagamento, tabelaDeVendas } from './ia-tabela-vendas';
 import crypto from 'crypto';
 import { query } from './db';
 import { lerConfigIA, type ConfigIA } from './crm-config';
@@ -33,6 +34,44 @@ const FERRAMENTAS = [
         banco: { type: 'string', description: 'Nome do banco, quando o cliente informar onde tem conta' }
       },
       required: ['valor_imovel']
+    }
+  },
+  {
+    name: 'tabela_de_vendas',
+    description:
+      'Tabela de vendas mais recente de um empreendimento (lançamento ou na planta): unidades disponíveis por metragem com o valor "a partir de", previsão de entrega e a forma de pagamento da incorporadora. Use quando perguntarem preço, disponibilidade ou condição de pagamento de um empreendimento.',
+    input_schema: {
+      type: 'object',
+      properties: { empreendimento: { type: 'string', description: 'Nome do empreendimento (pode ser parte do nome)' } },
+      required: ['empreendimento']
+    }
+  },
+  {
+    name: 'montar_forma_de_pagamento',
+    description:
+      'Monta a forma de pagamento com os valores de cada parcela, com a conta feita pelo sistema (sempre fecha no valor total). Conforme a tabela: informe empreendimento e valor_total. Personalizada (ex.: a pessoa quer sinal menor ou mais parcelas): informe valor_total e as parcelas (nome, qtd, pct ou valor, inicio); o que faltar para 100% vira o saldo.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        valor_total: { type: 'number', description: 'Valor total da unidade em reais' },
+        empreendimento: { type: 'string', description: 'Para usar a forma de pagamento da tabela do empreendimento' },
+        parcelas: {
+          type: 'array',
+          description: 'Forma personalizada, na ordem',
+          items: {
+            type: 'object',
+            properties: {
+              nome: { type: 'string', description: 'Ex.: Sinal, Mensais, Semestrais, Única, Chaves, Financiamento' },
+              qtd: { type: 'number', description: 'Quantidade de parcelas' },
+              pct: { type: 'number', description: 'Percentual do valor total desse grupo de parcelas' },
+              valor: { type: 'number', description: 'Ou o valor total desse grupo em reais' },
+              inicio: { type: 'string', description: 'Quando começa (ex.: ato, 30 dias, jan/2027)' }
+            }
+          }
+        },
+        nome_saldo: { type: 'string', description: 'Nome do saldo que completa 100% (padrão: Saldo (financiamento ou chaves))' }
+      },
+      required: ['valor_total']
     }
   },
   {
@@ -96,6 +135,8 @@ Sempre que mostrar números de simulação, deixe claro que são informativos, s
 Corretores: se a pessoa disser que é corretor, pedir parceria, comissão, exclusividade, número da unidade ou proprietário, use marcar_como_corretor, explique que parcerias são tratadas direto com a Leyde e use passar_para_atendente. Na dúvida, pergunte com naturalidade se está procurando para ela ou atendendo um cliente.
 
 Passe para a equipe (passar_para_atendente) quando: pedir visita, proposta, negociação de valor, análise de crédito, falar com uma pessoa, reclamação, assunto jurídico ou algo fora do contexto. Ao passar, avise a pessoa que a Leyde ou a equipe vai continuar o atendimento por aqui em breve.
+
+Lançamentos e imóveis na planta: para preço, disponibilidade ou condição de pagamento, use tabela_de_vendas. Para montar o plano de pagamento de uma unidade, use montar_forma_de_pagamento: primeiro conforme a tabela da incorporadora; se a pessoa pedir outra condição (sinal menor, mais parcelas, usar FGTS ou permuta), monte a personalizada, deixe claro que é uma proposta sujeita à aprovação da incorporadora e ofereça passar para a equipe. Nunca faça a conta de cabeça: use sempre a ferramenta.
 
 Guarde o que a pessoa informar (quartos, valor, bairros, banco, FGTS) com guardar_preferencias.
 ${cfg.instrucoesExtras ? `\nInstruções da Leyde:\n${cfg.instrucoesExtras}\n` : ''}`;
@@ -170,6 +211,12 @@ async function executar(contatoId: string, cfg: ConfigIA, nome: string, input: R
     const txt = textoSimulacao(s, chave);
     await query(`insert into crm_atividades (contato_id, tipo, texto, autor_email) values ($1, 'simulacao', $2, 'ia')`, [contatoId, `Simulação de financiamento (IA)\n${txt}`]);
     return txt;
+  }
+  if (nome === 'tabela_de_vendas') return tabelaDeVendas(String(input.empreendimento ?? ''));
+  if (nome === 'montar_forma_de_pagamento') {
+    const r = await montarFormaDePagamento(input);
+    if (r.ok) await query(`insert into crm_atividades (contato_id, tipo, texto, autor_email) values ($1, 'simulacao', $2, 'ia')`, [contatoId, `Forma de pagamento (IA)\n${r.texto}`]);
+    return r.texto;
   }
   if (nome === 'buscar_imoveis') {
     const params: unknown[] = [];

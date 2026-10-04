@@ -3,6 +3,7 @@
 // Painel → Tabelas de preços: sobe tabelas de vendas em massa (PDF, Excel, CSV, ZIP ou pasta),
 // lê no navegador (grátis), confere e grava com o HISTÓRICO (mês de referência de cada uma).
 // O empreendimento recebe só a tabela mais recente.
+import { fluxoEmTexto, type PagamentoTabela } from '@/lib/tabelas-pagamento';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PainelNav from '@/components/PainelNav';
@@ -17,6 +18,7 @@ type Linha = {
   caminho: string;
   hash: string;
   unidades: UnidadeTabela[];
+  pagamento?: PagamentoTabela | null;
   mes: string;
   devId: string | null;
   devNome: string;
@@ -60,6 +62,17 @@ export default function TabelasPage() {
     inputPasta.current?.setAttribute('webkitdirectory', '');
   }, []);
   const opcoes = useMemo(() => nomes.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')), [nomes]);
+  // sair da página com tabelas conferidas e não gravadas: o navegador pergunta antes
+  const naoGravadas = linhas.filter((l) => l.status === 'lida' && !l.repetida && l.unidades.length).length;
+  useEffect(() => {
+    if (!naoGravadas) return;
+    const avisar = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', avisar);
+    return () => window.removeEventListener('beforeunload', avisar);
+  }, [naoGravadas]);
   if (!loaded || !staff) return null;
   const pode = veTudo(staff.role);
 
@@ -80,6 +93,7 @@ export default function TabelasPage() {
         caminho: t.caminho,
         hash: t.hash,
         unidades: t.unidades,
+        pagamento: t.pagamento ?? null,
         mes: t.mes ?? '',
         devId: dev?.id ?? null,
         devNome: dev?.nome ?? '',
@@ -110,16 +124,28 @@ export default function TabelasPage() {
     for (let i = 0; i < prontas.length; i += 20) {
       const lote = prontas.slice(i, i + 20);
       const r = await gravarTabelas(
-        lote.map((l) => ({ tipo, empresaId: tipo === 'revenda' ? empresaId : null, developmentId: tipo === 'revenda' ? null : l.devId, nome: tipo === 'revenda' ? empresas.find((e) => e.id === empresaId)?.nome ?? null : l.devNome || null, mes: l.mes, arquivo: l.caminho, hash: l.hash, unidades: l.unidades.map((u) => ({ ...u, valor: u.valor ?? null, vagas: u.vagas ?? null })) }))
-      ).catch((e) => ({ gravadas: 0, repetidas: 0, aplicadas: 0, erros: [e instanceof Error ? e.message : 'Falhou.'] }));
+        lote.map((l) => ({ tipo, empresaId: tipo === 'revenda' ? empresaId : null, developmentId: tipo === 'revenda' ? null : l.devId, nome: tipo === 'revenda' ? empresas.find((e) => e.id === empresaId)?.nome ?? null : l.devNome || null, mes: l.mes, arquivo: l.caminho, hash: l.hash, pagamento: l.pagamento ?? null, unidades: l.unidades.map((u) => ({ ...u, valor: u.valor ?? null, vagas: u.vagas ?? null })) }))
+      ).catch((e) => ({ gravadas: 0, repetidas: 0, aplicadas: 0, erros: [e instanceof Error ? e.message : 'Falhou.'], porHash: {} as Record<string, string> }));
       g += r.gravadas;
       rep += r.repetidas;
       ap += r.aplicadas;
       erros.push(...r.erros);
-      const feitas = new Set(lote.map((l) => l.chave));
-      setLinhas((l) => l.map((x) => (feitas.has(x.chave) ? { ...x, status: 'gravada' } : x)));
+      const doLote = new Set(lote.map((l) => l.chave));
+      setLinhas((l) =>
+        l.map((x) => {
+          if (!doLote.has(x.chave)) return x;
+          const st = r.porHash[x.hash];
+          if (st === 'gravada') return { ...x, status: 'gravada' };
+          if (st === 'repetida') return { ...x, repetida: true };
+          return { ...x, status: 'erro', erro: st || r.erros[0] || 'Não foi gravada. Tente de novo.' };
+        })
+      );
     }
-    setAviso(`${g} tabela(s) gravada(s) no histórico, ${ap} empreendimento(s) com preço atualizado${rep ? `, ${rep} já existia(m)` : ''}.${erros.length ? ` Avisos: ${erros.slice(0, 3).join(' ')}` : ''}`);
+    setAviso(
+      g
+        ? `Pronto: ${g} tabela(s) gravada(s). ${ap} empreendimento(s) ligado(s) tiveram as unidades disponíveis atualizadas${g > ap ? ` (as demais estão sem empreendimento ou não são a tabela mais recente)` : ''}${rep ? `; ${rep} já tinha(m) sido gravada(s) antes` : ''}.${erros.length ? ` Atenção: ${erros.slice(0, 3).join(' ')}` : ''}`
+        : `Nenhuma tabela foi gravada.${rep ? ` ${rep} já tinha(m) sido gravada(s) antes.` : ''}${erros.length ? ` Motivo: ${erros.slice(0, 3).join(' ')}` : ''}`
+    );
     setGravando(false);
     listarTabelas(100).then(setRecentes).catch(() => {});
   };
@@ -214,6 +240,16 @@ export default function TabelasPage() {
 
         {aviso && <p className="mt-3 rounded-xl bg-[#F3F7FF] px-3 py-2 text-[13px]">{aviso}</p>}
 
+        {prontas.length > 0 && !gravando && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border-2 border-accent bg-[#F3F7FF] px-4 py-3">
+            <span className="text-[14px] font-semibold">
+              {prontas.length} tabela(s) conferida(s). Falta <strong>gravar</strong> para entrarem no sistema.
+            </span>
+            <button type="button" onClick={gravar} className="h-10 rounded-full bg-accent px-5 text-[14px] font-bold text-white">
+              Gravar {prontas.length} tabela(s)
+            </button>
+          </div>
+        )}
         {linhas.length > 0 && (
           <section className="mt-5">
             <div className="flex flex-wrap items-center gap-2">
@@ -257,6 +293,15 @@ export default function TabelasPage() {
                           <span className="block truncate" title={l.caminho}>
                             {l.caminho}
                           </span>
+                          {l.pagamento?.fluxo ? (
+                            <span className="mt-0.5 block text-[11px] leading-snug text-[#13874B]" title={l.pagamento.texto}>
+                              Pagamento: {fluxoEmTexto(l.pagamento.fluxo)}
+                            </span>
+                          ) : l.pagamento?.texto ? (
+                            <span className="mt-0.5 block text-[11px] text-[var(--text-muted)]" title={l.pagamento.texto}>
+                              Forma de pagamento guardada como texto (passe o mouse para ver)
+                            </span>
+                          ) : null}
                         </td>
                         <td className="px-2 py-1.5">
                           {tipo === 'revenda' ? (
@@ -385,14 +430,18 @@ export default function TabelasPage() {
                 type="button"
                 disabled={gravando}
                 onClick={async () => {
+                  if (!recentes?.length) {
+                    setAviso('Ainda não há nenhuma tabela gravada. Suba os arquivos acima e clique em "Gravar" primeiro; este botão só recalcula a partir das tabelas já gravadas.');
+                    return;
+                  }
                   setGravando(true);
                   const n = await recalcularDisponibilidade().catch(() => 0);
                   setGravando(false);
-                  setAviso(`Disponibilidade por metragem atualizada em ${n} empreendimento(s).`);
+                  setAviso(`Unidades disponíveis recalculadas em ${n} empreendimento(s), a partir das tabelas já gravadas.`);
                 }}
                 className="h-9 rounded-full border border-[var(--border)] px-4 text-[12.5px] font-semibold disabled:opacity-40"
               >
-                Atualizar a disponibilidade dos empreendimentos
+                Recalcular as unidades disponíveis (tabelas já gravadas)
               </button>
             )}
           </div>

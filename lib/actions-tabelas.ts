@@ -14,9 +14,9 @@ async function exigirGestorAval() {
 }
 import { veTudo } from './papeis';
 
-export type UnidadeGravar = { unidade: string; area: number; valor?: number | null; vagas?: number | null; garagens?: string | null; escaninho?: string | null; torre?: string | null; empreendimento?: string | null; situacao: string };
+export type UnidadeGravar = { unidade: string; area: number; valor?: number | null; vagas?: number | null; garagens?: string | null; escaninho?: string | null; torre?: string | null; empreendimento?: string | null; parcelas?: number[] | null; situacao: string };
 /** tipo 'lancamento' = tabela de um empreendimento; 'revenda' = estoque de revenda (permutas) de uma incorporadora */
-export type TabelaGravar = { developmentId: string | null; nome: string | null; mes: string; arquivo: string; hash: string; unidades: UnidadeGravar[]; tipo?: 'lancamento' | 'revenda'; empresaId?: string | null };
+export type TabelaGravar = { developmentId: string | null; nome: string | null; mes: string; arquivo: string; hash: string; unidades: UnidadeGravar[]; tipo?: 'lancamento' | 'revenda'; empresaId?: string | null; pagamento?: { texto: string; fluxo: { nome: string; qtd: number; inicio: string | null; pct: number }[] | null } | null };
 
 const chaveNome = (n: string) =>
   String(n ?? '')
@@ -49,12 +49,14 @@ export async function hashesJaGravados(hashes: string[]): Promise<string[]> {
   return r.map((x) => x.hash);
 }
 
-export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: number; repetidas: number; aplicadas: number; erros: string[] }> {
+export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: number; repetidas: number; aplicadas: number; erros: string[]; porHash: Record<string, 'gravada' | 'repetida' | string> }> {
   const eu = await exigirEquipe();
   if (!veTudo(eu.role)) throw new Error('Só admin e analista gravam tabelas de preços.');
   let gravadas = 0;
   let repetidas = 0;
   const erros: string[] = [];
+  // situação de cada arquivo (pelo hash): 'gravada', 'repetida' ou a mensagem de erro
+  const porHash: Record<string, string> = {};
   const devs = new Set<string>();
   const await_nomes = new Map<string, string>();
   if (lote.some((t) => t.tipo === 'revenda')) {
@@ -63,16 +65,19 @@ export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: n
   for (const t of lote.slice(0, 50)) {
     if (!/^\d{4}-\d{2}$/.test(t.mes)) {
       erros.push(`${t.arquivo}: falta o mês de referência.`);
+      porHash[t.hash] = 'falta o mês de referência';
       continue;
     }
     const revenda = t.tipo === 'revenda';
     if (revenda && !(t.empresaId && /^[0-9a-f-]{36}$/i.test(t.empresaId))) {
       erros.push(`${t.arquivo}: escolha a incorporadora do estoque de revenda.`);
+      porHash[t.hash] = 'escolha a incorporadora';
       continue;
     }
     const uns = (t.unidades ?? []).filter((u) => u && Number(u.area) > 0).slice(0, 3000);
     if (!uns.length) {
       erros.push(`${t.arquivo}: nenhuma unidade.`);
+      porHash[t.hash] = 'nenhuma unidade';
       continue;
     }
     const comValor = uns.filter((u) => Number(u.valor) > 0);
@@ -81,8 +86,8 @@ export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: n
     const m2 = base.length ? base.reduce((s, u) => s + Number(u.valor) / Number(u.area), 0) / base.length : null;
     const valores = base.map((u) => Number(u.valor));
     const r = await query<{ id: string }>(
-      `insert into tabelas_precos (development_id, empreendimento_nome, mes_referencia, arquivo, hash, unidades, disponiveis, valor_min, valor_max, m2_medio, criado_por, area_min, area_max, tipo, empresa_id, vgv_disponivel)
-       values ($1, $2, ($3 || '-01')::date, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) on conflict (hash) do nothing returning id`,
+      `insert into tabelas_precos (development_id, empreendimento_nome, mes_referencia, arquivo, hash, unidades, disponiveis, valor_min, valor_max, m2_medio, criado_por, area_min, area_max, tipo, empresa_id, vgv_disponivel, pagamento)
+       values ($1, $2, ($3 || '-01')::date, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb) on conflict (hash) do nothing returning id`,
       [
         revenda ? null : t.developmentId,
         t.nome?.slice(0, 200) ?? null,
@@ -99,16 +104,20 @@ export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: n
         Math.max(...uns.map((u) => Number(u.area))),
         revenda ? 'revenda' : 'lancamento',
         revenda ? t.empresaId : null,
-        disp.reduce((s2, u) => s2 + (Number(u.valor) || 0), 0) || null
+        disp.reduce((s2, u) => s2 + (Number(u.valor) || 0), 0) || null,
+        t.pagamento && (t.pagamento.texto || t.pagamento.fluxo)
+          ? JSON.stringify({ texto: String(t.pagamento.texto ?? '').slice(0, 2000), fluxo: Array.isArray(t.pagamento.fluxo) ? t.pagamento.fluxo.slice(0, 20) : null })
+          : null
       ]
     );
     if (!r[0]) {
       repetidas++;
+      porHash[t.hash] = 'repetida';
       continue;
     }
     await query(
-      `insert into tabelas_precos_unidades (tabela_id, unidade, area, vagas, valor, situacao, garagens, escaninho, torre, empreendimento_nome, development_id)
-       select $1, u, a, v, p, s, g, e, t, en, ed from unnest($2::text[], $3::numeric[], $4::int[], $5::numeric[], $6::text[], $7::text[], $8::text[], $9::text[], $10::text[], $11::text[]) x(u, a, v, p, s, g, e, t, en, ed)`,
+      `insert into tabelas_precos_unidades (tabela_id, unidade, area, vagas, valor, situacao, garagens, escaninho, torre, empreendimento_nome, development_id, parcelas)
+       select $1, u, a, v, p, s, g, e, t, en, ed, pc::jsonb from unnest($2::text[], $3::numeric[], $4::int[], $5::numeric[], $6::text[], $7::text[], $8::text[], $9::text[], $10::text[], $11::text[], $12::text[]) x(u, a, v, p, s, g, e, t, en, ed, pc)`,
       [
         r[0].id,
         uns.map((u) => String(u.unidade).slice(0, 40)),
@@ -120,16 +129,18 @@ export async function gravarTabelas(lote: TabelaGravar[]): Promise<{ gravadas: n
         uns.map((u) => (u.escaninho ? String(u.escaninho).slice(0, 30) : null)),
         uns.map((u) => (u.torre ? String(u.torre).slice(0, 30) : null)),
         uns.map((u) => (u.empreendimento ? String(u.empreendimento).slice(0, 160) : null)),
-        uns.map((u) => (revenda && u.empreendimento ? (await_nomes.get(chaveNome(u.empreendimento)) ?? null) : null))
+        uns.map((u) => (revenda && u.empreendimento ? (await_nomes.get(chaveNome(u.empreendimento)) ?? null) : null)),
+        uns.map((u) => (Array.isArray(u.parcelas) && u.parcelas.length ? JSON.stringify(u.parcelas.filter((v) => Number.isFinite(Number(v))).slice(0, 20).map(Number)) : null))
       ]
     );
     gravadas++;
+    porHash[t.hash] = 'gravada';
     if (t.developmentId && !revenda) devs.add(t.developmentId);
   }
   let aplicadas = 0;
   for (const d of Array.from(devs)) if (await aplicarTabelaMaisRecente(d)) aplicadas++;
   if (gravadas) await atualizarFechamentos().catch(() => {});
-  return { gravadas, repetidas, aplicadas, erros };
+  return { gravadas, repetidas, aplicadas, erros, porHash };
 }
 
 /** O empreendimento recebe a tabela de mês mais recente: preço de cada tipologia = menor
