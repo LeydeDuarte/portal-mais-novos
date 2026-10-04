@@ -176,6 +176,14 @@ export default function TabelasPage() {
             className="mt-4 flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-[var(--border)] p-6 text-center"
           >
             <p className="text-[14px] font-semibold">Arraste aqui PDFs, planilhas (Excel ou CSV) ou ZIPs</p>
+            <p className="max-w-xl text-[12px] text-[var(--text-muted)]">
+              O PDF da incorporadora pode vir como está: a leitura reconhece a unidade, a área privativa e o valor total sozinha. Para ligar sem erro, nomeie o arquivo com o{' '}
+              <strong>nome do empreendimento e o mês</strong> (ex.: &quot;Elements - set 2026.pdf&quot;). Tabela escaneada (foto) não é lida: peça o PDF original ou use o{' '}
+              <a href="/modelos/modelo-tabela-de-precos.csv" download className="font-semibold text-accent underline">
+                modelo padrão de planilha
+              </a>
+              .
+            </p>
             <div className="flex flex-wrap justify-center gap-2">
               <label className="cursor-pointer rounded-full bg-ink px-4 py-2 text-[13px] font-semibold text-white">
                 Escolher arquivos

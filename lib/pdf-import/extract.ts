@@ -57,7 +57,17 @@ export async function lerPdf(
       const tc = await page.getTextContent();
       const items: Item[] = (tc.items as { str?: string; transform?: number[]; width?: number; height?: number }[])
         .filter((i) => typeof i.str === 'string' && i.transform)
-        .map((i) => ({ str: i.str as string, x: i.transform![4], y: i.transform![5], w: i.width ?? 0, h: i.height ?? Math.abs(i.transform![3]) }));
+        .map((i) => {
+          const [ta, tb, , td, te, tf] = i.transform!;
+          // texto GIRADO 90° (tabela "deitada" na página): endireita antes de montar as linhas,
+          // senão cada coluna inteira vira uma linha só
+          if (Math.abs(tb) > Math.abs(ta)) {
+            return tb > 0
+              ? { str: i.str as string, x: tf, y: -te, w: i.width ?? i.height ?? 0, h: Math.abs(tb) } // sobe na página
+              : { str: i.str as string, x: -tf, y: te, w: i.width ?? i.height ?? 0, h: Math.abs(tb) }; // desce na página
+          }
+          return { str: i.str as string, x: te, y: tf, w: i.width ?? 0, h: i.height ?? Math.abs(td) };
+        });
       paginas.push(montarLinhas(items));
       page.cleanup();
       onProgresso?.(p, pdf.numPages);

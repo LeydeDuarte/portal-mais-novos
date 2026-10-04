@@ -3,6 +3,7 @@
 // Leitura de tabelas de vendas NO NAVEGADOR (grátis, sem IA): PDF pelas regras do
 // "Importar PDFs", planilha (xlsx/csv) pelo cabeçalho, ZIP aberto na hora.
 // Descobre o mês de referência e o empreendimento (pelo nome no arquivo, na pasta ou no texto).
+import { lerTabelaGenerica, mesDaTabela } from './tabelas-pdf';
 import { lerPdf } from './pdf-import/extract';
 import { lerTabela, parseMesAno, semAcento, type UnidadeTabela } from './pdf-import/parse';
 
@@ -104,8 +105,11 @@ export async function lerArquivoTabela(a: ArquivoTabela): Promise<TabelaLida> {
     if (/\.pdf$/i.test(a.nome)) {
       const doc = await lerPdf(await a.dados.arrayBuffer(), a.nome);
       const texto = doc.paginas.slice(0, 2).flat().join('\n').slice(0, 4000);
-      const unidades = lerTabela(doc);
-      const mes = parseMesAno(a.nome) ?? parseMesAno(texto) ?? null;
+      // leitura genérica (qualquer incorporadora); a antiga fica de reserva se ler mais
+      const generica = lerTabelaGenerica(doc);
+      const antiga = generica.length ? [] : lerTabela(doc);
+      const unidades = generica.length >= antiga.length ? generica : antiga;
+      const mes = mesDaTabela(a.caminho, texto) ?? parseMesAno(texto) ?? null;
       return { ...base, unidades, mes, texto, erro: unidades.length ? undefined : 'Não reconheci as linhas de unidade deste PDF.' };
     }
     let linhas: unknown[][];
@@ -122,7 +126,7 @@ export async function lerArquivoTabela(a: ArquivoTabela): Promise<TabelaLida> {
       .map((l) => l.join(' '))
       .join('\n');
     const unidades = lerLinhasPlanilha(linhas);
-    const mes = parseMesAno(a.nome) ?? parseMesAno(texto) ?? null;
+    const mes = mesDaTabela(a.caminho, texto) ?? parseMesAno(texto) ?? null;
     return { ...base, unidades, mes, texto, erro: unidades.length ? undefined : 'Não achei as colunas de unidade, área e valor.' };
   } catch (e) {
     return { ...base, unidades: [], mes: null, texto: '', erro: e instanceof Error ? e.message : 'Não foi possível ler.' };
@@ -130,21 +134,36 @@ export async function lerArquivoTabela(a: ArquivoTabela): Promise<TabelaLida> {
 }
 
 /** Empreendimento pelo nome: procura os nomes cadastrados no caminho (pasta + arquivo) e no texto.
- *  Só liga sozinho quando um nome bate sem empate (o mais longo). */
+ *  Vale o nome inteiro ou o COMEÇO do nome quando o resto é sobrenome de marca ("Elements" acha
+ *  "Elements Consciente"; "Maestro" acha "Maestro Residenza"). Só liga sozinho sem empate. */
+const SOBRENOME_MARCA = /^(by|consciente|opus|residenza|residencias|residencia|residence|residences|residencial|home|homes|authentic|club|clube|tower|towers|prime|exclusive|living|house)$/;
 export function acharEmpreendimento(t: TabelaLida, nomes: { id: string; nome: string }[]): { id: string; nome: string } | null {
   const alvo = ` ${norm(`${t.caminho} ${t.texto}`).replace(/[^a-z0-9]+/g, ' ')} `;
+  const noArquivo = ` ${norm(t.caminho).replace(/[^a-z0-9]+/g, ' ')} `;
   const limpar = (n: string) => norm(n).replace(/^(edificio|residencial|condominio)\s+/, '').replace(/[^a-z0-9]+/g, ' ').trim();
   let melhor: { id: string; nome: string; tam: number } | null = null;
   let empate = false;
   for (const n of nomes) {
-    const c = limpar(n.nome);
-    if (c.length < 5) continue;
-    if (alvo.includes(` ${c} `)) {
-      if (!melhor || c.length > melhor.tam) {
-        melhor = { ...n, tam: c.length };
-        empate = false;
-      } else if (c.length === melhor.tam && n.id !== melhor.id) empate = true;
+    const palavras = limpar(n.nome).split(' ').filter(Boolean);
+    if (!palavras.length) continue;
+    // maior começo do nome que aparece no arquivo/texto
+    let k = 0;
+    for (let j = palavras.length; j >= 1; j--) {
+      if (alvo.includes(` ${palavras.slice(0, j).join(' ')} `)) {
+        k = j;
+        break;
+      }
     }
+    if (!k) continue;
+    const achado = palavras.slice(0, k).join(' ');
+    if (achado.length < 4) continue;
+    // nome incompleto: só vale se o que falta é sobrenome de marca E se estiver no nome do arquivo
+    // (no texto do PDF, "Setor Marista" não pode virar "Marista Prime Residence")
+    if (k < palavras.length && (!palavras.slice(k).every((p) => SOBRENOME_MARCA.test(p)) || !noArquivo.includes(` ${achado} `))) continue;
+    if (!melhor || achado.length > melhor.tam) {
+      melhor = { id: n.id, nome: n.nome, tam: achado.length };
+      empate = false;
+    } else if (achado.length === melhor.tam && n.id !== melhor.id) empate = true;
   }
   return melhor && !empate ? { id: melhor.id, nome: melhor.nome } : null;
 }
