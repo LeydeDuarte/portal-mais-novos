@@ -557,10 +557,7 @@ function Avaliar() {
                         />
                       </td>
                       <td className="py-1.5 pr-2">
-                        <span className="block font-semibold">
-                          <SituacaoAmostra situacao={a.situacao} em={a.situacaoEm} />
-                          {a.condominio || a.titulo || 'Imóvel'}
-                        </span>
+                        <span className="block font-semibold">{a.condominio || a.titulo || 'Imóvel'}</span>
                         <span className="text-[11.5px]">
                           {[a.bairro, a.mesmoCondominio ? 'mesmo condomínio' : a.distKm != null ? `${a.distKm.toFixed(1).replace('.', ',')} km` : null].filter(Boolean).join(' · ')}
                           {a.fora === 'repetido' ? ` · repetido: também em ${a.repetidoDe ?? 'outro site'}` : a.fora === 'raio' ? ' · fora do raio' : a.fora === 'metragem' ? ' · fora da margem de metragem' : a.fora === 'idade' ? ' · fora da margem de idade' : a.fora === 'semIdade' ? ' · idade não informada' : a.descartada ? ' · descartada (fora da faixa)' : ''}
@@ -570,6 +567,7 @@ function Avaliar() {
                         <span className="font-semibold" style={{ color: ORIGEM[a.origem].cor }}>
                           {nomeFonte(a)}
                           {a.tambemEm && a.tambemEm.length > 0 && <span className="block text-[11px] font-normal text-[var(--text-muted)]">também em {a.tambemEm.join(', ')}</span>}
+                          <SituacaoAmostra situacao={a.situacao} em={a.situacaoEm} />
                         </span>
                         {a.url && (
                           <a href={a.url} target="_blank" rel="noopener noreferrer nofollow" className="block text-[11.5px] text-accent hover:underline">

@@ -15,7 +15,7 @@ const csp = [
   // 'unsafe-inline' é exigido pelo Next (scripts de hidratação); 'wasm-unsafe-eval' para o leitor de PDF/OCR do painel
   "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://accounts.google.com https://cdn.jsdelivr.net https://*.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://tagassistant.google.com https://connect.facebook.net https://analytics.tiktok.com https://*.tiktok.com https://*.tiktokw.us",
   "worker-src 'self' blob: https://cdn.jsdelivr.net",
-  "connect-src 'self' https:",
+  "connect-src 'self' https: data: blob:", // data:/blob: = módulos internos da geração de PDF no navegador
   'frame-src https://www.youtube.com https://www.youtube-nocookie.com https://www.instagram.com https://www.tiktok.com https://player.vimeo.com https://accounts.google.com https://www.googletagmanager.com https://tagassistant.google.com',
   'upgrade-insecure-requests'
 ].join('; ');

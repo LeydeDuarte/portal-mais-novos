@@ -41,6 +41,7 @@ export default function RelatorioAvaliacao() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const [a, setA] = useState<AvaliacaoInterna | null | undefined>(undefined);
+  const [gerando, setGerando] = useState(false);
   useEffect(() => {
     if (loaded && !staff) router.replace('/dashboard/login');
   }, [loaded, staff, router]);
@@ -75,8 +76,41 @@ export default function RelatorioAvaliacao() {
             <Link href={`/dashboard/avaliacoes/nova?id=${a.id}`} className="h-10 rounded-full border border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 text-[13px] font-semibold">
               Editar amostras
             </Link>
-            <button type="button" onClick={() => imprimirProposta(`Avaliação - ${local} - ${i.area} m2`)} className="h-10 rounded-full bg-accent px-5 text-[13px] font-semibold text-white">
-              Baixar PDF
+            <button
+              type="button"
+              disabled={gerando}
+              onClick={async () => {
+                // PDF montado direto (links de verdade, igual no computador e no celular)
+                setGerando(true);
+                try {
+                  const { gerarPdfAvaliacao } = await import('@/lib/pdf/RelatorioAvaliacaoPdf');
+                  const blob = await gerarPdfAvaliacao(a);
+                  const url = URL.createObjectURL(blob);
+                  const nome = `Avaliação - ${local} - ${String(i.area).replace('.', ',')} m2.pdf`;
+                  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                  if (ios) window.open(url, '_blank');
+                  else {
+                    const el = document.createElement('a');
+                    el.href = url;
+                    el.download = nome;
+                    document.body.appendChild(el);
+                    el.click();
+                    el.remove();
+                  }
+                  setTimeout(() => URL.revokeObjectURL(url), 60000);
+                } catch (err) {
+                  console.error(err);
+                  window.alert('Não foi possível gerar o PDF agora. Tente "Imprimir" como alternativa.');
+                } finally {
+                  setGerando(false);
+                }
+              }}
+              className="h-10 rounded-full bg-accent px-5 text-[13px] font-semibold text-white disabled:opacity-60"
+            >
+              {gerando ? 'Gerando PDF…' : 'Baixar PDF'}
+            </button>
+            <button type="button" onClick={() => imprimirProposta(`Avaliação - ${local} - ${i.area} m2`)} className="h-10 rounded-full border border-[var(--border)] bg-[var(--bg)] px-4 text-[13px] font-semibold">
+              Imprimir
             </button>
             <button
               type="button"
@@ -148,7 +182,7 @@ export default function RelatorioAvaliacao() {
               </span>
               Amostras utilizadas ({usadas.length})
             </h3>
-            <p className="mb-1 text-[11px] text-[#5f6368] print:text-[8.5px]">Os dados de cada amostra são os do anúncio na data indicada. Anúncios podem ser alterados ou retirados do ar pelos anunciantes depois dessa data; nesse caso, o link deixa de abrir, mas o registro do dado permanece válido para esta avaliação. As etiquetas VENDIDO e EXCLUÍDO indicam, quando conhecido, que o imóvel foi vendido ou o anúncio saiu do ar, com a data.</p>
+            <p className="mb-1 text-[11px] text-[#5f6368] print:text-[8.5px]">Os dados de cada amostra são os do anúncio na data indicada. Anúncios podem ser alterados ou retirados do ar pelos anunciantes depois dessa data; nesse caso, o link deixa de abrir, mas o registro do dado permanece válido para esta avaliação. Quando conhecido, a indicação &quot;vendido em&quot; ou &quot;excluído em&quot;, embaixo da fonte, mostra que o imóvel foi vendido ou o anúncio saiu do ar, e a data.</p>
             <table className="w-full text-[11.5px] print:text-[9px]">
               <thead className="print:table-header-group">
                 <tr className="text-left text-[10.5px] text-[#5f6368] print:text-[8.5px]">
@@ -170,7 +204,6 @@ export default function RelatorioAvaliacao() {
                   return (
                     <tr key={x.id} className="break-inside-avoid border-t border-[#e6e8eb] align-top">
                       <td className="py-1 pr-2">
-                        <SituacaoAmostra situacao={x.situacao} em={x.situacaoEm} pdf />
                         <strong>{x.condominio || x.titulo || 'Imóvel'}</strong>
                         {x.bairro ? `, ${x.bairro}` : ''}
                       </td>
@@ -179,6 +212,7 @@ export default function RelatorioAvaliacao() {
                           {nomeFonte(x)}
                         </span>
                         {x.tambemEm && x.tambemEm.length > 0 && <span className="block text-[9.5px] text-[#5f6368] print:text-[7.5px]">também em {x.tambemEm.join(', ')}</span>}
+                        <SituacaoAmostra situacao={x.situacao} em={x.situacaoEm} pdf />
                         {link && (
                           <a href={link} target="_blank" rel="noopener noreferrer" className="text-[10px] text-[#1B5FCC] underline print:text-[8px]">
                             ver anúncio
